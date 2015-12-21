@@ -1,0 +1,9 @@
+{
+  "staging": {
+    "api_key": "your ckan api key",
+    "root_url": "example: https://stage.wprdc.org/",
+    "organizations": {
+      "Name": "ckan-generated hash"
+    }
+  }
+}
