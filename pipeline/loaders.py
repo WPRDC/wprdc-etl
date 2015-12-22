@@ -2,24 +2,36 @@ import requests
 import json
 import datetime
 
+class InvalidConfigException(Exception):
+    pass
 
 class Datapusher(object):
     """Connection to ckan datastore"""
 
     def __init__(self, server="staging", settings_file='../settings.json'):
-        raw_config = json.load(open(settings_file))
-        self.config = raw_config[server]
+        try:
+            raw_config = json.load(open(settings_file))
+            self.config = raw_config[server]
+        except (KeyError, IOError):
+            raise InvalidConfigException(
+                'No config file found, or config not properly formatted'
+            )
 
         self.ckan_url = self.config['root_url'].rstrip('/') + '/api/3/'
         self.dump_url = self.config['root_url'].rstrip('/') + '/datastore/dump/'
         self.key = self.config['api_key']
 
-    def resource_exists(self, packageid, resource_name):
+    def resource_exists(self, package_id, resource_name):
         """
         Searches for resource on ckan instance
-        :param packageid: id of resources parent dataset
-        :param resource_name:  resources name
-        :return: true if found false otherwise
+
+        Params:
+            package_id: id of resources parent dataset
+            resource_name: name of the resource
+
+        Returns:
+            ``True`` if the resource is found within the package,
+            ``False`` otherwise
         """
 
         check_resource = requests.post(
@@ -29,23 +41,24 @@ class Datapusher(object):
                 'authorization': self.key
             },
             data=json.dumps({
-                'id': packageid
+                'id': package_id
             })
         )
-        import pdb; pdb.set_trace()
-        check = json.loads(check_resource.content)
 
-        # Check if this month's resource already exists
-        return resource_name in [i['name'] for i in check['result']['resources']]
+        response = check_resource.json()
+        return resource_name in set(i['name'] for i in response['result']['resources'])
 
-
-    def create_resource(self, packageid, resource_name):
-        """
+    def create_resource(self, package_id, resource_name):
+        '''
         Creates new resource in ckan instance
-        :param packageid: dataset under which to add new resource
-        :param resource_name: name of new resource
-        :return: id of newly created resource if successful
-        """
+
+        Params:
+            package_id: dataset under which to add new resource
+            resource_name: name of new resource
+
+        Returns:
+            id of newly created resource if successful, None otherwise
+        '''
 
         # Make api call
         create_resource = requests.post(
@@ -55,7 +68,7 @@ class Datapusher(object):
                 'authorization': self.key
             },
             data=json.dumps({
-                'package_id': packageid,
+                'package_id': package_id,
                 'url': '#',
                 'name': resource_name,
                 'url_type': 'datapusher',
@@ -63,50 +76,64 @@ class Datapusher(object):
             })
         )
 
-        resource = json.loads(create_resource.text)
+        resource = create_resource.json()
 
-        if not resource['success']:
+        if not resource.get('success', False):
             print("ERROR: " + resource['error']['name'][0])
             return
 
-        print("SUCCESS: Resource #" + resource['result']['id'] + ' was created.')
+        print("SUCCESS: Resource #" + str(resource['result']['id']) + ' was created.')
         return resource['result']['id']
 
-    def create_datastore(self, resource, fields):
+    def create_datastore(self, resource_id, fields):
         """
         Creates new datastore for specified resource
-        :param resource: resource id fo which new datastore is being made
-        :param fields: header fields for csv file
-        :return: resource id if successful
+
+        Params:
+            resource_id: resource id for which new datastore is being made
+            fields: header fields for csv file
+
+        Returns:
+            resource_id for the new datastore if successful
         """
 
         # Make API call
-        datastore_creation = requests.post(
+        create_datastore = requests.post(
             self.ckan_url + 'action/datastore_create',
             headers={
                 'content-type': 'application/json',
                 'authorization': self.key
             },
             data=json.dumps({
-                'resource_id': resource,
+                'resource_id': resource_id,
                 'force': True,
                 'fields': fields
             })
         )
 
-        datastore = json.loads(datastore_creation.text)
+        create_datastore = create_datastore.json()
 
-        if not datastore['success']:
-            print("ERROR: " + datastore['error']['name'][0])
+        if not create_datastore.get('success', False):
+            print("ERROR: " + create_datastore['error']['name'][0])
             return
-        print("SUCCESS: Datastore #" + datastore['result']['resource_id'] + ' was created.')
-        return datastore['result']['resource_id']
 
-    def delete_datastore(self, resource):
+        print(
+            'SUCCESS: Datastore #{} was created.'.format(
+                create_datastore['result']['resource_id']
+            )
+        )
+
+        return create_datastore['result']['resource_id']
+
+    def delete_datastore(self, resource_id):
         """
         Deletes datastore table for resource
-        :param resource: resource to remove table from
-        :return: request status
+
+        Params:
+            resource: resource_id to remove table from
+
+        Returns:
+            Status code from the request
         """
         delete = requests.post(
             self.ckan_url + 'action/datastore_delete',
@@ -115,18 +142,22 @@ class Datapusher(object):
                 'authorization': self.key
             },
             data=json.dumps({
-                'resource_id': resource,
+                'resource_id': resource_id,
                 'force': True
             })
         )
         return delete.status_code
 
-    def upsert(self, resource, data):
+    def upsert(self, resource_id, data):
         """
         Upsert data into datastore
-        :param resource: resource to which data will be inserted
-        :param data: data to be upserted
-        :return: request status
+
+        Params:
+            resource_id: resource_id to which data will be inserted
+            data: data to be upserted
+
+        Returns:
+            request status
         """
         insert = requests.post(
             self.ckan_url + 'action/datastore_upsert',
@@ -135,7 +166,7 @@ class Datapusher(object):
                 'authorization': self.key
             },
             data=json.dumps({
-                'resource_id': resource,
+                'resource_id': resource_id,
                 'method': 'insert',
                 'force': True,
                 'records': data
@@ -143,11 +174,15 @@ class Datapusher(object):
         )
         return insert.status_code
 
-    def update_meta_data(self, resource):
+    def update_metadata(self, resource_id):
         """
         TODO: Make this versatile
-        :param resource: resource whose metadata willbe modified
-        :return: request status
+
+        Params:
+            resource_id: resource whose metadata willbe modified
+
+        Returns:
+            request status
         """
         update = requests.post(
             self.ckan_url + 'action/resource_patch',
@@ -156,31 +191,10 @@ class Datapusher(object):
                 'authorization': self.key
             },
             data=json.dumps({
-                'id': resource,
-                'url': self.dump_url + resource,
+                'id': resource_id,
+                'url': self.dump_url + str(resource_id),
                 'url_type': 'datapusher',
                 'last_modified': datetime.datetime.now().isoformat(),
             })
         )
         return update.status_code
-
-    def resource_search(self, name):
-        """
-
-        :param name:
-        :return:
-        """
-        search = requests.post(
-            self.ckan_url + 'action/datastore_search',
-            headers={
-                'content-type': 'application/json',
-                'authorization':self.key
-            },
-            data=json.dumps({
-                "resource_id": name,
-                "plain": False
-            })
-        )
-
-        return search
-
