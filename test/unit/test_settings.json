@@ -1,7 +1,7 @@
 {
   "testing": {
     "api_key": "FUN FUN FUN",
-    "root_url": "localhost:9000",
+    "root_url": "localhost:9000/",
     "organizations": {}
   }
 }

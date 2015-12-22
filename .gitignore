@@ -3,3 +3,4 @@
 env
 settings.json
 .idea
+__pycache__
