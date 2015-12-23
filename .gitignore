@@ -2,5 +2,6 @@
 *.pyc
 env
 settings.json
+/test.json
 .idea
 __pycache__
