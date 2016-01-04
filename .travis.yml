@@ -3,4 +3,9 @@ python:
   - "3.5"
 install:
   - pip install -r requirements.txt
+before_script:
+  - cp settings.json.example settings.json
 script: nosetests -sv
+branches:
+  only:
+    - master

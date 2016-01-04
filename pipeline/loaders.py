@@ -1,23 +1,35 @@
+import os
 import requests
 import json
 import datetime
 
+HERE = os.path.abspath(os.path.dirname(__file__))
+PARENT = os.path.join(HERE, '..')
 
 class InvalidConfigException(Exception):
     pass
 
+class Loader(object):
+    def load(self, data):
+        raise NotImplementedError
 
-class Datapusher(object):
+class Datapusher(Loader):
     """Connection to ckan datastore"""
-
-    def __init__(self, server="staging", settings_file='../settings.json'):
+    def __init__(self, server="staging", settings_file=None):
+        f = None
+        settings_file = settings_file if settings_file else \
+            os.path.join(PARENT, 'settings.json')
         try:
-            raw_config = json.load(open(settings_file))
+            f = open(settings_file, 'r')
+            raw_config = json.loads(f.read())
             self.config = raw_config[server]
         except (KeyError, IOError):
             raise InvalidConfigException(
-                    'No config file found, or config not properly formatted'
+                'No config file found, or config not properly formatted'
             )
+        finally:
+            if f:
+                f.close()
 
         self.ckan_url = self.config['root_url'].rstrip('/') + '/api/3/'
         self.dump_url = self.config['root_url'].rstrip('/') + '/datastore/dump/'
@@ -37,14 +49,14 @@ class Datapusher(object):
         """
 
         check_resource = requests.post(
-                self.ckan_url + 'action/package_show',
-                headers={
-                    'content-type': 'application/json',
-                    'authorization': self.key
-                },
-                data=json.dumps({
-                    'id': package_id
-                })
+            self.ckan_url + 'action/package_show',
+            headers={
+                'content-type': 'application/json',
+                'authorization': self.key
+            },
+            data=json.dumps({
+                'id': package_id
+            })
         )
 
         response = check_resource.json()
@@ -64,18 +76,18 @@ class Datapusher(object):
 
         # Make api call
         create_resource = requests.post(
-                self.ckan_url + 'action/resource_create',
-                headers={
-                    'content-type': 'application/json',
-                    'authorization': self.key
-                },
-                data=json.dumps({
-                    'package_id': package_id,
-                    'url': '#',
-                    'name': resource_name,
-                    'url_type': 'datapusher',
-                    'format': 'CSV'
-                })
+            self.ckan_url + 'action/resource_create',
+            headers={
+                'content-type': 'application/json',
+                'authorization': self.key
+            },
+            data=json.dumps({
+                'package_id': package_id,
+                'url': '#',
+                'name': resource_name,
+                'url_type': 'datapusher',
+                'format': 'CSV'
+            })
         )
 
         resource = create_resource.json()
@@ -101,16 +113,16 @@ class Datapusher(object):
 
         # Make API call
         create_datastore = requests.post(
-                self.ckan_url + 'action/datastore_create',
-                headers={
-                    'content-type': 'application/json',
-                    'authorization': self.key
-                },
-                data=json.dumps({
-                    'resource_id': resource_id,
-                    'force': True,
-                    'fields': fields
-                })
+            self.ckan_url + 'action/datastore_create',
+            headers={
+                'content-type': 'application/json',
+                'authorization': self.key
+            },
+            data=json.dumps({
+                'resource_id': resource_id,
+                'force': True,
+                'fields': fields
+            })
         )
 
         create_datastore = create_datastore.json()
@@ -120,9 +132,9 @@ class Datapusher(object):
             return
 
         print(
-                'SUCCESS: Datastore #{} was created.'.format(
-                        create_datastore['result']['resource_id']
-                )
+            'SUCCESS: Datastore #{} was created.'.format(
+                create_datastore['result']['resource_id']
+            )
         )
 
         return create_datastore['result']['resource_id']
@@ -138,15 +150,15 @@ class Datapusher(object):
             Status code from the request
         """
         delete = requests.post(
-                self.ckan_url + 'action/datastore_delete',
-                headers={
-                    'content-type': 'application/json',
-                    'authorization': self.key
-                },
-                data=json.dumps({
-                    'resource_id': resource_id,
-                    'force': True
-                })
+            self.ckan_url + 'action/datastore_delete',
+            headers={
+                'content-type': 'application/json',
+                'authorization': self.key
+            },
+            data=json.dumps({
+                'resource_id': resource_id,
+                'force': True
+            })
         )
         return delete.status_code
 
@@ -162,17 +174,17 @@ class Datapusher(object):
             request status
         """
         insert = requests.post(
-                self.ckan_url + 'action/datastore_upsert',
-                headers={
-                    'content-type': 'application/json',
-                    'authorization': self.key
-                },
-                data=json.dumps({
-                    'resource_id': resource_id,
-                    'method': 'insert',
-                    'force': True,
-                    'records': data
-                })
+            self.ckan_url + 'action/datastore_upsert',
+            headers={
+                'content-type': 'application/json',
+                'authorization': self.key
+            },
+            data=json.dumps({
+                'resource_id': resource_id,
+                'method': 'insert',
+                'force': True,
+                'records': data
+            })
         )
         return insert.status_code
 
@@ -187,31 +199,19 @@ class Datapusher(object):
             request status
         """
         update = requests.post(
-                self.ckan_url + 'action/resource_patch',
-                headers={
-                    'content-type': 'application/json',
-                    'authorization': self.key
-                },
-                data=json.dumps({
-                    'id': resource_id,
-                    'url': self.dump_url + str(resource_id),
-                    'url_type': 'datapusher',
-                    'last_modified': datetime.datetime.now().isoformat(),
-                })
+            self.ckan_url + 'action/resource_patch',
+            headers={
+                'content-type': 'application/json',
+                'authorization': self.key
+            },
+            data=json.dumps({
+                'id': resource_id,
+                'url': self.dump_url + str(resource_id),
+                'url_type': 'datapusher',
+                'last_modified': datetime.datetime.now().isoformat(),
+            })
         )
         return update.status_code
 
-    def get_metadata(self, resource_id):
-        """
-        Uses ckan.logic.action.get
-
-            Params:
-                resource_id resource whose metadata will be retrieved
-            Returns:
-                dict containing resource metadata
-        """
-        metadata = requests.get(
-                self.ckan_url + 'action/resource_show',
-                {'id': resource_id}
-        )
-        return metadata['data']
+    def load(self, data):
+        pass
