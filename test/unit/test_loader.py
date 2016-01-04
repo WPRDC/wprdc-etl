@@ -3,29 +3,23 @@ import os
 
 from unittest.mock import Mock, patch, PropertyMock
 
-from pipeline.loaders import Datapusher, InvalidConfigException
+from pipeline.loaders import Datapusher
+from pipeline.pipelines import Pipeline
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 class TestDatapusher(unittest.TestCase):
     def setUp(self):
-        super(TestDatapusher, self).setUp()
-        self.data_pusher = Datapusher(
+        pipeline = Pipeline(
             server='testing',
             settings_file=os.path.join(HERE, 'test_settings.json')
         )
+        self.data_pusher = Datapusher(pipeline.get_config())
 
     def test_datapusher_init(self):
         self.assertIsNotNone(self.data_pusher)
         self.assertEquals(self.data_pusher.ckan_url, 'localhost:9000/api/3/')
         self.assertEquals(self.data_pusher.dump_url, 'localhost:9000/datastore/dump/')
-
-    def test_datapusher_exception_no_settings(self):
-        with self.assertRaises(InvalidConfigException):
-            Datapusher(
-                server='Does not exist',
-                settings_file=os.path.join(HERE, 'test_settings.json')
-            )
 
     @patch('requests.post')
     def test_resource_exists(self, post):
