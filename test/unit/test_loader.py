@@ -1,6 +1,5 @@
 import unittest
 import os
-import json
 
 from unittest.mock import Mock, patch, PropertyMock
 
@@ -22,8 +21,6 @@ class TestDatapusher(unittest.TestCase):
         self.assertEquals(self.data_pusher.dump_url, 'localhost:9000/datastore/dump/')
 
     def test_datapusher_exception_no_settings(self):
-        with self.assertRaises(InvalidConfigException):
-            Datapusher()
         with self.assertRaises(InvalidConfigException):
             Datapusher(
                 server='Does not exist',
