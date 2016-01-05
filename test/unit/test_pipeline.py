@@ -8,8 +8,9 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 class TestPipeline(unittest.TestCase):
     def setUp(self):
         self.pipeline = pl.Pipeline(
-            server='testing',
-            settings_file=os.path.join(HERE, 'test_settings.json')
+            'test', 'Test', server='testing',
+            settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+            log_status=False
         )
 
     def test_get_config(self):
@@ -20,8 +21,7 @@ class TestPipeline(unittest.TestCase):
 
     def test_reset_config(self):
         self.pipeline.set_config_from_file(
-            'second_testing',
-            os.path.join(HERE, 'test_settings.json')
+            'second_testing', os.path.join(HERE, '../mock/test_settings.json')
         )
         config = self.pipeline.get_config()
         self.assertEquals(config['api_key'], 'EVEN MORE FUN',)
@@ -31,28 +31,28 @@ class TestPipeline(unittest.TestCase):
     def test_invalid_config(self):
         with self.assertRaises(pl.InvalidConfigException):
             pl.Pipeline(
-                server='NO SERVER',
+                'test', 'Test', server='NO SERVER',
                 settings_file=os.path.join(HERE, 'test_settings.json')
             )
 
     def test_no_config(self):
         with self.assertRaises(pl.InvalidConfigException):
             pl.Pipeline(
-                server='NO SERVER',
+                'test', 'Test', server='NO SERVER',
                 settings_file=os.path.join(HERE, 'NOT-A-VALID-PATH')
             )
 
     def test_misconfigured_pipeline(self):
         with self.assertRaises(RuntimeError):
-            pl.Pipeline().run(None)
+            pl.Pipeline('test', 'Test').run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline().extract(pl.FileExtractor).run(None)
+            pl.Pipeline('test', 'Test').extract(pl.FileExtractor).run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline().extract(pl.FileExtractor).run(None)
+            pl.Pipeline('test', 'Test').extract(pl.FileExtractor).run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline().extract(pl.FileExtractor).schema(pl.BaseSchema).run(None)
+            pl.Pipeline('test', 'Test').extract(pl.FileExtractor).schema(pl.BaseSchema).run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline().schema(pl.BaseSchema).load(pl.Datapusher).run(None)
+            pl.Pipeline('test', 'Test').schema(pl.BaseSchema).load(pl.Datapusher).run(None)
 
     def test_extractor_args(self):
         self.pipeline.extract(pl.FileExtractor, 1, firstline_headers=False)

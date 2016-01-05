@@ -11,8 +11,9 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 class TestDatapusher(unittest.TestCase):
     def setUp(self):
         pipeline = Pipeline(
-            server='testing',
-            settings_file=os.path.join(HERE, 'test_settings.json')
+            'test', 'Test', server='testing',
+            settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+            log_status=False
         )
         self.data_pusher = Datapusher(pipeline.get_config())
 

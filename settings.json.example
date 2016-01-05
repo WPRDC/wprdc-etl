@@ -4,6 +4,7 @@
     "root_url": "example: https://stage.wprdc.org/",
     "organizations": {
       "Name": "ckan-generated hash"
-    }
+    },
+    "statusdb": "/path/to/sqlitedb.db"
   }
 }
