@@ -5,3 +5,4 @@ settings.json
 /test.json
 .idea
 __pycache__
+.coverage

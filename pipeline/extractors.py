@@ -1,3 +1,5 @@
+from .exceptions import IsHeaderException
+
 class Extractor(object):
     def __init__(self, target, *args, **kwargs):
         self.target = target
@@ -17,18 +19,15 @@ class Extractor(object):
         '''
         raise NotImplementedError
 
-    def get_headers(self):
-        '''Gets the column names or headers. Required for serialization
+    def set_headers(self):
+        '''Sets the column names or headers. Required for serialization
         '''
         raise NotImplementedError
 
 class FileExtractor(Extractor):
-    def __init__(self, target):
-        self.target = target
-
     def extract(self):
         try:
-            f = open(self.target)
+            f = open(self.target, 'r')
             return f
         except IOError as e:
             raise e
@@ -42,7 +41,7 @@ class FileExtractor(Extractor):
 class CSVExtractor(FileExtractor):
     def __init__(self, target, *args, **kwargs):
         super(CSVExtractor, self).__init__(target)
-        self.firstline = kwargs.get('firstline', True)
+        self.firstline_headers = kwargs.get('firstline_headers', True)
         self.headers = kwargs.get('headers', None)
 
         self.set_headers()
@@ -50,11 +49,15 @@ class CSVExtractor(FileExtractor):
     def handle_line(self, line):
         parsed = line.strip('\n').strip('\r\n').split(',')
         if parsed == self.headers:
-            return None
+            raise IsHeaderException('Headers found in data!')
         return dict(zip(self.schema_headers, parsed))
 
-    def set_headers(self):
-        if self.firstline:
+    def set_headers(self, headers=None):
+        if headers:
+            self.headers = headers
+            self.schema_headers = self.headers
+            return
+        elif self.firstline_headers:
             with open(self.target) as f:
                 self.headers = f.readline().strip('\n').strip('\r\n').split(',')
                 self.schema_headers = [
@@ -63,11 +66,7 @@ class CSVExtractor(FileExtractor):
                 ]
                 return
         else:
-            if self.headers:
-                self.schema_headers = self.headers
-                return
-
-        raise RuntimeError('No headers were passed or detected.')
+            raise RuntimeError('No headers were passed or detected.')
 
 class SFTPExtractor(Extractor):
     pass
