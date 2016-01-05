@@ -3,5 +3,10 @@
     "api_key": "FUN FUN FUN",
     "root_url": "localhost:9000/",
     "organizations": {}
+  },
+  "second_testing": {
+    "api_key": "EVEN MORE FUN",
+    "root_url": "localhost:9001/",
+    "organizations": {}
   }
 }

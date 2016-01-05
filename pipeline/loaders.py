@@ -1,13 +1,6 @@
-import os
 import requests
 import json
 import datetime
-
-HERE = os.path.abspath(os.path.dirname(__file__))
-PARENT = os.path.join(HERE, '..')
-
-class InvalidConfigException(Exception):
-    pass
 
 class Loader(object):
     def load(self, data):
@@ -15,22 +8,8 @@ class Loader(object):
 
 class Datapusher(Loader):
     """Connection to ckan datastore"""
-    def __init__(self, server="staging", settings_file=None):
-        f = None
-        settings_file = settings_file if settings_file else \
-            os.path.join(PARENT, 'settings.json')
-        try:
-            f = open(settings_file, 'r')
-            raw_config = json.loads(f.read())
-            self.config = raw_config[server]
-        except (KeyError, IOError):
-            raise InvalidConfigException(
-                'No config file found, or config not properly formatted'
-            )
-        finally:
-            if f:
-                f.close()
-
+    def __init__(self, config):
+        self.config = config
         self.ckan_url = self.config['root_url'].rstrip('/') + '/api/3/'
         self.dump_url = self.config['root_url'].rstrip('/') + '/datastore/dump/'
         self.key = self.config['api_key']
