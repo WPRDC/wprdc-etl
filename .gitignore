@@ -6,4 +6,3 @@ settings.json
 .idea
 __pycache__
 .coverage
-/test.db
