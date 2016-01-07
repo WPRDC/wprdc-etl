@@ -15,7 +15,7 @@ class TestODPipeline(TestBase):
         ) \
             .extract(pl.CSVExtractor, firstline_headers=True) \
             .schema(FatalODSchema) \
-            .load(pl.Datapusher) \
+            .load(self.Loader) \
             .run(os.path.join(HERE, '../mock/fatal_od_mock.csv'))
         status = self.cur.execute('select * from status').fetchall()
         self.assertEquals(len(status), 1)

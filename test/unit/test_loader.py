@@ -74,3 +74,6 @@ class TestDatapusher(unittest.TestCase):
     def test_update_metadata(self, post):
         type(post.return_value).status_code = PropertyMock(return_value=200)
         self.assertEquals(self.data_pusher.update_metadata(None), 200)
+
+    def test_loader(self):
+        self.assertTrue(self.data_pusher.load([]))
