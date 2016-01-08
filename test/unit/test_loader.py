@@ -11,8 +11,9 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 class TestDatapusher(unittest.TestCase):
     def setUp(self):
         pipeline = Pipeline(
-            server='testing',
-            settings_file=os.path.join(HERE, 'test_settings.json')
+            'test', 'Test', server='testing',
+            settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+            log_status=False
         )
         self.data_pusher = Datapusher(pipeline.get_config())
 
@@ -73,3 +74,6 @@ class TestDatapusher(unittest.TestCase):
     def test_update_metadata(self, post):
         type(post.return_value).status_code = PropertyMock(return_value=200)
         self.assertEquals(self.data_pusher.update_metadata(None), 200)
+
+    def test_loader(self):
+        self.assertTrue(self.data_pusher.load([]))

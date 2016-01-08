@@ -3,13 +3,16 @@ import json
 import datetime
 
 class Loader(object):
+    def __init__(self, config, *args, **kwargs):
+        self.config = config
+
     def load(self, data):
         raise NotImplementedError
 
 class Datapusher(Loader):
     """Connection to ckan datastore"""
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, config, *args, **kwargs):
+        super(Datapusher, self).__init__(config, *args, **kwargs)
         self.ckan_url = self.config['root_url'].rstrip('/') + '/api/3/'
         self.dump_url = self.config['root_url'].rstrip('/') + '/datastore/dump/'
         self.key = self.config['api_key']
@@ -193,4 +196,4 @@ class Datapusher(Loader):
         return update.status_code
 
     def load(self, data):
-        pass
+        return True

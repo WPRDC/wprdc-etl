@@ -29,11 +29,13 @@ class TestFileExtractor(unittest.TestCase):
 class TestCSVExtractor(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(HERE, '../mock/simple_mock.csv')
+        self.tsv_path = os.path.join(HERE, '../mock/simple_tsv_mock.tsv')
         self.extractor = pl.CSVExtractor(self.path)
 
     def test_initialization(self):
         self.assertListEqual(self.extractor.headers, ['One', 'Two words'])
         self.assertListEqual(self.extractor.schema_headers, ['one', 'two_words'])
+        self.assertEquals(self.extractor.delimiter, ',')
 
     def test_headers_change(self):
         self.assertListEqual(self.extractor.schema_headers, ['one', 'two_words'])
@@ -55,3 +57,17 @@ class TestCSVExtractor(unittest.TestCase):
             {'one': '1', 'two_words': '2'}
         )
         self.extractor.cleanup(f)
+
+    def test_extract_custom_delimiter(self):
+        extractor = pl.CSVExtractor(self.tsv_path, delimiter='\t')
+        self.assertEquals(extractor.delimiter, '\t')
+        f = extractor.extract()
+
+        with self.assertRaises(pl.IsHeaderException):
+            extractor.handle_line(f.readline()),
+
+        self.assertEquals(
+            extractor.handle_line(f.readline()),
+            {'one': '10', 'two_words': '20'}
+        )
+        extractor.cleanup(f)

@@ -4,8 +4,8 @@ python:
 install:
   - pip install -r requirements.txt
 before_script:
-  - cp settings.json.example settings.json
-script: nosetests -sv
+  - cp settings.example.json settings.json
+script: nosetests -v
 branches:
   only:
     - master

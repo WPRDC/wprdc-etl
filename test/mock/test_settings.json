@@ -2,11 +2,13 @@
   "testing": {
     "api_key": "FUN FUN FUN",
     "root_url": "localhost:9000/",
-    "organizations": {}
+    "organizations": {},
+    "statusdb": ":memory:"
   },
   "second_testing": {
     "api_key": "EVEN MORE FUN",
     "root_url": "localhost:9001/",
-    "organizations": {}
+    "organizations": {},
+    "statusdb": ":memory:"
   }
 }
