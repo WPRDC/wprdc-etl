@@ -44,15 +44,20 @@ class TestPipeline(unittest.TestCase):
 
     def test_misconfigured_pipeline(self):
         with self.assertRaises(RuntimeError):
-            pl.Pipeline('test', 'Test').run(None)
+            pl.Pipeline('test', 'Test', log_status=False) \
+                .run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline('test', 'Test').extract(pl.FileExtractor).run(None)
+            pl.Pipeline('test', 'Test', log_status=False) \
+                .extract(pl.FileExtractor).run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline('test', 'Test').extract(pl.FileExtractor).run(None)
+            pl.Pipeline('test', 'Test', log_status=False) \
+                .extract(pl.FileExtractor).run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline('test', 'Test').extract(pl.FileExtractor).schema(pl.BaseSchema).run(None)
+            pl.Pipeline('test', 'Test', log_status=False) \
+                .extract(pl.FileExtractor).schema(pl.BaseSchema).run(None)
         with self.assertRaises(RuntimeError):
-            pl.Pipeline('test', 'Test').schema(pl.BaseSchema).load(pl.Datapusher).run(None)
+            pl.Pipeline('test', 'Test', log_status=False) \
+                .schema(pl.BaseSchema).load(pl.Datapusher).run(None)
 
     def test_extractor_args(self):
         self.pipeline.extract(pl.FileExtractor, 1, firstline_headers=False)

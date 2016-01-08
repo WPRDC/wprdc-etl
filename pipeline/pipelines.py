@@ -46,27 +46,21 @@ class Pipeline(object):
         self, name, display_name, server="staging",
         settings_file=None, log_status=True, conn=None
     ):
-        self.start_time = time.time()
         self.data = []
         self._extractor, self._schema, self._loader = None, None, None
+        self.name = name
+        self.display_name = display_name
 
         settings_file = settings_file if settings_file else \
             os.path.join(PARENT, 'settings.json')
         self.set_config_from_file(server, settings_file)
         self.log_status = log_status
+
         if conn:
             self.conn = conn
             self.passed_conn = True
         else:
-            self.conn = sqlite3.Connection(self.config['statusdb'])
             self.passed_conn = False
-
-        if self.log_status:
-            self.status = Status(
-                self.conn, name, display_name, None,
-                self.start_time, 'new', None, None,
-            )
-            self.status.write()
 
     def get_config(self):
         return self.config
@@ -112,7 +106,21 @@ class Pipeline(object):
                 'You must specify extract, schema, and load steps!'
             )
 
+    def before_run(self):
+        start_time = time.time()
+
+        if not self.passed_conn:
+            self.conn = sqlite3.Connection(self.config['statusdb'])
+
+        if self.log_status:
+            self.status = Status(
+                self.conn, self.name, self.display_name, None,
+                start_time, 'new', None, None,
+            )
+            self.status.write()
+
     def _run(self):
+        self.before_run()
         try:
             self.enforce_full_pipeline()
             # instantiate a new extrator instance based on the passed extract class

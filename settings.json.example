@@ -5,6 +5,6 @@
     "organizations": {
       "Name": "ckan-generated hash"
     },
-    "statusdb": "/path/to/sqlitedb.db"
+    "statusdb": ":memory:" # replace with the path to a sqlite .db file
   }
 }
