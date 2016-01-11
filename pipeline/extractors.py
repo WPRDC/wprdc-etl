@@ -1,4 +1,4 @@
-from .exceptions import IsHeaderException
+from pipeline.exceptions import IsHeaderException
 
 class Extractor(object):
     def __init__(self, target, *args, **kwargs):

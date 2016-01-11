@@ -45,21 +45,22 @@ class TestPipeline(unittest.TestCase):
     def test_misconfigured_pipeline(self):
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .run(None)
+                .run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .extract(pl.FileExtractor).run(None)
+                .extract(pl.FileExtractor, None).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .extract(pl.FileExtractor).run(None)
+                .extract(pl.FileExtractor, None).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .extract(pl.FileExtractor).schema(pl.BaseSchema).run(None)
+                .extract(pl.FileExtractor, None).schema(pl.BaseSchema).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .schema(pl.BaseSchema).load(pl.Datapusher).run(None)
+                .schema(pl.BaseSchema).load(pl.Datapusher).run()
 
     def test_extractor_args(self):
-        self.pipeline.extract(pl.FileExtractor, 1, firstline_headers=False)
+        self.pipeline.extract(pl.FileExtractor, None, 1, firstline_headers=False)
+        self.assertIsNone(self.pipeline.target)
         self.assertIn(1, self.pipeline.extractor_args)
         self.assertIn('firstline_headers', self.pipeline.extractor_kwargs)
