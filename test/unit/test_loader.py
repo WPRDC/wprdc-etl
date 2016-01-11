@@ -3,19 +3,18 @@ import os
 
 from unittest.mock import Mock, patch, PropertyMock
 
-from pipeline.loaders import Datapusher
-from pipeline.pipelines import Pipeline
+import pipeline as pl
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 class TestDatapusher(unittest.TestCase):
     def setUp(self):
-        pipeline = Pipeline(
+        pipeline = pl.Pipeline(
             'test', 'Test', server='testing',
             settings_file=os.path.join(HERE, '../mock/test_settings.json'),
             log_status=False
         )
-        self.data_pusher = Datapusher(pipeline.get_config())
+        self.data_pusher = pl.Datapusher(pipeline.get_config())
 
     def test_datapusher_init(self):
         self.assertIsNotNone(self.data_pusher)

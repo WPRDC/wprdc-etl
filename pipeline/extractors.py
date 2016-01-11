@@ -48,7 +48,10 @@ class CSVExtractor(FileExtractor):
         self.set_headers()
 
     def handle_line(self, line):
-        parsed = line.strip('\n').strip('\r\n').split(self.delimiter)
+        parsed = [
+            i.strip('"') for i in
+            line.strip('\n').strip('\r\n').split(self.delimiter)
+        ]
         if parsed == self.headers:
             raise IsHeaderException('Headers found in data!')
         return dict(zip(self.schema_headers, parsed))
@@ -60,7 +63,11 @@ class CSVExtractor(FileExtractor):
             return
         elif self.firstline_headers:
             with open(self.target) as f:
-                self.headers = f.readline().strip('\n').strip('\r\n').split(self.delimiter)
+                self.headers = [
+                    i.strip('"') for i in f.readline()
+                    .strip('\n').strip('\r\n')
+                    .split(self.delimiter)
+                ]
                 self.schema_headers = [
                     i.lower().replace(' ', '_') for i in
                     self.headers

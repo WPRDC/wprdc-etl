@@ -94,8 +94,8 @@ class Pipeline(object):
         '''
         loaded = self._schema().load(data)
         if loaded.errors:
-            raise RuntimeError('There were errors in the input data: {}'.format(
-                loaded.errors.__str__()
+            raise RuntimeError('There were errors in the input data: {} (passed data: {})'.format(
+                loaded.errors.__str__(), data
             ))
         else:
             self.data.append(loaded.data)

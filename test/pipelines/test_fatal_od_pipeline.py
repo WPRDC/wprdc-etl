@@ -20,4 +20,4 @@ class TestODPipeline(TestBase):
         status = self.cur.execute('select * from status').fetchall()
         self.assertEquals(len(status), 1)
         self.assertEquals(status[0][-2], 'success')
-        self.assertEquals(status[0][-1], 1)
+        self.assertEquals(status[0][-1], 6)
