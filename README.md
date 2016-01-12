@@ -13,12 +13,21 @@ Once you have a virtualenv, activate it. From there, the following steps can be 
 ```bash
 git clone https://github.com/UCSUR-Pitt/wprdc-etl
 cd wprdc-etl
+# install dependencies. if you just need access the Pipeline and related
+# classes, you can install via setup.py:
+pip install -e .
+# if you want to develop, you'll need to install additional requirements
+# (such as the test runner):
+pip install -r requirements.txt
 # create a copy of the settings
 cp settings.json.example settings.json
 # after the settings have been copied, you will need to go in and
 # edit the various values for your setup. at this point, you should
-# be ready to create the status database
-python create_db.py --server NAME_OF_YOUR_SERVER_HERE
+# be ready to create the status database. by installing the package above
+# you should have access to two command-line commands, one of which
+# will create the database for you
+create_monitoring_db --server <name of your server>
 # note, if you need to destroy and recreate the status data at any point
-# you can do so with python create_db.py --server NAME_OF_YOUR_SERVER_HERE --drop
+# you can do so with:
+# create_monitoring_db --server <name of your server> --drop
 ```

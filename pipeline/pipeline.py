@@ -43,7 +43,7 @@ class Status(object):
 
 class Pipeline(object):
     def __init__(
-        self, name, display_name, server="staging",
+        self, name, display_name, server='staging',
         settings_file=None, log_status=True, conn=None
     ):
         self.data = []
@@ -144,7 +144,8 @@ class Pipeline(object):
 
             # load the data
             self._loader(self.config).load(self.data)
-            self.status.update(status='success')
+            if self.log_status:
+                self.status.update(status='success')
         except Exception as e:
             if self.log_status:
                 self.status.update(status='error: {}'.format(str(e)))

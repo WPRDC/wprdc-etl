@@ -1,0 +1,99 @@
+import os
+import sqlite3
+
+from unittest import TestCase
+
+from click.testing import CliRunner
+
+import pipeline as pl
+from pipeline.scripts import create_db, run_job
+
+from test.jobs.base import TestLoader, TestExtractor
+
+HERE = os.path.abspath(os.path.dirname(__file__))
+
+class TestCreateDBScript(TestCase):
+    def setUp(self):
+        self.runner = CliRunner()
+
+    def test_create_database(self):
+        with self.runner.isolated_filesystem():
+            with open('test_settings.json', 'w') as f:
+                f.write('''{"cli_testing": {"statusdb": "test.db"}}''')
+
+            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'cli_testing'])
+
+            self.assertEquals(result.exit_code, 0)
+            self.assertTrue('test.db' in os.listdir())
+
+            os.unlink(os.path.join(os.getcwd(), 'test.db'))
+
+    def test_create_and_drop_database(self):
+        with self.runner.isolated_filesystem():
+
+            conn = sqlite3.connect(os.path.join(os.getcwd(), 'test.db'))
+            cur = conn.cursor()
+            cur.execute('create table status (name TEXT NOT NULL)')
+            cur.execute("insert into status (name) values ('test')")
+            conn.close()
+
+            self.assertTrue('test.db' in os.listdir())
+
+            with open('test_settings.json', 'w') as f:
+                f.write('''{"cli_testing": {"statusdb": "test.db"}}''')
+
+            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'cli_testing', '--drop'])
+
+            self.assertEquals(result.exit_code, 0)
+            self.assertTrue('test.db' in os.listdir())
+
+            conn = sqlite3.connect(os.path.join(os.getcwd(), 'test.db'))
+            cur = conn.cursor()
+            cur.execute("select count(*) from status")
+            status_count = cur.fetchall()[0][0]
+            conn.close()
+
+            self.assertEquals(status_count, 0)
+            os.unlink(os.path.join(os.getcwd(), 'test.db'))
+
+    def test_bad_server_name(self):
+        with self.runner.isolated_filesystem():
+            with open('test_settings.json', 'w') as f:
+                f.write('''{"cli_testing": {"statusdb": "test.db"}}''')
+            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'DOES NOT EXIST'])
+            self.assertNotEquals(result.exit_code, 0)
+            self.assertTrue('invalid choice: DOES NOT EXIST' in result.output)
+
+    def test_bad_config_path(self):
+        with self.runner.isolated_filesystem():
+            result = self.runner.invoke(create_db, ['./no_file_here.txt'])
+            self.assertNotEquals(result.exit_code, 0)
+            self.assertTrue('"./no_file_here.txt" does not exist' in result.output)
+
+    def test_malformed_config(self):
+        with self.runner.isolated_filesystem():
+            with open('test_settings.json', 'w') as f:
+                f.write('''This isn't valid JSON doc!''')
+            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'DOES NOT EXIST'])
+            self.assertNotEquals(result.exit_code, 0)
+            self.assertTrue('invalid JSON in settings file' in result.output)
+
+test_pipeline = pl.Pipeline(
+    'test', 'Test',
+    server='testing',
+    settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+    log_status=False
+).extract(TestExtractor, None).schema(pl.BaseSchema).load(TestLoader)
+
+class TestRunJobScript(TestCase):
+    def setUp(self):
+        self.runner = CliRunner()
+
+    def test_run_job_successfully(self):
+        result = self.runner.invoke(run_job, ['test.unit.test_scripts:test_pipeline'])
+        self.assertEquals(result.exit_code, 0)
+
+    def test_run_job_no_job(self):
+        result = self.runner.invoke(run_job, ['nope.does.not:exist'])
+        self.assertNotEquals(result.exit_code, 0)
+        self.assertTrue('A Pipeline could not be found' in result.output)
