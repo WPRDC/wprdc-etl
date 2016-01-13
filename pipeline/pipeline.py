@@ -3,7 +3,7 @@ import json
 import sqlite3
 import time
 
-from .exceptions import IsHeaderException, InvalidConfigException
+from pipeline.exceptions import IsHeaderException, InvalidConfigException
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 PARENT = os.path.join(HERE, '..')
@@ -43,7 +43,7 @@ class Status(object):
 
 class Pipeline(object):
     def __init__(
-        self, name, display_name, server="staging",
+        self, name, display_name, server='staging',
         settings_file=None, log_status=True, conn=None
     ):
         self.data = []
@@ -75,8 +75,9 @@ class Pipeline(object):
                 'No config file found, or config not properly formatted'
             )
 
-    def extract(self, extractor, *args, **kwargs):
+    def extract(self, extractor, target, *args, **kwargs):
         self._extractor = extractor
+        self.target = target
         self.extractor_args = list(args)
         self.extractor_kwargs = dict(**kwargs)
         return self
@@ -94,8 +95,8 @@ class Pipeline(object):
         '''
         loaded = self._schema().load(data)
         if loaded.errors:
-            raise RuntimeError('There were errors in the input data: {}'.format(
-                loaded.errors.__str__()
+            raise RuntimeError('There were errors in the input data: {} (passed data: {})'.format(
+                loaded.errors.__str__(), data
             ))
         else:
             self.data.append(loaded.data)
@@ -119,7 +120,7 @@ class Pipeline(object):
             )
             self.status.write()
 
-    def _run(self):
+    def run(self):
         self.before_run()
         try:
             self.enforce_full_pipeline()
@@ -143,7 +144,8 @@ class Pipeline(object):
 
             # load the data
             self._loader(self.config).load(self.data)
-            self.status.update(status='success')
+            if self.log_status:
+                self.status.update(status='success')
         except Exception as e:
             if self.log_status:
                 self.status.update(status='error: {}'.format(str(e)))
@@ -155,14 +157,6 @@ class Pipeline(object):
                     last_ran=time.time()
                 )
             self.close()
-
-    def schedule(self, extract_target, frequency='daily', time='00:30'):
-        self.target = extract_target
-        return self
-
-    def run(self, extract_target):
-        self.target = extract_target
-        self._run()
         return self
 
     def close(self):
