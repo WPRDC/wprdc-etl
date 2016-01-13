@@ -1,3 +1,4 @@
+import csv
 from pipeline.exceptions import IsHeaderException
 
 class Extractor(object):
@@ -47,14 +48,20 @@ class CSVExtractor(FileExtractor):
 
         self.set_headers()
 
+    def extract(self):
+        f = open(self.target, 'r')
+        self.__file = f
+        reader = csv.reader(f, delimiter=self.delimiter)
+        return reader
+
+    def cleanup(self, f):
+        self.__file.close()
+        return
+
     def handle_line(self, line):
-        parsed = [
-            i.strip('"') for i in
-            line.strip('\n').strip('\r\n').split(self.delimiter)
-        ]
-        if parsed == self.headers:
+        if line == self.headers:
             raise IsHeaderException('Headers found in data!')
-        return dict(zip(self.schema_headers, parsed))
+        return dict(zip(self.schema_headers, line))
 
     def set_headers(self, headers=None):
         if headers:
@@ -63,11 +70,8 @@ class CSVExtractor(FileExtractor):
             return
         elif self.firstline_headers:
             with open(self.target) as f:
-                self.headers = [
-                    i.strip('"') for i in f.readline()
-                    .strip('\n').strip('\r\n')
-                    .split(self.delimiter)
-                ]
+                reader = csv.reader(f, delimiter=self.delimiter)
+                self.headers = next(reader)
                 self.schema_headers = [
                     i.lower().replace(' ', '_') for i in
                     self.headers
