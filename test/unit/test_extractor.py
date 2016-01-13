@@ -50,10 +50,10 @@ class TestCSVExtractor(unittest.TestCase):
         f = self.extractor.extract()
 
         with self.assertRaises(pl.IsHeaderException):
-            self.extractor.handle_line(f.readline()),
+            self.extractor.handle_line(next(f)),
 
         self.assertEquals(
-            self.extractor.handle_line(f.readline()),
+            self.extractor.handle_line(next(f)),
             {'one': '1', 'two_words': '2'}
         )
         self.extractor.cleanup(f)
@@ -64,10 +64,10 @@ class TestCSVExtractor(unittest.TestCase):
         f = extractor.extract()
 
         with self.assertRaises(pl.IsHeaderException):
-            extractor.handle_line(f.readline()),
+            extractor.handle_line(next(f)),
 
         self.assertEquals(
-            extractor.handle_line(f.readline()),
+            extractor.handle_line(next(f)),
             {'one': '10', 'two_words': '20'}
         )
         extractor.cleanup(f)
