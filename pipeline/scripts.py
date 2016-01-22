@@ -3,14 +3,19 @@ import sqlite3
 import click
 import json
 import importlib
+from pipeline import Pipeline
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 @click.command()
 @click.argument('config', type=click.Path(exists=True))
-@click.option('--server', type=click.STRING)
-@click.option('--drop', type=click.BOOL, is_flag=True)
+@click.option('--server', type=click.STRING,
+    help='The name of the server (key) in the CONFIG to use.')
+@click.option('--drop', type=click.BOOL, is_flag=True,
+    help='Whether or not to drop and recreate the table.')
 def create_db(config, server, drop):
+    '''Create a status table based on the passed CONFIG json file
+    '''
     with open(config) as f:
         try:
             settings_file = json.loads(f.read())
@@ -26,7 +31,12 @@ def create_db(config, server, drop):
                 'invalid JSON in settings file'
             )
 
-    conn = sqlite3.connect(settings['statusdb'])
+    try:
+        conn = sqlite3.connect(settings['statusdb'])
+    except KeyError:
+        raise click.ClickException(
+            'CONFIG must contain a location for a statusdb'
+        )
     cur = conn.cursor()
 
     if drop:
@@ -52,10 +62,20 @@ def create_db(config, server, drop):
 @click.command()
 @click.argument('job_path', type=click.STRING)
 def run_job(job_path):
+    '''Run a pipeline based on the given input JOB_PATH
+
+    Directories should be separated based on the . character
+    and the pipeline should be separated from the directories
+    with a : character.
+
+    For example: my.nested.job.directory:my_pipeline
+    '''
     try:
         path, pipeline = job_path.split(':')
         pipeline_module = importlib.import_module(path)
         pipeline = getattr(pipeline_module, pipeline)
+        if not isinstance(pipeline, Pipeline):
+            raise
     except:
         raise click.ClickException(
             'A Pipeline could not be found at "{}"'.format(

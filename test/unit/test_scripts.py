@@ -78,12 +78,25 @@ class TestCreateDBScript(TestCase):
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('invalid JSON in settings file' in result.output)
 
+    def test_no_statusdb_in_config(self):
+        with self.runner.isolated_filesystem():
+            with open('test_settings.json', 'w') as f:
+                f.write('''{"cli_testing": {"lolnostatusdb": "test.db"}}''')
+            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'cli_testing'])
+            self.assertNotEquals(result.exit_code, 0)
+            self.assertTrue('CONFIG must contain a location for a statusdb' in result.output)
+
 test_pipeline = pl.Pipeline(
     'test', 'Test',
     server='testing',
     settings_file=os.path.join(HERE, '../mock/test_settings.json'),
     log_status=False
 ).extract(TestExtractor, None).schema(pl.BaseSchema).load(TestLoader)
+
+class Junk(object):
+    pass
+
+junk = Junk()
 
 class TestRunJobScript(TestCase):
     def setUp(self):
@@ -95,5 +108,10 @@ class TestRunJobScript(TestCase):
 
     def test_run_job_no_job(self):
         result = self.runner.invoke(run_job, ['nope.does.not:exist'])
+        self.assertNotEquals(result.exit_code, 0)
+        self.assertTrue('A Pipeline could not be found' in result.output)
+
+    def test_run_job_no_pipline(self):
+        result = self.runner.invoke(run_job, ['test.unit.test_scripts:junk'])
         self.assertNotEquals(result.exit_code, 0)
         self.assertTrue('A Pipeline could not be found' in result.output)
