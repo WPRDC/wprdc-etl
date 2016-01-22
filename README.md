@@ -31,3 +31,15 @@ create_monitoring_db --server <name of your server>
 # you can do so with:
 # create_monitoring_db --server <name of your server> --drop
 ```
+
+### Docs
+
+Documentation is stored in the docs directory. To make and view docs locally, run the following (on a mac):
+
+```bash
+cd docs
+make html
+open _build/html/index.html
+```
+
+A make.bat file is included for windows users as well.

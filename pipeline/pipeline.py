@@ -4,48 +4,40 @@ import sqlite3
 import time
 
 from pipeline.exceptions import IsHeaderException, InvalidConfigException
+from pipeline.status import Status
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 PARENT = os.path.join(HERE, '..')
 
-class Status(object):
-    def __init__(
-        self, conn, name, display_name, last_ran, start_time,
-        status, frequency, num_lines
-    ):
-        self.conn = conn
-        self.name = name
-        self.display_name = display_name
-        self.last_ran = last_ran
-        self.start_time = start_time
-        self.status = status
-        self.num_lines = num_lines
-
-    def update(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-        self.write()
-
-    def write(self):
-        cur = self.conn.cursor()
-        cur.execute(
-            '''
-            INSERT OR REPLACE INTO status (
-                name, display_name, last_ran, start_time,
-                status, num_lines
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                self.name, self.display_name, self.last_ran,
-                self.start_time, self.status, self.num_lines
-            )
-        )
-        self.conn.commit()
-
 class Pipeline(object):
+    '''Main pipeline class
+
+    The pipeline class binds together extractors, schema,
+    and loaders and runs everything together. Almost all
+    Pipeline methods return the pipeline object, allowing
+    for methods to be chained together.
+    '''
     def __init__(
         self, name, display_name, server='staging',
         settings_file=None, log_status=True, conn=None
     ):
+        '''
+        Arguments:
+            name: pipeline's name, passed to
+                :py:class:`~purchasing.status.Status`
+            display_name: display name, passed to
+                :py:class:`~purchasing.status.Status`
+
+        Keyword Arguments:
+            server: name of the server to use in the configuration,
+                defaults to "staging"
+            settings_file: filepath to the configuration file
+            log_status: boolean for whether or not to log the status
+                of the pipeline. useful to turn off for testing
+            conn: optionally passed sqlite3 connection object. if no
+                connection is passed, one will be instantiated when the
+                pipeline's ``run`` method is called
+        '''
         self.data = []
         self._extractor, self._schema, self._loader = None, None, None
         self.name = name
@@ -66,6 +58,16 @@ class Pipeline(object):
         return self.config
 
     def set_config_from_file(self, server, file):
+        '''Sets the pipeline's configuration from file
+
+        Arguments:
+            server: String that represents
+            file: Location of the configuration to load
+
+        Raises:
+            InvalidConfigException: if configuration is found or
+            the found configuration is not valid json
+        '''
         try:
             with open(file) as f:
                 raw_config = json.loads(f.read())
@@ -76,6 +78,12 @@ class Pipeline(object):
             )
 
     def extract(self, extractor, target, *args, **kwargs):
+        '''Set the extractor class and related arguments
+
+        Arguments:
+            extractor: Extractor class, see :ref:`built-in-extractors`
+            target: location of the extraction target (file, url, etc.)
+        '''
         self._extractor = extractor
         self.target = target
         self.extractor_args = list(args)
@@ -83,17 +91,37 @@ class Pipeline(object):
         return self
 
     def schema(self, schema):
+        '''Set the schema class
+
+        Arguments:
+            schema: Schema class
+
+        Returns:
+            modified Pipeline object
+        '''
         self._schema = schema
         return self
 
     def load(self, loader):
+        '''Sets the loader class
+
+        Arguments:
+            loader: Loader class. See :ref:`built-in-loaders`
+
+        Returns:
+            modified Pipeline object
+        '''
         self._loader = loader
         return self
 
     def load_line(self, data):
         '''Load a line into the pipeline's data or throw an error
+
+        Arguments:
+            data: A parsed line from an extractor's handle_line
+                method
         '''
-        loaded = self._schema().load(data)
+        loaded = self._schema.load(data)
         if loaded.errors:
             raise RuntimeError('There were errors in the input data: {} (passed data: {})'.format(
                 loaded.errors.__str__(), data
@@ -102,12 +130,24 @@ class Pipeline(object):
             self.data.append(loaded.data)
 
     def enforce_full_pipeline(self):
+        '''Ensure that a pipeline has an extractor, schema, and loader
+
+        Raises:
+            RuntimeError: if an extractor, schema, and loader are not
+                all specified
+        '''
         if not all([self._extractor, self._schema, self._loader]):
             raise RuntimeError(
                 'You must specify extract, schema, and load steps!'
             )
 
-    def before_run(self):
+    def pre_run(self):
+        '''Method to be run immediately before the pipeline runs
+
+        Establishes a connection to the monitoring database on the
+        pipeline and builds the initial :py:class:`~pipeline.status.Status`
+        object.
+        '''
         start_time = time.time()
 
         if not self.passed_conn:
@@ -121,7 +161,32 @@ class Pipeline(object):
             self.status.write()
 
     def run(self):
-        self.before_run()
+        '''Main pipeline run method
+
+        One of the main features is that the extractor, schema, and
+        loader are all instantiated here as opposed to when they
+        are declared on pipeline instantiation. This delays opening
+        connections until the last possible moment.
+
+        The run method works essentially as follow:
+
+        1. Ensure that we have all pieces of the pipeline
+        2. Instantiate the extractor, passing it whatever args
+           and kwargs needed
+        3. Run the extract method, which should return an iterable
+           of different data methods
+        4. Instantiate our schema and attach it to the pipeline
+        5. Iterate through the extracted raw data, using the extractor's
+           ``handle_line`` to extract the data from each line, and
+           then run the ``load_line`` method to attach each row to the
+           pipeline's ``data`` attribute. At the end of the iteration,
+           call the extractor's ``cleanup`` attribute.
+        6. Instantiate the loader and then load the data
+        7. Finally, at the end of the run, run a final log, and run the
+           close method to shut down the pipeline
+        '''
+        self.pre_run()
+
         try:
             self.enforce_full_pipeline()
             # instantiate a new extrator instance based on the passed extract class
@@ -130,6 +195,9 @@ class Pipeline(object):
             )
             # instantiate a new schema instance based on the passed schema class
             raw = _extractor.extract()
+
+            # instantiate our schema
+            self._schema = self._schema()
 
             # build the data
             try:
@@ -160,5 +228,7 @@ class Pipeline(object):
         return self
 
     def close(self):
+        '''Close any open database connections.
+        '''
         if not self.passed_conn:
             self.conn.close()
