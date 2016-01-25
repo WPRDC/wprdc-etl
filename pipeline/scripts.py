@@ -9,9 +9,11 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 
 @click.command()
 @click.argument('config', type=click.Path(exists=True))
-@click.option('--server', type=click.STRING,
+@click.option(
+    '--server', type=click.STRING,
     help='The name of the server (key) in the CONFIG to use.')
-@click.option('--drop', type=click.BOOL, is_flag=True,
+@click.option(
+    '--drop', type=click.BOOL, is_flag=True,
     help='Whether or not to drop and recreate the table.')
 def create_db(config, server, drop):
     '''Create a status table based on the passed CONFIG json file
@@ -61,7 +63,13 @@ def create_db(config, server, drop):
 
 @click.command()
 @click.argument('job_path', type=click.STRING)
-def run_job(job_path):
+@click.option(
+    '--config', type=click.Path(exists=True),
+    help='Path to a configuration object to use')
+@click.option(
+    '--server', type=click.STRING,
+    help='The name of the server (key) in the CONFIG to use.')
+def run_job(job_path, config, server):
     '''Run a pipeline based on the given input JOB_PATH
 
     Directories should be separated based on the . character
@@ -82,5 +90,8 @@ def run_job(job_path):
                 job_path
             )
         )
+
+    if config and server:
+        pipeline.set_config_from_file(server, config)
 
     pipeline.run()

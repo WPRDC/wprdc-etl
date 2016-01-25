@@ -115,3 +115,12 @@ class TestRunJobScript(TestCase):
         result = self.runner.invoke(run_job, ['test.unit.test_scripts:junk'])
         self.assertNotEquals(result.exit_code, 0)
         self.assertTrue('A Pipeline could not be found' in result.output)
+
+    def test_run_job_custom_settings(self):
+        result = self.runner.invoke(
+            run_job, [
+                'test.unit.test_scripts:test_pipeline',
+                '--config', os.path.join(HERE, '../mock/test_settings.json'),
+                '--server', 'second_testing']
+        )
+        self.assertEquals(result.exit_code, 0)

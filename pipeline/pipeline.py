@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 import time
+import click
 
 from pipeline.exceptions import IsHeaderException, InvalidConfigException
 from pipeline.status import Status
@@ -121,7 +122,7 @@ class Pipeline(object):
             data: A parsed line from an extractor's handle_line
                 method
         '''
-        loaded = self._schema.load(data)
+        loaded = self.__schema.load(data)
         if loaded.errors:
             raise RuntimeError('There were errors in the input data: {} (passed data: {})'.format(
                 loaded.errors.__str__(), data
@@ -197,7 +198,7 @@ class Pipeline(object):
             raw = _extractor.extract()
 
             # instantiate our schema
-            self._schema = self._schema()
+            self.__schema = self._schema()
 
             # build the data
             try:
@@ -232,3 +233,4 @@ class Pipeline(object):
         '''
         if not self.passed_conn:
             self.conn.close()
+        self.__schema = None
