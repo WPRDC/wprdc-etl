@@ -104,5 +104,38 @@ class TestCKANUpsertLoader(TestCKANDatastoreBase):
         with self.assertRaises(RuntimeError):
             pl.CKANUpsertLoader(self.pipeline.get_config())
 
-class TestCKANBinaryLoader(TestCKANDatastoreBase):
-    pass
+    @patch('requests.post')
+    def test_upsert_load_successful(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
+        ]
+        post.return_value = mock_post
+        self.upsert_loader.load([])
+
+    @patch('requests.post')
+    def test_upsert_load_upsert_failed(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
+        ]
+        post.return_value = mock_post
+        type(post.return_value).status_code = PropertyMock(side_effect=[500, 200])
+
+        with self.assertRaises(RuntimeError):
+            self.upsert_loader.load([])
+
+    @patch('requests.post')
+    def test_upsert_load_update_metadata_failed(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
+        ]
+        post.return_value = mock_post
+        type(post.return_value).status_code = PropertyMock(side_effect=[200, 500])
+        with self.assertRaises(RuntimeError):
+            self.upsert_loader.load([])
+

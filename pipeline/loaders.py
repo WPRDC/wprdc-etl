@@ -201,13 +201,12 @@ class CKANUpsertLoader(CKANLoader):
 
     def load(self, data):
         self.generate_datastore(self.fields)
-        self.upsert(self.resource_id, data, self.method)
-        self.update_metadata(self.resource_id)
+        upsert_status = self.upsert(self.resource_id, data, self.method)
+        update_status = self.update_metadata(self.resource_id)
 
-class CKANBinaryLoader(CKANLoader):
-    def __init__(self, config, *args, **kwargs):
-        super(CKANBinaryLoader, self).__init__(config, *args, **kwargs)
-        self.fields = kwargs.get('fields')
-
-    def load(self, data):
-        self.generate_datastore(self.fields)
+        if str(upsert_status)[0] in ['4', '5']:
+            raise RuntimeError('Upsert failed with status code {}'.format(str(upsert_status)))
+        elif str(update_status)[0] in ['4', '5']:
+            raise RuntimeError('Metadata update failed with status code {}'.format(str(upsert_status)))
+        else:
+            return upsert_status, update_status
