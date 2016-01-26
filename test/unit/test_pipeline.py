@@ -3,6 +3,8 @@ import unittest
 
 import pipeline as pl
 
+from test.jobs.base import TestLoader
+
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 class TestPipeline(unittest.TestCase):
@@ -57,7 +59,7 @@ class TestPipeline(unittest.TestCase):
                 .extract(pl.FileExtractor, None).schema(pl.BaseSchema).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .schema(pl.BaseSchema).load(pl.Datapusher).run()
+                .schema(pl.BaseSchema).load(TestLoader).run()
 
     def test_extractor_args(self):
         self.pipeline.extract(pl.FileExtractor, None, 1, firstline_headers=False)
