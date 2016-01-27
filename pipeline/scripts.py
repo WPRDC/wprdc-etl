@@ -7,6 +7,9 @@ from pipeline import Pipeline
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
+class InvalidPipelineError(Exception):
+    pass
+
 @click.command()
 @click.argument('config', type=click.Path(exists=True))
 @click.option(
@@ -79,20 +82,27 @@ def run_job(job_path, config, server):
     For example: my.nested.job.directory:my_pipeline
     '''
     try:
+        if ':' not in job_path:
+            raise InvalidPipelineError
         path, pipeline = job_path.split(':')
         pipeline_module = importlib.import_module(path)
         pipeline = getattr(pipeline_module, pipeline)
         if not isinstance(pipeline, Pipeline):
-            raise
-    except Exception as e:
-        import pdb; pdb.set_trace()
+            raise InvalidPipelineError
+
+        if config and server:
+            pipeline.set_config_from_file(server, config)
+
+        pipeline.run()
+
+    except (InvalidPipelineError, ImportError):
         raise click.ClickException(
             'A Pipeline could not be found at "{}"'.format(
                 job_path
             )
         )
+    except Exception as e:
+        raise click.ClickException(
+            'Something went wrong in the pipeline: {}'.format(e)
+        )
 
-    if config and server:
-        pipeline.set_config_from_file(server, config)
-
-    pipeline.run()

@@ -26,6 +26,10 @@ class TestCSVExtractor(unittest.TestCase):
         self.extractor.set_headers(['new', 'new_two'])
         self.assertListEqual(self.extractor.schema_headers, ['new', 'new_two'])
 
+    def test_raises_headers_exception(self):
+        with self.assertRaises(pl.IsHeaderException):
+            self.extractor.handle_line(['One', 'Two words'])
+
     def test_no_headers_error(self):
         with self.assertRaises(RuntimeError):
             pl.CSVExtractor(

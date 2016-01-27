@@ -40,7 +40,7 @@ class CSVExtractor(Extractor):
         '''
         if line == self.headers:
             raise IsHeaderException
-        return dict(zip(self.schema_headers, line))
+        return dict(zip(self.schema_headers, [i if i != '' else None for i in line]))
 
     def create_schema_headers(self, headers):
         '''Maps headers to schema headers

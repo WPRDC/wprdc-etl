@@ -97,6 +97,8 @@ test_pipeline = pl.Pipeline(
     .schema(pl.BaseSchema) \
     .load(TestLoader)
 
+not_working = pl.Pipeline('nope', 'It does not work')
+
 class Junk(object):
     pass
 
@@ -119,6 +121,11 @@ class TestRunJobScript(TestCase):
         result = self.runner.invoke(run_job, ['test.unit.test_scripts:junk'])
         self.assertNotEquals(result.exit_code, 0)
         self.assertTrue('A Pipeline could not be found' in result.output)
+
+    def test_run_job_error_in_pipeline(self):
+        result = self.runner.invoke(run_job, ['test.unit.test_scripts:not_working'])
+        self.assertNotEquals(result.exit_code, 0)
+        self.assertTrue('Something went wrong in the pipeline' in result.output)
 
     def test_run_job_custom_settings(self):
         result = self.runner.invoke(
