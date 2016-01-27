@@ -50,19 +50,18 @@ class TestPipeline(unittest.TestCase):
                 .run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .extract(pl.FileExtractor, None).run()
+                .extract(pl.CSVExtractor, None).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .extract(pl.FileExtractor, None).run()
+                .extract(pl.CSVExtractor, None).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
-                .extract(pl.FileExtractor, None).schema(pl.BaseSchema).run()
+                .extract(pl.CSVExtractor, None).schema(pl.BaseSchema).run()
         with self.assertRaises(RuntimeError):
             pl.Pipeline('test', 'Test', log_status=False) \
                 .schema(pl.BaseSchema).load(TestLoader).run()
 
     def test_extractor_args(self):
-        self.pipeline.extract(pl.FileExtractor, None, 1, firstline_headers=False)
-        self.assertIsNone(self.pipeline.target)
+        self.pipeline.extract(pl.CSVExtractor, None, 1, firstline_headers=False)
         self.assertIn(1, self.pipeline.extractor_args)
         self.assertIn('firstline_headers', self.pipeline.extractor_kwargs)

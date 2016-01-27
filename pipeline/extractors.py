@@ -2,16 +2,11 @@ import csv
 from pipeline.exceptions import IsHeaderException
 
 class Extractor(object):
-    def __init__(self, target, *args, **kwargs):
-        '''Extractor base class
+    def __init__(self, connection):
+        self.connection = connection
 
-        Attributes:
-            target: location of object to be extracted from
-        '''
-        self.target = target
-
-    def extract(self):
-        '''Return a generator. Must be implemented in subclasses
+    def process_connection(self):
+        '''Do any additional processing on a connection to prepare it for reading
         '''
         raise NotImplementedError
 
@@ -20,78 +15,31 @@ class Extractor(object):
         '''
         raise NotImplementedError
 
-    def cleanup(self, *args, **kwargs):
-        '''Perform whatever cleanup is necessary to the extractor.
-        '''
-        raise NotImplementedError
-
     def set_headers(self):
         '''Sets the column names or headers. Required for serialization
         '''
         raise NotImplementedError
 
-class FileExtractor(Extractor):
-    '''Base class for file-based extraction
-    '''
-    def extract(self):
-        '''Open the file object
-
-        Returns:
-            f: a ``file`` object
-
-        Raises:
-            IOError: When there are problems opening the file
-        '''
-        try:
-            f = open(self.target, 'r')
-            return f
-        except IOError as e:
-            raise e
-
-    def cleanup(self, f):
-        '''Closes a file object if it isn't closed already
-        '''
-        f.close()
-        return
-
-class CSVExtractor(FileExtractor):
-    def __init__(self, target, *args, **kwargs):
+class CSVExtractor(Extractor):
+    def __init__(self, connection, *args, **kwargs):
         '''FileExtractor subclass for csv or character-delimited files
         '''
-        super(CSVExtractor, self).__init__(target)
+        super(CSVExtractor, self).__init__(connection)
         self.firstline_headers = kwargs.get('firstline_headers', True)
         self.headers = kwargs.get('headers', None)
         self.delimiter = kwargs.get('delimiter', ',')
 
         self.set_headers()
 
-    def extract(self):
-        '''Extract method for csv file
-
-        Because we are using the csv module, we need to have access
-        to the file itself on the class, so we store it here.
-
-        Returns:
-            csv.reader object
-        '''
-        f = open(self.target, 'r')
-        self.__file = f
-        reader = csv.reader(f, delimiter=self.delimiter)
+    def process_connection(self):
+        reader = csv.reader(self.connection, delimiter=self.delimiter)
         return reader
 
-    def cleanup(self, f):
-        '''Cleanup method
-
-        Closes the file that was opened and set in the ``extract`` method
-        '''
-        self.__file.close()
-        return
-
     def handle_line(self, line):
-        '''Handle a file
+        '''Handle a line in a file
         '''
         if line == self.headers:
-            raise IsHeaderException('Headers found in data!')
+            raise IsHeaderException
         return dict(zip(self.schema_headers, line))
 
     def create_schema_headers(self, headers):
@@ -137,13 +85,8 @@ class CSVExtractor(FileExtractor):
             self.schema_headers = self.headers
             return
         elif self.firstline_headers:
-            with open(self.target) as f:
-                reader = csv.reader(f, delimiter=self.delimiter)
-                self.headers = next(reader)
-                self.schema_headers = self.create_schema_headers(self.headers)
-                return
+            reader = csv.reader(self.connection, delimiter=self.delimiter)
+            self.headers = next(reader)
+            self.schema_headers = self.create_schema_headers(self.headers)
         else:
             raise RuntimeError('No headers were passed or detected.')
-
-class SFTPExtractor(Extractor):
-    pass

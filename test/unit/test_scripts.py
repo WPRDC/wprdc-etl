@@ -8,9 +8,10 @@ from click.testing import CliRunner
 import pipeline as pl
 from pipeline.scripts import create_db, run_job
 
-from test.jobs.base import TestLoader, TestExtractor
+from test.jobs.base import TestLoader, TestExtractor, TestConnector
 
 HERE = os.path.abspath(os.path.dirname(__file__))
+SETTINGS_FILE = os.path.join(HERE, '../mock/test_settings.json')
 
 class TestCreateDBScript(TestCase):
     def setUp(self):
@@ -89,9 +90,12 @@ class TestCreateDBScript(TestCase):
 test_pipeline = pl.Pipeline(
     'test', 'Test',
     server='testing',
-    settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+    settings_file=SETTINGS_FILE,
     log_status=False
-).extract(TestExtractor, None).schema(pl.BaseSchema).load(TestLoader)
+).connect(TestConnector, None) \
+    .extract(TestExtractor) \
+    .schema(pl.BaseSchema) \
+    .load(TestLoader)
 
 class Junk(object):
     pass
@@ -120,7 +124,7 @@ class TestRunJobScript(TestCase):
         result = self.runner.invoke(
             run_job, [
                 'test.unit.test_scripts:test_pipeline',
-                '--config', os.path.join(HERE, '../mock/test_settings.json'),
+                '--config', SETTINGS_FILE,
                 '--server', 'second_testing']
         )
         self.assertEquals(result.exit_code, 0)
