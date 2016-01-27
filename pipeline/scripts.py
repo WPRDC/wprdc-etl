@@ -84,7 +84,8 @@ def run_job(job_path, config, server):
         pipeline = getattr(pipeline_module, pipeline)
         if not isinstance(pipeline, Pipeline):
             raise
-    except:
+    except Exception as e:
+        import pdb; pdb.set_trace()
         raise click.ClickException(
             'A Pipeline could not be found at "{}"'.format(
                 job_path
