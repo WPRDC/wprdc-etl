@@ -109,7 +109,7 @@ class Pipeline(object):
         self._schema = schema
         return self
 
-    def load(self, loader):
+    def load(self, loader, *args, **kwargs):
         '''Sets the loader class
 
         Arguments:
@@ -119,6 +119,8 @@ class Pipeline(object):
             modified Pipeline object
         '''
         self._loader = loader
+        self.loader_args = list(args)
+        self.loader_kwargs = dict(**kwargs)
         return self
 
     def load_line(self, data):
@@ -229,7 +231,7 @@ class Pipeline(object):
                 _connector.close()
 
             # load the data
-            self._loader(self.config).load(self.data)
+            self._loader(self.config, *(self.loader_args), **(self.loader_kwargs)).load(self.data)
             if self.log_status:
                 self.status.update(status='success')
         except Exception as e:

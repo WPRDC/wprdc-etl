@@ -77,7 +77,7 @@ class CKANLoader(Loader):
         response_json = response.json()
 
         if not response_json.get('success', False):
-            raise CKANException('An error occured: {}'.format(response_json['error']['name'][0]))
+            raise CKANException('An error occured: {}'.format(response_json['error']['_type'][0]))
 
         return response_json['result']['id']
 
@@ -194,10 +194,13 @@ class CKANUpsertLoader(CKANLoader):
     def __init__(self, config, *args, **kwargs):
         super(CKANUpsertLoader, self).__init__(config, *args, **kwargs)
         self.fields = kwargs.get('fields', None)
+        self.key_fields = kwargs.get('key_fields', None)
         self.method = kwargs.get('method', 'upsert')
 
         if self.fields is None:
-            raise RuntimeError('Fields must be specified')
+            raise RuntimeError('Fields must be specified.')
+        if self.method == 'upsert' and self.key_fields is None:
+            raise RuntimeError('Upsert method requires at primary key(s).')
 
     def load(self, data):
         self.generate_datastore(self.fields)
