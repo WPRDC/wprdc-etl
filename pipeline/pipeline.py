@@ -2,9 +2,10 @@ import os
 import json
 import sqlite3
 import time
-import click
 
-from pipeline.exceptions import IsHeaderException, InvalidConfigException
+from pipeline.exceptions import (
+    IsHeaderException, InvalidConfigException, DuplicateFileException
+)
 from pipeline.status import Status
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -40,7 +41,8 @@ class Pipeline(object):
                 pipeline's ``run`` method is called
         '''
         self.data = []
-        self._extractor, self._schema, self._loader = None, None, None
+        self._connector, self._extractor, self._schema, self._loader = \
+            None, None, None, None
         self.name = name
         self.display_name = display_name
 
@@ -78,7 +80,14 @@ class Pipeline(object):
                 'No config file found, or config not properly formatted'
             )
 
-    def extract(self, extractor, target, *args, **kwargs):
+    def connect(self, connector, target, *args, **kwargs):
+        self._connector = connector
+        self.target = target
+        self.connector_args = list(args)
+        self.connector_kwargs = dict(**kwargs)
+        return self
+
+    def extract(self, extractor, *args, **kwargs):
         '''Set the extractor class and related arguments
 
         Arguments:
@@ -86,7 +95,6 @@ class Pipeline(object):
             target: location of the extraction target (file, url, etc.)
         '''
         self._extractor = extractor
-        self.target = target
         self.extractor_args = list(args)
         self.extractor_kwargs = dict(**kwargs)
         return self
@@ -103,7 +111,7 @@ class Pipeline(object):
         self._schema = schema
         return self
 
-    def load(self, loader):
+    def load(self, loader, *args, **kwargs):
         '''Sets the loader class
 
         Arguments:
@@ -113,6 +121,8 @@ class Pipeline(object):
             modified Pipeline object
         '''
         self._loader = loader
+        self.loader_args = list(args)
+        self.loader_kwargs = dict(**kwargs)
         return self
 
     def load_line(self, data):
@@ -137,29 +147,46 @@ class Pipeline(object):
             RuntimeError: if an extractor, schema, and loader are not
                 all specified
         '''
-        if not all([self._extractor, self._schema, self._loader]):
+        if not all([
+            self._connector, self._extractor,
+            self._schema, self._loader,
+        ]):
             raise RuntimeError(
-                'You must specify extract, schema, and load steps!'
+                'You must specify connet, extract, schema, and load steps!'
             )
+
+    def get_last_run_checksum(self):
+        if self.log_status:
+            result = self.conn.execute('''
+                SELECT input_checksum, max(last_ran)
+                FROM status
+                WHERE name = ?
+                AND display_name = ?
+                GROUP BY input_checksum
+            ''', (self.name, self.display_name)).fetchone()
+            if result:
+                return result[0]
+        return None
 
     def pre_run(self):
         '''Method to be run immediately before the pipeline runs
 
-        Establishes a connection to the monitoring database on the
-        pipeline and builds the initial :py:class:`~pipeline.status.Status`
-        object.
+        Enforces that a pipeline is complete and, connects to the statusdb
         '''
         start_time = time.time()
+
+        self.enforce_full_pipeline()
 
         if not self.passed_conn:
             self.conn = sqlite3.Connection(self.config['statusdb'])
 
-        if self.log_status:
-            self.status = Status(
-                self.conn, self.name, self.display_name, None,
-                start_time, 'new', None, None,
-            )
-            self.status.write()
+        return start_time
+
+    def validate_input(self, connection):
+        input_checksum = connection.checksum_contents()
+        if input_checksum == self.get_last_run_checksum():
+            raise DuplicateFileException
+        return input_checksum
 
     def run(self):
         '''Main pipeline run method
@@ -186,21 +213,38 @@ class Pipeline(object):
         7. Finally, at the end of the run, run a final log, and run the
            close method to shut down the pipeline
         '''
-        self.pre_run()
-
         try:
-            self.enforce_full_pipeline()
-            # instantiate a new extrator instance based on the passed extract class
-            _extractor = self._extractor(
-                self.target, *(self.extractor_args), **(self.extractor_kwargs)
+            start_time = self.pre_run()
+
+            # instantiate a new connection based on the
+            # passed connector class
+            _connector = self._connector(
+                *(self.connector_args), **(self.connector_kwargs)
             )
-            # instantiate a new schema instance based on the passed schema class
-            raw = _extractor.extract()
+            connection = _connector.connect(self.target)
+
+            input_checksum = self.validate_input(_connector)
+
+            # log the status
+            if self.log_status:
+                self.status = Status(
+                    self.conn, self.name, self.display_name, None,
+                    start_time, 'new', None, None, None
+                )
+                self.status.write()
+
+            # instantiate a new extrator instance based on
+            # the passed extract class
+            _extractor = self._extractor(
+                connection, *(self.extractor_args), **(self.extractor_kwargs)
+            )
 
             # instantiate our schema
             self.__schema = self._schema()
 
             # build the data
+            raw = _extractor.process_connection()
+
             try:
                 for line in raw:
                     try:
@@ -209,12 +253,12 @@ class Pipeline(object):
                     except IsHeaderException:
                         continue
             finally:
-                _extractor.cleanup(raw)
+                _connector.close()
 
             # load the data
-            self._loader(self.config).load(self.data)
+            self._loader(self.config, *(self.loader_args), **(self.loader_kwargs)).load(self.data)
             if self.log_status:
-                self.status.update(status='success')
+                self.status.update(status='success', input_checksum=input_checksum)
         except Exception as e:
             if self.log_status:
                 self.status.update(status='error: {}'.format(str(e)))
@@ -231,6 +275,6 @@ class Pipeline(object):
     def close(self):
         '''Close any open database connections.
         '''
-        if not self.passed_conn:
+        if not self.passed_conn and hasattr(self, 'conn'):
             self.conn.close()
         self.__schema = None

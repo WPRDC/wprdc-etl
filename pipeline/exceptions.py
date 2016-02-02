@@ -13,3 +13,14 @@ class IsHeaderException(Exception):
 class CKANException(Exception):
     '''Thrown when a non-success status is received from CKAN
     '''
+
+class HTTPConnectorError(Exception):
+    pass
+
+class DuplicateFileException(Exception):
+    '''Thrown when two checksums match
+    '''
+
+class InvalidPipelineError(Exception):
+    pass
+

@@ -17,6 +17,14 @@ Job Status
 .. automodule:: pipeline.status
     :members:
 
+.. _built-in-connectors:
+
+Built-in Connectors
+-------------------
+
+.. automodule:: pipeline.connectors
+    :member:
+
 .. _built-in-extractors:
 
 Built-in Extractors

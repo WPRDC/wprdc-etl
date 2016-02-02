@@ -4,12 +4,14 @@ import datetime
 
 from pipeline.exceptions import CKANException
 
+
 class Loader(object):
     def __init__(self, config, *args, **kwargs):
         self.config = config
 
     def load(self, data):
         raise NotImplementedError
+
 
 class CKANLoader(Loader):
     """Connection to ckan datastore"""
@@ -23,18 +25,18 @@ class CKANLoader(Loader):
         self.package_id = kwargs.get('package_id')
         self.resource_name = kwargs.get('resource_name')
 
-    def resource_exists(self, package_id, resource_name):
+
+    def get_resource_id(self, package_id, resource_name):
         """
-        Searches for resource on ckan instance
+        Searches for resource within CKAN dataset and returns it's id
         Params:
             package_id: id of resources parent dataset
             resource_name: name of the resource
         Returns:
-            ``True`` if the resource is found within the package,
-            ``False`` otherwise
+            The resource id if the resource is found within the package,
+            ``None`` otherwise
         """
-
-        check_resource = requests.post(
+        response = requests.post(
             self.ckan_url + 'action/package_show',
             headers={
                 'content-type': 'application/json',
@@ -44,9 +46,22 @@ class CKANLoader(Loader):
                 'id': package_id
             })
         )
+        # todo: handle bad request
+        response_json = response.json()
+        return next((i['id'] for i in response_json['result']['resources'] if resource_name in i['name']), None)
 
-        response = check_resource.json()
-        return resource_name in set(i['name'] for i in response['result']['resources'])
+    def resource_exists(self, package_id, resource_name):
+        """
+        Searches for resource the existence of a resource on ckan instance
+        Params:
+            package_id: id of resources parent dataset
+            resource_name: name of the resource
+        Returns:
+            ``True`` if the resource is found within the package,
+            ``False`` otherwise
+        """
+        resource_id = self.get_resource_id(package_id, resource_name)
+        return (resource_id is not None)
 
     def create_resource(self, package_id, resource_name):
         '''
@@ -77,7 +92,7 @@ class CKANLoader(Loader):
         response_json = response.json()
 
         if not response_json.get('success', False):
-            raise CKANException('An error occured: {}'.format(response_json['error']['name'][0]))
+            raise CKANException('An error occured: {}'.format(response_json['error']['__type'][0]))
 
         return response_json['result']['id']
 
@@ -190,14 +205,18 @@ class CKANLoader(Loader):
     def load(self, data):
         raise NotImplementedError
 
-class CKANUpsertLoader(CKANLoader):
+
+class CKANDatastoreLoader(CKANLoader):
     def __init__(self, config, *args, **kwargs):
-        super(CKANUpsertLoader, self).__init__(config, *args, **kwargs)
+        super(CKANDatastoreLoader, self).__init__(config, *args, **kwargs)
         self.fields = kwargs.get('fields', None)
+        self.key_fields = kwargs.get('key_fields', None)
         self.method = kwargs.get('method', 'upsert')
 
         if self.fields is None:
-            raise RuntimeError('Fields must be specified')
+            raise RuntimeError('Fields must be specified.')
+        if self.method == 'upsert' and self.key_fields is None:
+            raise RuntimeError('Upsert method requires primary key(s).')
 
     def load(self, data):
         self.generate_datastore(self.fields)

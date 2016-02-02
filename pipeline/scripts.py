@@ -4,6 +4,7 @@ import click
 import json
 import importlib
 from pipeline import Pipeline
+from pipeline.exceptions import InvalidPipelineError, DuplicateFileException
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -54,6 +55,7 @@ def create_db(config, server, drop):
         display_name TEXT,
         last_ran INTEGER,
         start_time INTEGER NOT NULL,
+        input_checksum TEXT,
         status TEXT,
         num_lines INTEGER,
         PRIMARY KEY (display_name, start_time)
@@ -79,19 +81,32 @@ def run_job(job_path, config, server):
     For example: my.nested.job.directory:my_pipeline
     '''
     try:
+        if ':' not in job_path:
+            raise InvalidPipelineError
         path, pipeline = job_path.split(':')
         pipeline_module = importlib.import_module(path)
         pipeline = getattr(pipeline_module, pipeline)
         if not isinstance(pipeline, Pipeline):
-            raise
-    except:
+            raise InvalidPipelineError
+
+        if config and server:
+            pipeline.set_config_from_file(server, config)
+
+        pipeline.run()
+
+    except (InvalidPipelineError, ImportError):
         raise click.ClickException(
             'A Pipeline could not be found at "{}"'.format(
                 job_path
             )
         )
 
-    if config and server:
-        pipeline.set_config_from_file(server, config)
+    except DuplicateFileException:
+        raise click.ClickException(
+            'This input has already been processed!'
+        )
 
-    pipeline.run()
+    except Exception as e:
+        raise click.ClickException(
+            'Something went wrong in the pipeline: {}'.format(e)
+        )

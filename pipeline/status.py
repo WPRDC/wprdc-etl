@@ -12,7 +12,7 @@ class Status(object):
     '''
     def __init__(
         self, conn, name, display_name, last_ran, start_time,
-        status, frequency, num_lines
+        status, frequency, num_lines, input_checksum
     ):
         self.conn = conn
         self.name = name
@@ -21,6 +21,7 @@ class Status(object):
         self.start_time = start_time
         self.status = status
         self.num_lines = num_lines
+        self.input_checksum = input_checksum
 
     def update(self, **kwargs):
         '''Update the Status object with passed kwargs and write the result
@@ -37,11 +38,12 @@ class Status(object):
             '''
             INSERT OR REPLACE INTO status (
                 name, display_name, last_ran, start_time,
-                status, num_lines
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                input_checksum, status, num_lines
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 self.name, self.display_name, self.last_ran,
-                self.start_time, self.status, self.num_lines
+                self.start_time, self.input_checksum,
+                self.status, self.num_lines
             )
         )
         self.conn.commit()
