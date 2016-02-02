@@ -7,7 +7,7 @@ FIELD_TO_CKAN_TYPE_MAPPING = {
 }
 
 class BaseSchema(Schema):
-    def serialize_to_ckan_fields(self):
+    def serialize_to_ckan_fields(self, capitalize=False):
         '''Convert schema fieldlist to CKAN-friendly Fields
 
         Returns:
@@ -23,6 +23,7 @@ class BaseSchema(Schema):
         '''
         ckan_fields = []
         for name, marsh_field in self.fields.items():
+            name = name.upper() if capitalize else name,
             ckan_fields.append({
                 'id': name,
                 'type': FIELD_TO_CKAN_TYPE_MAPPING[marsh_field.__class__]

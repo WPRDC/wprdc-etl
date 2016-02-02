@@ -1,3 +1,4 @@
+import hashlib
 import requests
 import urllib
 
@@ -8,32 +9,43 @@ from pipeline.exceptions import HTTPConnectorError
 class Connector(object):
     def __init__(self, *args, **kwargs):
         self.encoding = kwargs.get('encoding', 'utf-8')
+        self.checksum = None
 
     def connect(self):
         raise NotImplementedError
 
+    def checksum_contents(self):
+        '''Get an md5 hash of the contents of the conn object
+        '''
+        raise NotImplementedError
+
     def close(self):
         raise NotImplementedError
 
-class LocalFileConnector(Connector):
+class FileConnector(Connector):
     def connect(self, target):
-        self.__file = open(target, 'r', encoding=self.encoding)
-        return self.__file
+        self._file = open(target, 'r', encoding=self.encoding)
+        return self._file
+
+    def checksum_contents(self, blocksize=8192):
+        m = hashlib.md5()
+        for chunk in iter(lambda: self._file.read(blocksize, ), b''):
+            if not chunk:
+                break
+            m.update(chunk.encode(self.encoding))
+        self.checksum = m.hexdigest()
+        self._file.seek(0)
+        return self.checksum
 
     def close(self):
-        if not self.__file.closed:
-            self.__file.close()
+        if not self._file.closed:
+            self._file.close()
         return
 
-class RemoteFileConnector(Connector):
+class RemoteFileConnector(FileConnector):
     def connect(self, target):
-        self.__file = TextIOWrapper(urllib.request.urlopen(target))
-        return self.__file
-
-    def close(self):
-        if not self.__file.closed:
-            self.__file.close()
-        return
+        self._file = TextIOWrapper(urllib.request.urlopen(target))
+        return self._file
 
 class HTTPConnector(Connector):
     ''' Connect to remote file via HTTP

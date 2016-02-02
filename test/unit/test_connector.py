@@ -17,7 +17,7 @@ class TestConnector(unittest.TestCase):
 class TestCSVConnector(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(HERE, '../mock/simple_mock.csv')
-        self.connector = pl.LocalFileConnector()
+        self.connector = pl.FileConnector()
 
     def test_connect(self):
         f = self.connector.connect(self.path)

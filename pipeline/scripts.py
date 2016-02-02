@@ -4,11 +4,9 @@ import click
 import json
 import importlib
 from pipeline import Pipeline
+from pipeline.exceptions import InvalidPipelineError, DuplicateFileException
 
 HERE = os.path.abspath(os.path.dirname(__file__))
-
-class InvalidPipelineError(Exception):
-    pass
 
 @click.command()
 @click.argument('config', type=click.Path(exists=True))
@@ -57,6 +55,7 @@ def create_db(config, server, drop):
         display_name TEXT,
         last_ran INTEGER,
         start_time INTEGER NOT NULL,
+        input_checksum TEXT,
         status TEXT,
         num_lines INTEGER,
         PRIMARY KEY (display_name, start_time)
@@ -101,8 +100,13 @@ def run_job(job_path, config, server):
                 job_path
             )
         )
+
+    except DuplicateFileException:
+        raise click.ClickException(
+            'This input has already been processed!'
+        )
+
     except Exception as e:
         raise click.ClickException(
             'Something went wrong in the pipeline: {}'.format(e)
         )
-

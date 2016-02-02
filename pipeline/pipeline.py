@@ -3,7 +3,9 @@ import json
 import sqlite3
 import time
 
-from pipeline.exceptions import IsHeaderException, InvalidConfigException
+from pipeline.exceptions import (
+    IsHeaderException, InvalidConfigException, DuplicateFileException
+)
 from pipeline.status import Status
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -153,24 +155,38 @@ class Pipeline(object):
                 'You must specify connet, extract, schema, and load steps!'
             )
 
+    def get_last_run_checksum(self):
+        if self.log_status:
+            result = self.conn.execute('''
+                SELECT input_checksum, max(last_ran)
+                FROM status
+                WHERE name = ?
+                AND display_name = ?
+                GROUP BY input_checksum
+            ''', (self.name, self.display_name)).fetchone()
+            if result:
+                return result[0]
+        return None
+
     def pre_run(self):
         '''Method to be run immediately before the pipeline runs
 
-        Establishes a connection to the monitoring database on the
-        pipeline and builds the initial :py:class:`~pipeline.status.Status`
-        object.
+        Enforces that a pipeline is complete and, connects to the statusdb
         '''
         start_time = time.time()
+
+        self.enforce_full_pipeline()
 
         if not self.passed_conn:
             self.conn = sqlite3.Connection(self.config['statusdb'])
 
-        if self.log_status:
-            self.status = Status(
-                self.conn, self.name, self.display_name, None,
-                start_time, 'new', None, None,
-            )
-            self.status.write()
+        return start_time
+
+    def validate_input(self, connection):
+        input_checksum = connection.checksum_contents()
+        if input_checksum == self.get_last_run_checksum():
+            raise DuplicateFileException
+        return input_checksum
 
     def run(self):
         '''Main pipeline run method
@@ -197,16 +213,25 @@ class Pipeline(object):
         7. Finally, at the end of the run, run a final log, and run the
            close method to shut down the pipeline
         '''
-        self.pre_run()
-
         try:
-            self.enforce_full_pipeline()
+            start_time = self.pre_run()
+
             # instantiate a new connection based on the
             # passed connector class
             _connector = self._connector(
                 *(self.connector_args), **(self.connector_kwargs)
             )
             connection = _connector.connect(self.target)
+
+            input_checksum = self.validate_input(_connector)
+
+            # log the status
+            if self.log_status:
+                self.status = Status(
+                    self.conn, self.name, self.display_name, None,
+                    start_time, 'new', None, None, None
+                )
+                self.status.write()
 
             # instantiate a new extrator instance based on
             # the passed extract class
@@ -233,7 +258,7 @@ class Pipeline(object):
             # load the data
             self._loader(self.config, *(self.loader_args), **(self.loader_kwargs)).load(self.data)
             if self.log_status:
-                self.status.update(status='success')
+                self.status.update(status='success', input_checksum=input_checksum)
         except Exception as e:
             if self.log_status:
                 self.status.update(status='error: {}'.format(str(e)))
@@ -250,6 +275,6 @@ class Pipeline(object):
     def close(self):
         '''Close any open database connections.
         '''
-        if not self.passed_conn:
+        if not self.passed_conn and hasattr(self, 'conn'):
             self.conn.close()
         self.__schema = None

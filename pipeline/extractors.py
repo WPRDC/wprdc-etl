@@ -4,6 +4,7 @@ from pipeline.exceptions import IsHeaderException
 class Extractor(object):
     def __init__(self, connection):
         self.connection = connection
+        self.checksum = None
 
     def process_connection(self):
         '''Do any additional processing on a connection to prepare it for reading
@@ -36,7 +37,7 @@ class CSVExtractor(Extractor):
         return reader
 
     def handle_line(self, line):
-        '''Handle a line in a file
+        '''Replace empty strings with None types.
         '''
         if line == self.headers:
             raise IsHeaderException

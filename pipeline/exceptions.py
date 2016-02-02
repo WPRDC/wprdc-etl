@@ -16,3 +16,11 @@ class CKANException(Exception):
 
 class HTTPConnectorError(Exception):
     pass
+
+class DuplicateFileException(Exception):
+    '''Thrown when two checksums match
+    '''
+
+class InvalidPipelineError(Exception):
+    pass
+
