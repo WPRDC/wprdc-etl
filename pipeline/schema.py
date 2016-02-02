@@ -3,7 +3,7 @@ from marshmallow import Schema, fields
 FIELD_TO_CKAN_TYPE_MAPPING = {
     fields.String: 'text',
     fields.Number: 'numeric', fields.Integer: 'numeric',
-    fields.DateTime: 'timestamp', fields.Date: 'timestamp'
+    fields.DateTime: 'timestamp', fields.Date: 'date'
 }
 
 class BaseSchema(Schema):
