@@ -23,8 +23,9 @@ class BaseSchema(Schema):
         '''
         ckan_fields = []
         for name, marsh_field in self.fields.items():
-            name = name.upper() if capitalize else name,
+            name = name.upper() if capitalize else name
             ckan_fields.append({
                 'id': name,
                 'type': FIELD_TO_CKAN_TYPE_MAPPING[marsh_field.__class__]
             })
+        return ckan_fields
