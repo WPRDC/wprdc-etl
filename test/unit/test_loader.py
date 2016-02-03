@@ -133,23 +133,50 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
             ],
             key_fields=['words']
         )
+        self.error_codes = [409, 500]
 
     def test_datastore_loader_no_fields(self):
         with self.assertRaises(RuntimeError):
             pl.CKANDatastoreLoader(self.pipeline.get_config())
 
     @patch('requests.post')
-    def test_datastore_load_successful(self, post):
+    def test_datastore_load__insert_successful(self, post):
         mock_post = Mock()
         mock_post.json.side_effect = [
-            {'success': True, 'result': {'id': 1}},
-            {'success': True, 'result': {'resource_id': 1}},
             {'success': True, 'result': {'id': 1}},
             {'success': True, 'result': {'resource_id': 1}},
         ]
         post.return_value = mock_post
         self.insert_loader.load([])
+
+    @patch('requests.post')
+    def test_datastore_load_insert_failed(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
+            {'success': False, 'result': {'help': 'really doesn\'t matter'}},
+            {'success': False, 'result': {'help': 'some help text'}},
+        ]
+        post.return_value = mock_post
+
+        for error in self.error_codes:
+            type(post.return_value).status_code = PropertyMock(return_value=error)
+
+            with self.assertRaises(RuntimeError):
+                self.insert_loader.load([])
+
+
+    @patch('requests.post')
+    def test_datastore_load__upsert_successful(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
+        ]
+        post.return_value = mock_post
         self.upsert_loader.load([])
+
 
     @patch('requests.post')
     def test_datastore_load_upsert_failed(self, post):
@@ -157,22 +184,41 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         mock_post.json.side_effect = [
             {'success': True, 'result': {'id': 1}},
             {'success': True, 'result': {'resource_id': 1}},
+            {'success': False, 'result': {'help': 'really doesn\'t matter'}},
+            {'success': False, 'result': {'help': 'some help text'}},
         ]
         post.return_value = mock_post
-        type(post.return_value).status_code = PropertyMock(side_effect=[500, 200])
 
-        with self.assertRaises(RuntimeError):
-            self.insert_loader.load([])
+        for error in self.error_codes:
+            type(post.return_value).status_code = PropertyMock(return_value=error)
+
+            with self.assertRaises(RuntimeError):
+                self.upsert_loader.load([])
 
     @patch('requests.post')
-    def test_datastore_load_update_metadata_failed(self, post):
+    def test_datastore_load_insert_update_metadata_failed(self, post):
         mock_post = Mock()
         mock_post.json.side_effect = [
             {'success': True, 'result': {'id': 1}},
             {'success': True, 'result': {'resource_id': 1}},
         ]
         post.return_value = mock_post
-        type(post.return_value).status_code = PropertyMock(side_effect=[200, 500])
-        with self.assertRaises(RuntimeError):
-            self.insert_loader.load([])
 
+        for error in self.error_codes:
+            type(post.return_value).status_code = PropertyMock(side_effect=[200, 500])
+            with self.assertRaises(RuntimeError):
+                self.insert_loader.load([])
+
+    @patch('requests.post')
+    def test_datastore_load_upsert_update_metadata_failed(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
+        ]
+        post.return_value = mock_post
+
+        for error in self.error_codes:
+            type(post.return_value).status_code = PropertyMock(return_value=error)
+            with self.assertRaises(RuntimeError):
+                    self.upsert_loader.load([])
