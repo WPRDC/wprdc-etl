@@ -161,7 +161,7 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         post.return_value = mock_post
 
         for error in self.error_codes:
-            type(post.return_value).status_code = PropertyMock(side_effect=[error, 200])
+            type(post.return_value).status_code = PropertyMock(return_value=error)
 
             with self.assertRaises(RuntimeError):
                 self.insert_loader.load([])
@@ -190,7 +190,7 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         post.return_value = mock_post
 
         for error in self.error_codes:
-            type(post.return_value).status_code = PropertyMock(side_effect=[error, 200])
+            type(post.return_value).status_code = PropertyMock(return_value=error)
 
             with self.assertRaises(RuntimeError):
                 self.upsert_loader.load([])
@@ -219,6 +219,6 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         post.return_value = mock_post
 
         for error in self.error_codes:
-            type(post.return_value).status_code = PropertyMock(side_effect=[200, 500])
+            type(post.return_value).status_code = PropertyMock(return_value=error)
             with self.assertRaises(RuntimeError):
                     self.upsert_loader.load([])
