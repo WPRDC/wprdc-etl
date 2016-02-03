@@ -267,7 +267,7 @@ class Pipeline(object):
             raise
 
         finally:
-            if self.log_status:
+            if self.log_status and hasattr(self, 'status'):
                 self.status.update(
                     num_lines=len(self.data),
                     last_ran=time.time()
