@@ -163,7 +163,7 @@ class CKANLoader(Loader):
         Returns:
             request status
         """
-        insert = requests.post(
+        upsert = requests.post(
             self.ckan_url + 'action/datastore_upsert',
             headers={
                 'content-type': 'application/json',
@@ -176,7 +176,7 @@ class CKANLoader(Loader):
                 'records': data
             })
         )
-        return insert.status_code
+        return upsert.status_code
 
     def update_metadata(self, resource_id):
         """
