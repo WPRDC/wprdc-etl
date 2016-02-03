@@ -182,12 +182,6 @@ class Pipeline(object):
 
         return start_time
 
-    def validate_input(self, connection):
-        input_checksum = connection.checksum_contents()
-        if input_checksum == self.get_last_run_checksum():
-            raise DuplicateFileException
-        return input_checksum
-
     def run(self):
         '''Main pipeline run method
 
@@ -221,17 +215,22 @@ class Pipeline(object):
             _connector = self._connector(
                 *(self.connector_args), **(self.connector_kwargs)
             )
-            connection = _connector.connect(self.target)
 
-            input_checksum = self.validate_input(_connector)
+            input_checksum = _connector.checksum_contents(self.target)
+            if input_checksum == self.get_last_run_checksum():
+                raise DuplicateFileException
 
-            # log the status
             if self.log_status:
                 self.status = Status(
                     self.conn, self.name, self.display_name, None,
                     start_time, 'new', None, None, None
                 )
+
+            # log the status
+            if self.log_status:
                 self.status.write()
+
+            connection = _connector.connect(self.target)
 
             # instantiate a new extrator instance based on
             # the passed extract class
@@ -256,13 +255,17 @@ class Pipeline(object):
                 _connector.close()
 
             # load the data
-            self._loader(self.config, *(self.loader_args), **(self.loader_kwargs)).load(self.data)
+            _loader = self._loader(self.config, *(self.loader_args), **(self.loader_kwargs))
+            _loader.load(self.data)
+
             if self.log_status:
                 self.status.update(status='success', input_checksum=input_checksum)
+
         except Exception as e:
-            if self.log_status:
+            if self.log_status and hasattr(self, 'status'):
                 self.status.update(status='error: {}'.format(str(e)))
             raise
+
         finally:
             if self.log_status:
                 self.status.update(
@@ -270,6 +273,7 @@ class Pipeline(object):
                     last_ran=time.time()
                 )
             self.close()
+
         return self
 
     def close(self):

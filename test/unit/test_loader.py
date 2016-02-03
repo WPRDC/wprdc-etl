@@ -117,7 +117,7 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
             self.pipeline.get_config(), fields=[],
             method='insert'
         )
-        # TODO: add a whole suite of tests involving method=upsert
+
         self.upsert_loader = pl.CKANDatastoreLoader(
             self.pipeline.get_config(),
             method='upsert',
@@ -144,9 +144,12 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         mock_post.json.side_effect = [
             {'success': True, 'result': {'id': 1}},
             {'success': True, 'result': {'resource_id': 1}},
+            {'success': True, 'result': {'id': 1}},
+            {'success': True, 'result': {'resource_id': 1}},
         ]
         post.return_value = mock_post
         self.insert_loader.load([])
+        self.upsert_loader.load([])
 
     @patch('requests.post')
     def test_datastore_load_upsert_failed(self, post):

@@ -12,7 +12,6 @@ class Loader(object):
     def load(self, data):
         raise NotImplementedError
 
-
 class CKANLoader(Loader):
     """Connection to ckan datastore"""
 

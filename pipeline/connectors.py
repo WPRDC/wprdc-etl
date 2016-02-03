@@ -11,10 +11,10 @@ class Connector(object):
         self.encoding = kwargs.get('encoding', 'utf-8')
         self.checksum = None
 
-    def connect(self):
+    def connect(self, target):
         raise NotImplementedError
 
-    def checksum_contents(self):
+    def checksum_contents(self, target):
         '''Get an md5 hash of the contents of the conn object
         '''
         raise NotImplementedError
@@ -27,15 +27,14 @@ class FileConnector(Connector):
         self._file = open(target, 'r', encoding=self.encoding)
         return self._file
 
-    def checksum_contents(self, blocksize=8192):
+    def checksum_contents(self, target, blocksize=8192):
+        _file = self.connect(target)
         m = hashlib.md5()
-        for chunk in iter(lambda: self._file.read(blocksize, ), b''):
+        for chunk in iter(lambda: _file.read(blocksize, ), b''):
             if not chunk:
                 break
             m.update(chunk.encode(self.encoding))
-        self.checksum = m.hexdigest()
-        self._file.seek(0)
-        return self.checksum
+        return m.hexdigest()
 
     def close(self):
         if not self._file.closed:
