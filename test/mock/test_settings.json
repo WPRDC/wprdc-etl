@@ -1,14 +1,34 @@
 {
   "testing": {
-    "api_key": "FUN FUN FUN",
-    "root_url": "localhost:9000/",
-    "organizations": {},
-    "statusdb": ":memory:"
+    "general": {
+      "statusdb": ":memory:"
+    },
+    "connector": {
+      "nested": {
+        "two_levels": {
+          "key": "value"
+        }
+      }
+    },
+    "loader": {
+      "ckan": {
+        "ckan_api_key": "FUN FUN FUN",
+        "ckan_root_url": "localhost:9000/",
+        "ckan_organization": {}
+      }
+    }
   },
   "second_testing": {
-    "api_key": "EVEN MORE FUN",
-    "root_url": "localhost:9001/",
-    "organizations": {},
-    "statusdb": ":memory:"
+    "general": {
+      "statusdb": ":memory:"
+    },
+    "connector": {},
+    "loader": {
+      "ckan": {
+        "ckan_api_key": "EVEN MORE FUN",
+        "ckan_root_url": "localhost:9001/",
+        "ckan_organization": {}
+      }
+    }
   }
 }

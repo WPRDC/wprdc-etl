@@ -17,12 +17,14 @@ class TestCKANDatastoreBase(unittest.TestCase):
             settings_file=os.path.join(HERE, '../mock/test_settings.json'),
             log_status=False
         )
-
+        self.ckan_config = self.pipeline.parse_config_piece(
+            'loader', 'ckan'
+        )
 
 class TestCKANDatastore(TestCKANDatastoreBase):
     def setUp(self):
         super(TestCKANDatastore, self).setUp()
-        self.ckan_loader = CKANLoader(self.pipeline.get_config())
+        self.ckan_loader = CKANLoader(self.ckan_config)
 
     def test_datapusher_init(self):
         self.assertIsNotNone(self.ckan_loader)
@@ -114,12 +116,12 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
     def setUp(self):
         super(TestCKANDatastoreLoader, self).setUp()
         self.insert_loader = pl.CKANDatastoreLoader(
-            self.pipeline.get_config(), fields=[],
+            self.ckan_config, fields=[],
             method='insert'
         )
 
         self.upsert_loader = pl.CKANDatastoreLoader(
-            self.pipeline.get_config(),
+            self.ckan_config,
             method='upsert',
             fields=[
                 {
@@ -137,7 +139,7 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
 
     def test_datastore_loader_no_fields(self):
         with self.assertRaises(RuntimeError):
-            pl.CKANDatastoreLoader(self.pipeline.get_config())
+            pl.CKANDatastoreLoader(self.ckan_config)
 
     @patch('requests.post')
     def test_datastore_load__insert_successful(self, post):
@@ -166,7 +168,6 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
             with self.assertRaises(RuntimeError):
                 self.insert_loader.load([])
 
-
     @patch('requests.post')
     def test_datastore_load__upsert_successful(self, post):
         mock_post = Mock()
@@ -176,7 +177,6 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         ]
         post.return_value = mock_post
         self.upsert_loader.load([])
-
 
     @patch('requests.post')
     def test_datastore_load_upsert_failed(self, post):

@@ -4,7 +4,6 @@ import datetime
 
 from pipeline.exceptions import CKANException
 
-
 class Loader(object):
     def __init__(self, config, *args, **kwargs):
         self.config = config
@@ -22,13 +21,12 @@ class CKANLoader(Loader):
 
     def __init__(self, config, *args, **kwargs):
         super(CKANLoader, self).__init__(config, *args, **kwargs)
-        self.ckan_url = self.config['root_url'].rstrip('/') + '/api/3/'
-        self.dump_url = self.config['root_url'].rstrip('/') + '/datastore/dump/'
-        self.key = self.config['api_key']
+        self.ckan_url = self.config['ckan_root_url'].rstrip('/') + '/api/3/'
+        self.dump_url = self.config['ckan_root_url'].rstrip('/') + '/datastore/dump/'
+        self.key = self.config['ckan_api_key']
         self.resource_id = kwargs.get('resource_id')
         self.package_id = kwargs.get('package_id')
         self.resource_name = kwargs.get('resource_name')
-
 
     def get_resource_id(self, package_id, resource_name):
         """Search for resource within CKAN dataset and returns its id
