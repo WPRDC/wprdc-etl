@@ -1,0 +1,19 @@
+{
+  "general": {
+    "statusdb": ":memory:"
+  },
+  "connector": {
+    "nested": {
+      "two_levels": {
+        "key": "value"
+      }
+    }
+  },
+  "loader": {
+    "ckan": {
+      "ckan_api_key": "FUN FUN FUN",
+      "ckan_root_url": "localhost:9000/",
+      "ckan_organization": {}
+    }
+  }
+}
