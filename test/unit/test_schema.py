@@ -9,7 +9,8 @@ class FakeSchema(pl.BaseSchema):
     int = fields.Integer()
     num = fields.Number()
     datetime = fields.DateTime()
-    date = fields.Date()
+    date = fields.Date(dump_to='a_different_name')
+    not_there = fields.String(load_only=True)
 
 class TestSchema(TestCase):
     def test_ckan_serialization(self):
@@ -17,7 +18,7 @@ class TestSchema(TestCase):
         self.assertListEqual(
             sorted(fields, key=itemgetter('id')),
             [
-                {'id': 'date', 'type': 'date'},
+                {'id': 'a_different_name', 'type': 'date'},
                 {'id': 'datetime', 'type': 'timestamp'},
                 {'id': 'int', 'type': 'numeric'},
                 {'id': 'num', 'type': 'numeric'},
@@ -30,7 +31,7 @@ class TestSchema(TestCase):
         self.assertListEqual(
             sorted(fields, key=itemgetter('id')),
             [
-                {'id': 'DATE', 'type': 'date'},
+                {'id': 'A_DIFFERENT_NAME', 'type': 'date'},
                 {'id': 'DATETIME', 'type': 'timestamp'},
                 {'id': 'INT', 'type': 'numeric'},
                 {'id': 'NUM', 'type': 'numeric'},

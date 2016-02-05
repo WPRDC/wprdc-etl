@@ -1,4 +1,4 @@
-Api
+API
 ===
 
 .. _the-pipeline-class:
@@ -50,4 +50,4 @@ Built-in Loaders
 .. automodule:: pipeline.loaders
     :members:
 
-
+.. _file-object: https://docs.python.org/3.5/glossary.html#term-file-object

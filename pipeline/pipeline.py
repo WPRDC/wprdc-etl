@@ -172,6 +172,9 @@ class Pipeline(object):
         '''Method to be run immediately before the pipeline runs
 
         Enforces that a pipeline is complete and, connects to the statusdb
+
+        Returns:
+            A unix timestamp of the pipeline's start time.
         '''
         start_time = time.time()
 
@@ -185,27 +188,30 @@ class Pipeline(object):
     def run(self):
         '''Main pipeline run method
 
-        One of the main features is that the extractor, schema, and
-        loader are all instantiated here as opposed to when they
-        are declared on pipeline instantiation. This delays opening
-        connections until the last possible moment.
+        One of the main features is that the connector, extractor,
+        schema, and loader are all instantiated here as opposed to
+        when they are declared on pipeline instantiation. This delays
+        opening connections until the last possible moment.
 
         The run method works essentially as follow:
 
-        1. Ensure that we have all pieces of the pipeline
-        2. Instantiate the extractor, passing it whatever args
-           and kwargs needed
-        3. Run the extract method, which should return an iterable
-           of different data methods
-        4. Instantiate our schema and attach it to the pipeline
-        5. Iterate through the extracted raw data, using the extractor's
-           ``handle_line`` to extract the data from each line, and
-           then run the ``load_line`` method to attach each row to the
-           pipeline's ``data`` attribute. At the end of the iteration,
-           call the extractor's ``cleanup`` attribute.
-        6. Instantiate the loader and then load the data
-        7. Finally, at the end of the run, run a final log, and run the
-           close method to shut down the pipeline
+        1. Run the ``pre_run`` method, which gives us the pipeline
+           start time, ensures that our pipeline has all of the
+           required component pieces, and connects to the status db.
+        2. Boot up a new connection object, and get the checksum
+           of the connected iterable.
+        3. Check to make sure that the incoming checksum is different
+           from the previous run's input_checksum
+        4. Instantiate our schema
+        5. Iterate through the iterable returned from the connector's
+           connect method, handling each element with the extractor's
+           ``handle_line`` method before passing it to the the
+           ``load_line`` method to attach each row to the pipeline's
+           data.
+        6. After iteration, clean up the connector
+        7. Instantiate the loader and load the data
+        8. Finally, update the status to successful run and close
+           down and clean up the pipeline.
         '''
         try:
             start_time = self.pre_run()

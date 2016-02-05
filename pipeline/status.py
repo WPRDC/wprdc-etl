@@ -9,6 +9,7 @@ class Status(object):
         start_time: UNIX timestamp (number) for last complete run start
         status: string representing status/errors with the pipeline
         num_lines: if successful, number of lines processed
+        input_checksum: a checksum of the input's contents
     '''
     def __init__(
         self, conn, name, display_name, last_ran, start_time,

@@ -7,6 +7,9 @@ FIELD_TO_CKAN_TYPE_MAPPING = {
 }
 
 class BaseSchema(Schema):
+    '''Base schema for the pipeline. Extends :py:class:`marshmallow.Schema`
+    '''
+
     def serialize_to_ckan_fields(self, capitalize=False):
         '''Convert schema fieldlist to CKAN-friendly Fields
 
@@ -14,6 +17,9 @@ class BaseSchema(Schema):
             A list of dictionaries with proper name/type mappings
             for CKAN. For example, name=fields.String() would go
             to:
+
+            .. code-block:: json
+
                 [
                     {
                         'id': 'name',
@@ -23,6 +29,10 @@ class BaseSchema(Schema):
         '''
         ckan_fields = []
         for name, marsh_field in self.fields.items():
+            if marsh_field.load_only:
+                continue
+            if marsh_field.dump_to is not None:
+                name = marsh_field.dump_to
             name = name.upper() if capitalize else name
             ckan_fields.append({
                 'id': name,
