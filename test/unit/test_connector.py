@@ -92,3 +92,43 @@ class TestSFTPConnector(unittest.TestCase):
         self.assertEquals(self.connector.port, 22)
         self.assertEquals(self.connector.root_dir, '/')
         self.assertEquals(self.connector.conn, None)
+
+    @patch('pipeline.connectors.paramiko.SFTPClient')
+    @patch('pipeline.connectors.paramiko.Transport')
+    def test_connector(self, Transport, SFTPClient):
+        self.assertTrue(self.connector.conn is None)
+        self.assertTrue(self.connector.transport is None)
+        self.assertTrue(self.connector._file is None)
+        self.connector.connect('myfile.txt')
+
+        self.assertTrue(self.connector.transport is not None)
+        self.assertTrue(Transport.called)
+        Transport.assert_called_with((None, 22))
+
+        self.assertTrue(self.connector.conn is not None)
+        self.assertTrue(SFTPClient.from_transport.called)
+        SFTPClient.from_transport.assert_called_with(self.connector.transport)
+
+        self.assertTrue(self.connector._file is not None)
+        self.assertTrue(SFTPClient.from_transport().open.called)
+        SFTPClient.from_transport().open.assert_called_with(
+            '/myfile.txt', 'r'
+        )
+
+    @patch('pipeline.connectors.paramiko.SFTPClient')
+    @patch('pipeline.connectors.paramiko.Transport')
+    def test_bad_sftp(self, Transport, SFTPClient):
+        SFTPClient.from_transport().open.side_effect = IOError()
+        with self.assertRaises(IOError):
+            self.connector.connect('')
+
+    @patch('pipeline.connectors.paramiko.SFTPClient')
+    @patch('pipeline.connectors.paramiko.Transport')
+    def test_connector_closes_connections(self, Transport, SFTPClient):
+        self.connector.connect('myfile.txt')
+        self.connector._file = StringIO()
+        self.assertFalse(self.connector._file.closed)
+        self.connector.close()
+        self.assertTrue(self.connector.conn.close.called)
+        self.assertTrue(self.connector.transport.close.called)
+        self.assertTrue(self.connector._file.closed)

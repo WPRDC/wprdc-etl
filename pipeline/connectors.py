@@ -129,7 +129,7 @@ class SFTPConnector(FileConnector):
         self.password = kwargs.get('password', '')
         self.port = kwargs.get('port', 22)
         self.root_dir = kwargs.get('root_dir', '').rstrip('/') + '/'
-        self.conn, self.transport, self._file = None,None, None
+        self.conn, self.transport, self._file = None, None, None
 
     def connect(self, target):
         try:
