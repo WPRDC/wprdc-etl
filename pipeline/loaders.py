@@ -10,6 +10,11 @@ class Loader(object):
         self.config = config
 
     def load(self, data):
+        '''Main load method for Loaders to implement
+
+        Raises:
+            NotImplementedError
+        '''
         raise NotImplementedError
 
 class CKANLoader(Loader):
@@ -26,11 +31,12 @@ class CKANLoader(Loader):
 
 
     def get_resource_id(self, package_id, resource_name):
-        """
-        Searches for resource within CKAN dataset and returns it's id
+        """Search for resource within CKAN dataset and returns its id
+
         Params:
             package_id: id of resources parent dataset
             resource_name: name of the resource
+
         Returns:
             The resource id if the resource is found within the package,
             ``None`` otherwise
@@ -50,11 +56,12 @@ class CKANLoader(Loader):
         return next((i['id'] for i in response_json['result']['resources'] if resource_name in i['name']), None)
 
     def resource_exists(self, package_id, resource_name):
-        """
-        Searches for resource the existence of a resource on ckan instance
+        """Search for resource the existence of a resource on ckan instance
+
         Params:
             package_id: id of resources parent dataset
             resource_name: name of the resource
+
         Returns:
             ``True`` if the resource is found within the package,
             ``False`` otherwise
@@ -63,13 +70,15 @@ class CKANLoader(Loader):
         return (resource_id is not None)
 
     def create_resource(self, package_id, resource_name):
-        '''
-        Creates new resource in ckan instance
+        '''Create new resource in ckan instance
+
         Params:
             package_id: dataset under which to add new resource
             resource_name: name of new resource
+
         Returns:
-            id of newly created resource if successful, None otherwise
+            id of newly created resource if successful,
+            ``None`` otherwise
         '''
 
         # Make api call
@@ -96,13 +105,17 @@ class CKANLoader(Loader):
         return response_json['result']['id']
 
     def create_datastore(self, resource_id, fields):
-        """
-        Creates new datastore for specified resource
+        """Create new datastore for specified resource
+
         Params:
             resource_id: resource id for which new datastore is being made
             fields: header fields for csv file
+
         Returns:
             resource_id for the new datastore if successful
+
+        Raises:
+            CKANException if resource creation is unsuccessful
         """
 
         # Make API call
@@ -134,10 +147,11 @@ class CKANLoader(Loader):
         return self.resource_id
 
     def delete_datastore(self, resource_id):
-        """
-        Deletes datastore table for resource
+        """Deletes datastore table for resource
+
         Params:
             resource: resource_id to remove table from
+
         Returns:
             Status code from the request
         """
@@ -155,11 +169,12 @@ class CKANLoader(Loader):
         return delete.status_code
 
     def upsert(self, resource_id, data, method='upsert'):
-        """
-        Upsert data into datastore
+        """Upsert data into datastore
+
         Params:
             resource_id: resource_id to which data will be inserted
             data: data to be upserted
+
         Returns:
             request status
         """
@@ -179,10 +194,13 @@ class CKANLoader(Loader):
         return upsert.status_code
 
     def update_metadata(self, resource_id):
-        """
+        """Update a resource's metadata
+
         TODO: Make this versatile
+
         Params:
             resource_id: resource whose metadata willbe modified
+
         Returns:
             request status
         """
@@ -201,12 +219,29 @@ class CKANLoader(Loader):
         )
         return update.status_code
 
-    def load(self, data):
-        raise NotImplementedError
-
-
 class CKANDatastoreLoader(CKANLoader):
+    '''Store data in CKAN using an upsert strategy
+    '''
+
     def __init__(self, config, *args, **kwargs):
+        '''Constructor for new CKANDatastoreLoader
+
+        Arguments:
+            config: location of a configuration file
+
+        Keyword Arguments:
+            fields: List of CKAN fields. CKAN fields must be
+                formatted as a list of dictionaries with
+                ``id`` and ``type`` keys.
+            key_fields: Primary key field
+            method: Must be one of ``upsert`` or ``insert``.
+                Defaults to ``upsert``. See
+                :~pipeline.loaders.CKANLoader.upsert:
+
+        Raises:
+            RuntimeError if fields is not specified or method is
+            ``upsert`` and no ``key_fields`` are passed.
+        '''
         super(CKANDatastoreLoader, self).__init__(config, *args, **kwargs)
         self.fields = kwargs.get('fields', None)
         self.key_fields = kwargs.get('key_fields', None)
@@ -218,6 +253,20 @@ class CKANDatastoreLoader(CKANLoader):
             raise RuntimeError('Upsert method requires primary key(s).')
 
     def load(self, data):
+        '''Load data to CKAN using an upsert strategy
+
+        Arguments:
+            data: a list of data to be inserted or upserted
+                to the configured CKAN instance
+
+        Raises:
+            RuntimeError if the upsert or update metadata
+                calls are unsuccessful
+
+        Returns:
+            A two-tuple of the status codes for the upsert
+            and metadata update calls
+        '''
         self.generate_datastore(self.fields)
         upsert_status = self.upsert(self.resource_id, data, self.method)
         update_status = self.update_metadata(self.resource_id)

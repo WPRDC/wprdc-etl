@@ -1,4 +1,4 @@
-Api
+API
 ===
 
 .. _the-pipeline-class:
@@ -23,7 +23,7 @@ Built-in Connectors
 -------------------
 
 .. automodule:: pipeline.connectors
-    :member:
+    :members:
 
 .. _built-in-extractors:
 
@@ -33,7 +33,16 @@ Built-in Extractors
 .. automodule:: pipeline.extractors
     :members:
 
+.. _built-in-schema:
+
+Built-in Schema
+---------------
+
+.. automodule:: pipeline.schema
+    :members:
+
 .. _built-in-loaders:
+
 
 Built-in Loaders
 ----------------
@@ -41,4 +50,4 @@ Built-in Loaders
 .. automodule:: pipeline.loaders
     :members:
 
-
+.. _file-object: https://docs.python.org/3.5/glossary.html#term-file-object
