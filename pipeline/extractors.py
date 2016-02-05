@@ -1,5 +1,6 @@
 import csv
 from pipeline.exceptions import IsHeaderException
+import xlrd
 
 class Extractor(object):
     def __init__(self, connection):
@@ -21,16 +22,23 @@ class Extractor(object):
         '''
         raise NotImplementedError
 
+class TableExtractor(Extractor):
+    def __init__(self, connection, *args, **kwargs):
+        super(TableExtractor, self).__init__(connection)
+        self.headers = kwargs.get('headers', None)
+        self.delimiter = kwargs.get('delimiter', ',')
+
+        self.set_headers()
+
 class CSVExtractor(Extractor):
     def __init__(self, connection, *args, **kwargs):
         '''FileExtractor subclass for csv or character-delimited files
         '''
         super(CSVExtractor, self).__init__(connection)
         self.firstline_headers = kwargs.get('firstline_headers', True)
-        self.headers = kwargs.get('headers', None)
-        self.delimiter = kwargs.get('delimiter', ',')
 
-        self.set_headers()
+
+
 
     def process_connection(self):
         reader = csv.reader(self.connection, delimiter=self.delimiter)
@@ -60,6 +68,47 @@ class CSVExtractor(Extractor):
         ]
 
     def set_headers(self, headers=None):
+        '''Sets headers from file or passed headers
+
+        This method sets two attributes on the class: the headers
+        attribute and the schema_headers attribute. schema_headers
+        must align with the schema attributes for the pipeline.
+
+        If no headers are passed, then we check the first line of the file.
+        The headers attribute is set from the first line, and schema
+        headers are by default created by lowercasing and replacing
+        spaces with underscores. Custom header -> schema header mappings can
+        be created by subclassing the CSVExtractor and overwriting the
+        create_schema_headers method.
+
+        Keyword Arguments:
+            headers: Optional headers that can be passed to be used
+                as the headers and schema headers
+
+        Raises:
+            RuntimeError: if self.headers is not passed and the
+            firstline_headers kwarg is not set.
+        '''
+        if headers:
+            self.headers = headers
+            self.schema_headers = self.headers
+            return
+        elif self.firstline_headers:
+            reader = csv.reader(self.connection, delimiter=self.delimiter)
+            self.headers = next(reader)
+            self.schema_headers = self.create_schema_headers(self.headers)
+        else:
+            raise RuntimeError('No headers were passed or detected.')
+
+class ExcelExtractor(Extractor):
+    def __init__(self, connection, *args, **kwargs):
+        super(CSVExtractor, self).__init__(connection)
+        self.firstline_headers = kwargs.get('firstline_headers', True)
+        self.headers = kwargs.get('headers', None)
+
+        self.set_headers()
+
+    def set_headers(self, headers):
         '''Sets headers from file or passed headers
 
         This method sets two attributes on the class: the headers
