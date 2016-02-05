@@ -1,6 +1,7 @@
 import hashlib
 import requests
 import urllib
+import paramiko
 
 from io import TextIOWrapper
 
@@ -70,7 +71,7 @@ class FileConnector(Connector):
         for chunk in iter(lambda: _file.read(blocksize, ), b''):
             if not chunk:
                 break
-            m.update(chunk.encode(self.encoding))
+            m.update(chunk.encode(self.encoding) if self.encoding else chunk)
         return m.hexdigest()
 
     def close(self):
@@ -118,7 +119,7 @@ class HTTPConnector(Connector):
     def close(self):
         return True
 
-class SFTPConnector(Connector):
+class SFTPConnector(FileConnector):
     ''' Connect to remote file via SFTP
     '''
     def __init__(self, *args, **kwargs):
@@ -127,5 +128,24 @@ class SFTPConnector(Connector):
         self.username = kwargs.get('username', '')
         self.password = kwargs.get('password', '')
         self.port = kwargs.get('port', 22)
-        self.dir = kwargs.get('dir','')
-        self.conn = None
+        self.root_dir = kwargs.get('root_dir', '').rstrip('/') + '/'
+        self.conn, self.transport, self._file = None,None, None
+
+    def connect(self, target):
+        try:
+            self.transport = paramiko.Transport((self.host, self.port))
+            self.transport.connect(username=self.username,
+                              password=self.password)
+            self.conn = paramiko.SFTPClient.from_transport(self.transport)
+            self._file = self.conn.open(self.root_dir + target, 'r')
+
+        except IOError as e:
+            raise e
+
+        return self._file
+
+    def close(self):
+        self.conn.close()
+        self.transport.close()
+        if not self._file.closed:
+            self._file.close()

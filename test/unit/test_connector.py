@@ -90,5 +90,5 @@ class TestSFTPConnector(unittest.TestCase):
         self.assertEquals(self.connector.username, '')
         self.assertEquals(self.connector.password, '')
         self.assertEquals(self.connector.port, 22)
-        self.assertEquals(self.connector.dir, '')
+        self.assertEquals(self.connector.root_dir, '/')
         self.assertEquals(self.connector.conn, None)
