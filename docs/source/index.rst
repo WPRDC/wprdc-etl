@@ -44,6 +44,7 @@ Guide:
    :maxdepth: 1
 
    getting_started
+   writing_pipelines
    extractors
    loaders
    monitoring
