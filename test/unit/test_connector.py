@@ -12,12 +12,12 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 
 class TestConnector(unittest.TestCase):
     def test_encoding(self):
-        self.assertEquals(Connector().encoding, 'utf-8')
+        self.assertEquals(Connector('').encoding, 'utf-8')
 
 class TestCSVConnector(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(HERE, '../mock/simple_mock.csv')
-        self.connector = pl.FileConnector()
+        self.connector = pl.FileConnector('')
 
     def test_connect(self):
         f = self.connector.connect(self.path)
@@ -32,7 +32,7 @@ class TestCSVConnector(unittest.TestCase):
 
 class TestRemoteFileConnector(unittest.TestCase):
     def setUp(self):
-        self.connector = pl.RemoteFileConnector()
+        self.connector = pl.RemoteFileConnector('')
 
     @patch('urllib.request.urlopen', return_value=StringIO())
     def test_remote_connection(self, urlopen):
@@ -49,7 +49,7 @@ class TestRemoteFileConnector(unittest.TestCase):
 
 class TestHTTPConnector(unittest.TestCase):
     def setUp(self):
-        self.connector = pl.HTTPConnector()
+        self.connector = pl.HTTPConnector('')
 
     @patch('requests.get')
     def test_error_when_bad_status_code(self, get):
@@ -82,13 +82,17 @@ class TestHTTPConnector(unittest.TestCase):
 
 class TestSFTPConnector(unittest.TestCase):
     def setUp(self):
-        self.connector = pl.SFTPConnector()
+        self.connector = pl.SFTPConnector({
+            'username': 'hello',
+            'password': 'world',
+            'host': 'afunhost@localhost'
+        })
 
     def test_successful_init(self):
         self.assertEquals(self.connector.encoding, 'utf-8')
-        self.assertEquals(self.connector.host, None)
-        self.assertEquals(self.connector.username, '')
-        self.assertEquals(self.connector.password, '')
+        self.assertEquals(self.connector.host, 'afunhost@localhost')
+        self.assertEquals(self.connector.username, 'hello')
+        self.assertEquals(self.connector.password, 'world')
         self.assertEquals(self.connector.port, 22)
         self.assertEquals(self.connector.root_dir, '/')
         self.assertEquals(self.connector.conn, None)
@@ -103,7 +107,7 @@ class TestSFTPConnector(unittest.TestCase):
 
         self.assertTrue(self.connector.transport is not None)
         self.assertTrue(Transport.called)
-        Transport.assert_called_with((None, 22))
+        Transport.assert_called_with(('afunhost@localhost', 22))
 
         self.assertTrue(self.connector.conn is not None)
         self.assertTrue(SFTPClient.from_transport.called)

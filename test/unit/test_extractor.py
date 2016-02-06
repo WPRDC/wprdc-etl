@@ -10,7 +10,7 @@ class TestCSVExtractor(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(HERE, '../mock/simple_mock.csv')
         self.tsv_path = os.path.join(HERE, '../mock/simple_tsv_mock.tsv')
-        self.conn = pl.FileConnector()
+        self.conn = pl.FileConnector('')
         self.extractor = pl.CSVExtractor(self.conn.connect(self.path))
 
     def tearDown(self):

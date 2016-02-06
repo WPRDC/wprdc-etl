@@ -13,7 +13,8 @@ class Connector(object):
     Subclasses must implement ``connect``, ``checksum_contents``,
     and ``close`` methods.
     '''
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config, *args, **kwargs):
+        self.config = config
         self.encoding = kwargs.get('encoding', 'utf-8')
         self.checksum = None
 
@@ -122,20 +123,21 @@ class HTTPConnector(Connector):
 class SFTPConnector(FileConnector):
     ''' Connect to remote file via SFTP
     '''
-    def __init__(self, *args, **kwargs):
-        super(SFTPConnector, self).__init__(*args, **kwargs)
-        self.host = kwargs.get('host', None)
-        self.username = kwargs.get('username', '')
-        self.password = kwargs.get('password', '')
-        self.port = kwargs.get('port', 22)
-        self.root_dir = kwargs.get('root_dir', '').rstrip('/') + '/'
+    def __init__(self, config, *args, **kwargs):
+        super(SFTPConnector, self).__init__(config, *args, **kwargs)
+        self.host = self.config.get('host', None)
+        self.username = self.config.get('username', '')
+        self.password = self.config.get('password', '')
+        self.port = self.config.get('port', 22)
+        self.root_dir = self.config.get('root_dir', '').rstrip('/') + '/'
         self.conn, self.transport, self._file = None, None, None
 
     def connect(self, target):
         try:
             self.transport = paramiko.Transport((self.host, self.port))
-            self.transport.connect(username=self.username,
-                              password=self.password)
+            self.transport.connect(
+                username=self.username, password=self.password
+            )
             self.conn = paramiko.SFTPClient.from_transport(self.transport)
             self._file = self.conn.open(self.root_dir + target, 'r')
 
