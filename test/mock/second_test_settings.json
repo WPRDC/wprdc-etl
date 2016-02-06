@@ -1,0 +1,14 @@
+{
+  "general": {
+    "statusdb": ":memory:"
+  },
+  "connector": {},
+  "loader": {
+    "ckan": {
+      "ckan_api_key": "EVEN MORE FUN",
+      "ckan_root_url": "localhost:9001/",
+      "ckan_organization": {}
+    }
+  }
+}
+

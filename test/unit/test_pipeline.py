@@ -11,8 +11,8 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 class TestPipeline(unittest.TestCase):
     def setUp(self):
         self.pipeline = pl.Pipeline(
-            'test', 'Test', server='testing',
-            settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+            'test', 'Test',
+            settings_file=os.path.join(HERE, '../mock/first_test_settings.json'),
             log_status=False
         )
 
@@ -22,26 +22,17 @@ class TestPipeline(unittest.TestCase):
         self.assertEquals(config['loader']['ckan']['ckan_root_url'], 'localhost:9000/')
         self.assertEquals(config['general']['statusdb'], ':memory:')
 
-    def test_reset_config(self):
-        self.pipeline.set_config_from_file(
-            'second_testing', os.path.join(HERE, '../mock/test_settings.json')
-        )
-        config = self.pipeline.get_config()
-        self.assertEquals(config['loader']['ckan']['ckan_api_key'], 'EVEN MORE FUN',)
-        self.assertEquals(config['loader']['ckan']['ckan_root_url'], 'localhost:9001/',)
-        self.assertEquals(config['general']['statusdb'], ':memory:')
-
     def test_invalid_config(self):
         with self.assertRaises(pl.InvalidConfigException):
             pl.Pipeline(
-                'test', 'Test', server='NO SERVER',
-                settings_file=os.path.join(HERE, 'test_settings.json')
+                'test', 'Test',
+                settings_file=os.path.join(HERE, 'first_test_settings.json')
             )
 
     def test_no_config(self):
         with self.assertRaises(pl.InvalidConfigException):
             pl.Pipeline(
-                'test', 'Test', server='NO SERVER',
+                'test', 'Test',
                 settings_file=os.path.join(HERE, 'NOT-A-VALID-PATH')
             )
 
@@ -97,7 +88,6 @@ class TestStatusLogging(TestBase):
     def test_checksum_duplicate_prevention(self):
         od_pipeline = pl.Pipeline(
             'fatal_od_pipeline', 'Fatal OD Pipeline',
-            server=self.default_server,
             settings_file=self.settings_file,
             conn=self.conn
         ) \

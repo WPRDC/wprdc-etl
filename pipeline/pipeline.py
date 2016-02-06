@@ -21,8 +21,8 @@ class Pipeline(object):
     for methods to be chained together.
     '''
     def __init__(
-        self, name, display_name, server='staging',
-        settings_file=None, log_status=True, conn=None
+        self, name, display_name, settings_file=None,
+        log_status=True, conn=None
     ):
         '''
         Arguments:
@@ -32,8 +32,6 @@ class Pipeline(object):
                 :py:class:`~purchasing.status.Status`
 
         Keyword Arguments:
-            server: name of the server to use in the configuration,
-                defaults to "staging"
             settings_file: filepath to the configuration file
             log_status: boolean for whether or not to log the status
                 of the pipeline. useful to turn off for testing
@@ -49,7 +47,7 @@ class Pipeline(object):
 
         settings_file = settings_file if settings_file else \
             os.path.join(PARENT, 'settings.json')
-        self.set_config_from_file(server, settings_file)
+        self.set_config_from_file(settings_file)
         self.log_status = log_status
 
         if conn:
@@ -61,11 +59,10 @@ class Pipeline(object):
     def get_config(self):
         return self.config
 
-    def set_config_from_file(self, server, file):
+    def set_config_from_file(self, file):
         '''Sets the pipeline's configuration from file
 
         Arguments:
-            server: String that represents
             file: Location of the configuration to load
 
         Raises:
@@ -74,8 +71,8 @@ class Pipeline(object):
         '''
         try:
             with open(file) as f:
-                raw_config = json.loads(f.read())
-                self.config = raw_config[server]
+                self.config = json.loads(f.read())
+
         except (KeyError, IOError, FileNotFoundError):
             raise InvalidConfigException(
                 'No config file found, or config not properly formatted'

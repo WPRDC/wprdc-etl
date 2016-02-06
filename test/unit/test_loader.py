@@ -13,8 +13,8 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 class TestCKANDatastoreBase(unittest.TestCase):
     def setUp(self):
         self.pipeline = pl.Pipeline(
-            'test', 'Test', server='testing',
-            settings_file=os.path.join(HERE, '../mock/test_settings.json'),
+            'test', 'Test',
+            settings_file=os.path.join(HERE, '../mock/first_test_settings.json'),
             log_status=False
         )
         self.ckan_config = self.pipeline.parse_config_piece(
