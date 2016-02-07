@@ -26,7 +26,7 @@ def create_db(config, drop):
             )
 
     try:
-        conn = sqlite3.connect(settings['statusdb'])
+        conn = sqlite3.connect(settings['general']['statusdb'])
     except KeyError:
         raise click.ClickException(
             'CONFIG must contain a location for a statusdb'

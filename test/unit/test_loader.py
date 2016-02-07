@@ -21,10 +21,17 @@ class TestCKANDatastoreBase(unittest.TestCase):
             'loader', 'ckan'
         )
 
+
 class TestCKANDatastore(TestCKANDatastoreBase):
     def setUp(self):
+        patcher = patch('requests.post')
+        mock_post = patcher.start()
+        mock_post.json.side_effect = [
+            {'id': {'someNumber': []}},
+        ]
         super(TestCKANDatastore, self).setUp()
         self.ckan_loader = CKANLoader(self.ckan_config)
+        patcher.stop()
 
     def test_datapusher_init(self):
         self.assertIsNotNone(self.ckan_loader)
@@ -34,24 +41,24 @@ class TestCKANDatastore(TestCKANDatastoreBase):
     @patch('requests.post')
     def test_get_resource_id(self, post):
         mock_post = Mock()
-        mock_post.json.side_effect= [
+        mock_post.json.side_effect = [
             {'result': {'resources': []}},
-            {'result': {'resources': [{'name': 'NOT EXIST','id':'who cares'}]}},
-            {'result': {'resources': [{'name': 'exists','id':'anID'}]}},
+            {'result': {'resources': [{'name': 'NOT EXIST', 'id': 'who cares'}]}},
+            {'result': {'resources': [{'name': 'exists', 'id': 'anID'}]}},
         ]
         post.return_value = mock_post
 
         self.assertIsNone(self.ckan_loader.get_resource_id(None, 'anything'))
         self.assertIsNone(self.ckan_loader.get_resource_id(None, 'exists'))
-        self.assertEqual(self.ckan_loader.get_resource_id(None,'exists'),'anID')
+        self.assertEqual(self.ckan_loader.get_resource_id(None, 'exists'), 'anID')
 
     @patch('requests.post')
     def test_resource_exists(self, post):
         mock_post = Mock()
         mock_post.json.side_effect = [
             {'result': {'resources': []}},
-            {'result': {'resources': [{'name': 'NOT EXIST','id':'who cares'}]}},
-            {'result': {'resources': [{'name': 'exists','id':'anID'}]}},
+            {'result': {'resources': [{'name': 'NOT EXIST', 'id': 'who cares'}]}},
+            {'result': {'resources': [{'name': 'exists', 'id': 'anID'}]}},
         ]
         post.return_value = mock_post
 
@@ -111,9 +118,13 @@ class TestCKANDatastore(TestCKANDatastoreBase):
         type(post.return_value).status_code = PropertyMock(return_value=200)
         self.assertEquals(self.ckan_loader.update_metadata(None), 200)
 
-
 class TestCKANDatastoreLoader(TestCKANDatastoreBase):
     def setUp(self):
+        patcher = patch('requests.post')
+        mock_post = patcher.start()
+        mock_post.json.side_effect = [
+            {'id': {'someNumber': []}},
+        ]
         super(TestCKANDatastoreLoader, self).setUp()
         self.insert_loader = pl.CKANDatastoreLoader(
             self.ckan_config, fields=[],
@@ -221,4 +232,4 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         for error in self.error_codes:
             type(post.return_value).status_code = PropertyMock(return_value=error)
             with self.assertRaises(RuntimeError):
-                    self.upsert_loader.load([])
+                self.upsert_loader.load([])

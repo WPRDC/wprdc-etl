@@ -269,6 +269,7 @@ class Pipeline(object):
             if self.log_status:
                 self.status.write()
 
+            # TODO: this is called when running checksum
             connection = _connector.connect(self.target)
 
             # instantiate a new extrator instance based on

@@ -13,6 +13,7 @@ from test.jobs.base import TestLoader, TestExtractor, TestConnector
 HERE = os.path.abspath(os.path.dirname(__file__))
 SETTINGS_FILE = os.path.join(HERE, '../mock/first_test_settings.json')
 
+
 class TestCreateDBScript(TestCase):
     def setUp(self):
         self.runner = CliRunner()
@@ -20,7 +21,12 @@ class TestCreateDBScript(TestCase):
     def test_create_database(self):
         with self.runner.isolated_filesystem():
             with open('test_settings.json', 'w') as f:
-                f.write('''{"statusdb": "test.db"}''')
+                f.write('''
+                {
+                    "general": {
+                        "statusdb": "test.db"
+                    }
+                }''')
 
             result = self.runner.invoke(create_db, ['test_settings.json'])
 
@@ -31,17 +37,21 @@ class TestCreateDBScript(TestCase):
 
     def test_create_and_drop_database(self):
         with self.runner.isolated_filesystem():
-
             conn = sqlite3.connect(os.path.join(os.getcwd(), 'test.db'))
             cur = conn.cursor()
-            cur.execute('create table status (name TEXT NOT NULL)')
-            cur.execute("insert into status (name) values ('test')")
+            cur.execute('CREATE TABLE status (name TEXT NOT NULL)')
+            cur.execute("INSERT INTO status (name) VALUES ('test')")
             conn.close()
 
             self.assertTrue('test.db' in os.listdir())
 
             with open('test_settings.json', 'w') as f:
-                f.write('''{"statusdb": "test.db"}''')
+                f.write('''
+                {
+                    "general": {
+                        "statusdb": "test.db"
+                    }
+                }''')
 
             result = self.runner.invoke(create_db, ['test_settings.json', '--drop'])
 
@@ -50,7 +60,7 @@ class TestCreateDBScript(TestCase):
 
             conn = sqlite3.connect(os.path.join(os.getcwd(), 'test.db'))
             cur = conn.cursor()
-            cur.execute("select count(*) from status")
+            cur.execute("SELECT count(*) FROM status")
             status_count = cur.fetchall()[0][0]
             conn.close()
 
@@ -79,6 +89,7 @@ class TestCreateDBScript(TestCase):
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('CONFIG must contain a location for a statusdb' in result.output)
 
+
 test_pipeline = pl.Pipeline(
     'test', 'Test',
     settings_file=SETTINGS_FILE,
@@ -90,10 +101,13 @@ test_pipeline = pl.Pipeline(
 
 not_working = pl.Pipeline('nope', 'It does not work')
 
+
 class Junk(object):
     pass
 
+
 junk = Junk()
+
 
 class TestRunJobScript(TestCase):
     def setUp(self):
