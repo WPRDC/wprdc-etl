@@ -124,6 +124,7 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         mock_post = patcher.start()
         mock_post.json.side_effect = [
             {'id': {'someNumber': []}},
+            {'id': {'someNumber': []}}
         ]
         super(TestCKANDatastoreLoader, self).setUp()
         self.insert_loader = pl.CKANDatastoreLoader(
@@ -147,8 +148,14 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
             key_fields=['words']
         )
         self.error_codes = [409, 500]
+        patcher.stop()
 
-    def test_datastore_loader_no_fields(self):
+    @patch('requests.post')
+    def test_datastore_loader_no_fields(self, post):
+        mock_post = Mock()
+        mock_post.json.side_effect = [
+            {'id': {'someNumber': []}}
+        ]
         with self.assertRaises(RuntimeError):
             pl.CKANDatastoreLoader(self.ckan_config)
 
