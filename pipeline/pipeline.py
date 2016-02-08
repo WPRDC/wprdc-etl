@@ -282,15 +282,11 @@ class Pipeline(object):
             self.__schema = self._schema()
 
             # build the data
-            raw = _extractor.process_connection()
-
             try:
-                for line in raw:
-                    try:
-                        data = _extractor.handle_line(line)
-                        self.load_line(data)
-                    except IsHeaderException:
-                        continue
+                for line in _extractor.extract():
+                    self.load_line(line)
+            except Exception as e:
+                raise e
             finally:
                 _connector.close()
 
