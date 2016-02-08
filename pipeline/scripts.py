@@ -11,31 +11,22 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 @click.command()
 @click.argument('config', type=click.Path(exists=True))
 @click.option(
-    '--server', type=click.STRING,
-    help='The name of the server (key) in the CONFIG to use.')
-@click.option(
     '--drop', type=click.BOOL, is_flag=True,
     help='Whether or not to drop and recreate the table.')
-def create_db(config, server, drop):
+def create_db(config, drop):
     '''Create a status table based on the passed CONFIG json file
     '''
     with open(config) as f:
         try:
-            settings_file = json.loads(f.read())
-            settings = settings_file[server]
-        except KeyError:
-            raise click.BadParameter(
-                'invalid choice: {}. (choose from {})'.format(
-                    server, ', '.join(settings_file.keys())
-                )
-            )
+            settings = json.loads(f.read())
+
         except json.decoder.JSONDecodeError:
             raise click.ClickException(
                 'invalid JSON in settings file'
             )
 
     try:
-        conn = sqlite3.connect(settings['statusdb'])
+        conn = sqlite3.connect(settings['general']['statusdb'])
     except KeyError:
         raise click.ClickException(
             'CONFIG must contain a location for a statusdb'
@@ -68,10 +59,7 @@ def create_db(config, server, drop):
 @click.option(
     '--config', type=click.Path(exists=True),
     help='Path to a configuration object to use')
-@click.option(
-    '--server', type=click.STRING,
-    help='The name of the server (key) in the CONFIG to use.')
-def run_job(job_path, config, server):
+def run_job(job_path, config):
     '''Run a pipeline based on the given input JOB_PATH
 
     Directories should be separated based on the . character
@@ -89,8 +77,8 @@ def run_job(job_path, config, server):
         if not isinstance(pipeline, Pipeline):
             raise InvalidPipelineError
 
-        if config and server:
-            pipeline.set_config_from_file(server, config)
+        if config:
+            pipeline.set_config_from_file(config)
 
         pipeline.run()
 

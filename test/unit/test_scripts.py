@@ -11,7 +11,8 @@ from pipeline.scripts import create_db, run_job
 from test.jobs.base import TestLoader, TestExtractor, TestConnector
 
 HERE = os.path.abspath(os.path.dirname(__file__))
-SETTINGS_FILE = os.path.join(HERE, '../mock/test_settings.json')
+SETTINGS_FILE = os.path.join(HERE, '../mock/first_test_settings.json')
+
 
 class TestCreateDBScript(TestCase):
     def setUp(self):
@@ -20,9 +21,14 @@ class TestCreateDBScript(TestCase):
     def test_create_database(self):
         with self.runner.isolated_filesystem():
             with open('test_settings.json', 'w') as f:
-                f.write('''{"cli_testing": {"statusdb": "test.db"}}''')
+                f.write('''
+                {
+                    "general": {
+                        "statusdb": "test.db"
+                    }
+                }''')
 
-            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'cli_testing'])
+            result = self.runner.invoke(create_db, ['test_settings.json'])
 
             self.assertEquals(result.exit_code, 0)
             self.assertTrue('test.db' in os.listdir())
@@ -31,39 +37,35 @@ class TestCreateDBScript(TestCase):
 
     def test_create_and_drop_database(self):
         with self.runner.isolated_filesystem():
-
             conn = sqlite3.connect(os.path.join(os.getcwd(), 'test.db'))
             cur = conn.cursor()
-            cur.execute('create table status (name TEXT NOT NULL)')
-            cur.execute("insert into status (name) values ('test')")
+            cur.execute('CREATE TABLE status (name TEXT NOT NULL)')
+            cur.execute("INSERT INTO status (name) VALUES ('test')")
             conn.close()
 
             self.assertTrue('test.db' in os.listdir())
 
             with open('test_settings.json', 'w') as f:
-                f.write('''{"cli_testing": {"statusdb": "test.db"}}''')
+                f.write('''
+                {
+                    "general": {
+                        "statusdb": "test.db"
+                    }
+                }''')
 
-            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'cli_testing', '--drop'])
+            result = self.runner.invoke(create_db, ['test_settings.json', '--drop'])
 
             self.assertEquals(result.exit_code, 0)
             self.assertTrue('test.db' in os.listdir())
 
             conn = sqlite3.connect(os.path.join(os.getcwd(), 'test.db'))
             cur = conn.cursor()
-            cur.execute("select count(*) from status")
+            cur.execute("SELECT count(*) FROM status")
             status_count = cur.fetchall()[0][0]
             conn.close()
 
             self.assertEquals(status_count, 0)
             os.unlink(os.path.join(os.getcwd(), 'test.db'))
-
-    def test_bad_server_name(self):
-        with self.runner.isolated_filesystem():
-            with open('test_settings.json', 'w') as f:
-                f.write('''{"cli_testing": {"statusdb": "test.db"}}''')
-            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'DOES NOT EXIST'])
-            self.assertNotEquals(result.exit_code, 0)
-            self.assertTrue('invalid choice: DOES NOT EXIST' in result.output)
 
     def test_bad_config_path(self):
         with self.runner.isolated_filesystem():
@@ -75,21 +77,21 @@ class TestCreateDBScript(TestCase):
         with self.runner.isolated_filesystem():
             with open('test_settings.json', 'w') as f:
                 f.write('''This isn't valid JSON doc!''')
-            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'DOES NOT EXIST'])
+            result = self.runner.invoke(create_db, ['test_settings.json'])
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('invalid JSON in settings file' in result.output)
 
     def test_no_statusdb_in_config(self):
         with self.runner.isolated_filesystem():
             with open('test_settings.json', 'w') as f:
-                f.write('''{"cli_testing": {"lolnostatusdb": "test.db"}}''')
-            result = self.runner.invoke(create_db, ['test_settings.json', '--server', 'cli_testing'])
+                f.write('''{"lolnostatusdb": "test.db"}''')
+            result = self.runner.invoke(create_db, ['test_settings.json'])
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('CONFIG must contain a location for a statusdb' in result.output)
 
+
 test_pipeline = pl.Pipeline(
     'test', 'Test',
-    server='testing',
     settings_file=SETTINGS_FILE,
     log_status=False
 ).connect(TestConnector, None) \
@@ -99,10 +101,13 @@ test_pipeline = pl.Pipeline(
 
 not_working = pl.Pipeline('nope', 'It does not work')
 
+
 class Junk(object):
     pass
 
+
 junk = Junk()
+
 
 class TestRunJobScript(TestCase):
     def setUp(self):
@@ -132,6 +137,6 @@ class TestRunJobScript(TestCase):
             run_job, [
                 'test.unit.test_scripts:test_pipeline',
                 '--config', SETTINGS_FILE,
-                '--server', 'second_testing']
+            ]
         )
         self.assertEquals(result.exit_code, 0)

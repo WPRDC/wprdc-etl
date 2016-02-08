@@ -23,4 +23,3 @@ class DuplicateFileException(Exception):
 
 class InvalidPipelineError(Exception):
     pass
-
