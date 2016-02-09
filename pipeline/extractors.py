@@ -1,6 +1,9 @@
 import csv
+import datetime
+import paramiko
+from collections import OrderedDict
 from pipeline.exceptions import IsHeaderException
-import xlrd
+from xlrd import open_workbook, xldate_as_tuple, XL_CELL_DATE
 
 
 class Extractor(object):
@@ -26,6 +29,8 @@ class Extractor(object):
 
 
 class TableExtractor(Extractor):
+    '''Abstract Extractor subclass for extracting data in a tabular format
+    '''
     def __init__(self, connection, *args, **kwargs):
         super(TableExtractor, self).__init__(connection)
         self.headers = kwargs.get('headers', None)
@@ -53,11 +58,12 @@ class TableExtractor(Extractor):
         '''
         if line == self.headers:
             raise IsHeaderException
-        return dict(zip(self.schema_headers, [i if i != '' else None for i in line]))
+        return OrderedDict(zip(self.schema_headers, [i if i != '' else None for i in line]))
+
 
 class CSVExtractor(TableExtractor):
     def __init__(self, connection, *args, **kwargs):
-        '''FileExtractor subclass for csv or character-delimited files
+        '''TableExtractor subclass for csv or character-delimited files
         '''
         super(CSVExtractor, self).__init__(connection, *args, **kwargs)
         self.delimiter = kwargs.get('delimiter', ',')
@@ -100,8 +106,6 @@ class CSVExtractor(TableExtractor):
         reader = csv.reader(self.connection, delimiter=self.delimiter)
         return reader
 
-
-
     def extract(self):
         raw = self.process_connection()
         for line in raw:
@@ -113,12 +117,14 @@ class CSVExtractor(TableExtractor):
 
 
 class ExcelExtractor(TableExtractor):
+    '''TableExtractor subclass for Microsft Excel spreadsheet files (xls, xlsx)
+    '''
     def __init__(self, connection, *args, **kwargs):
         super(ExcelExtractor, self).__init__(connection, *args, **kwargs)
         self.firstline_headers = kwargs.get('firstline_headers', True)
         self.sheet_index = kwargs.get('sheet_index', 0)
-        self.column_count = kwargs.get('column_count', 0)
-        self.sheet = None
+        self.workbook = None
+        self.set_headers()
 
     # TODO: very similar to CSVExtractor - see if it can be moved to TableExtractor
     def set_headers(self, headers=None):
@@ -127,26 +133,39 @@ class ExcelExtractor(TableExtractor):
             self.schema_headers = self.headers
             return
         elif self.firstline_headers:
-            self.sheet = xlrd.open_workbook(file_contents=self.connection) \
-                .sheet_by_index(self.sheet_index)
-            self.headers = self.read_line(0)
+            self.process_connection()
+            self.headers = self._read_line(0)
             self.schema_headers = self.create_schema_headers(self.headers)
         else:
             raise RuntimeError
 
     def process_connection(self):
-        if self.sheet:
-            return self.sheet
-        self.sheet = xlrd.open_workbook(file_contents=self.connection). \
-            sheet_by_index(self.sheet_index)
+        contents = self.connection.read()
+        self.workbook = open_workbook(file_contents=contents)
+        self.sheet = self.workbook.sheet_by_index(self.sheet_index)
 
     def extract(self):
         if self.sheet is None:
-            self.sheet = self.process_connection()
-        for i in self.sheet.nrows():
-            self.data.append(self.handle_line(self.read_line(i))) # fixme: this is ugly
+            self.process_connection()
+        for i in range(self.sheet.nrows):
+            try:
+                self.data.append(self.handle_line(self._read_line(i)))
+            except IsHeaderException:
+                continue
+        return self.data
 
-    def read_line(self, row, columns=0):
-        if not columns:
-            columns = self.column_count
-        return [self.sheet.cell(row, column).value for column in range(columns)]
+    def _read_line(self, row):
+        '''Helper function to read line from Excel files and handle representations of
+            different data types
+        '''
+        line = []
+        for col in range(self.sheet.ncols):
+            cell = self.sheet.cell(row, col)
+            if cell.ctype == XL_CELL_DATE:
+                date = datetime.datetime(*xldate_as_tuple(cell.value, self.workbook.datemode))
+                dt = date.strftime('%m/%d/%Y')   #todo: return datetime and handle the formatting elsewhere
+                line.append(dt)
+            else:
+                line.append(cell.value)
+        return line
+

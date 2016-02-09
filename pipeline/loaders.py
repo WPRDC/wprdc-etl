@@ -126,7 +126,8 @@ class CKANLoader(Loader):
             data=json.dumps({
                 'resource_id': resource_id,
                 'force': True,
-                'fields': fields
+                'fields': fields,
+                'primary_key': self.key_fields if hasattr(self, 'key_fields') else None
             })
         )
 
@@ -270,7 +271,7 @@ class CKANDatastoreLoader(CKANLoader):
         update_status = self.update_metadata(self.resource_id)
 
         if str(upsert_status)[0] in ['4', '5']:
-            raise RuntimeError('Upsert failed with status code {}'.format(str(upsert_status)))
+            raise RuntimeError('Upsert failed with status code {}.'.format(str(upsert_status)))
         elif str(update_status)[0] in ['4', '5']:
             raise RuntimeError('Metadata update failed with status code {}'.format(str(upsert_status)))
         else:

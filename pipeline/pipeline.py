@@ -184,7 +184,7 @@ class Pipeline(object):
             self._schema, self._loader,
         ]):
             raise RuntimeError(
-                'You must specify connet, extract, schema, and load steps!'
+                'You must specify connect, extract, schema, and load steps!'
             )
 
     def get_last_run_checksum(self):
@@ -285,8 +285,6 @@ class Pipeline(object):
             try:
                 for line in _extractor.extract():
                     self.load_line(line)
-            except Exception as e:
-                raise e
             finally:
                 _connector.close()
 
