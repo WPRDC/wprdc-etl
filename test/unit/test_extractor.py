@@ -40,7 +40,6 @@ class TestCSVExtractor(unittest.TestCase):
 
     def test_extract_line(self):
         f = self.extractor.process_connection()
-
         self.assertEquals(
             self.extractor.handle_line(next(f)),
             {'one': '1', 'two_words': '2'}
@@ -63,7 +62,7 @@ class TestCSVExtractor(unittest.TestCase):
 class TestExcellExtractor(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(HERE, '../mock/excel_mock.xlsx')
-        self.conn = pl.FileConnector('')
+        self.conn = pl.FileConnector('', encoding=None)
         self.extractor = pl.ExcelExtractor(self.conn.connect(self.path))
 
     def tearDown(self):
@@ -72,8 +71,6 @@ class TestExcellExtractor(unittest.TestCase):
     def test_initialization(self):
         self.assertListEqual(self.extractor.headers, ['One', 'Two', 'Three Things'])
         self.assertListEqual(self.extractor.schema_headers, ['one', 'two', 'three_things'])
-        self.assertTrue(isinstance(self.extractor.workbook, xlrd.Book))
-        self.assertTrue(isinstance(self.extractor.sheet, xlrd.Sheet))
 
     def test_headers_change(self):
         self.assertListEqual(self.extractor.schema_headers, ['one', 'two', 'three_things'])
@@ -92,9 +89,8 @@ class TestExcellExtractor(unittest.TestCase):
             )
 
     def test_extract_line(self):
-        f = self.extractor.process_connection()
-
+        line = self.extractor.process_connection()
         self.assertEquals(
-            self.extractor.handle_line(next(f)),
+            self.extractor.handle_line(next(line)),
             {'one': '1', 'two': 'a', 'three_things': 'ccc'}
         )

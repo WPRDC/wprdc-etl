@@ -51,7 +51,10 @@ class FileConnector(Connector):
         Returns:
             A `file-object`_
         '''
-        self._file = open(target, 'r', encoding=self.encoding)
+        if self.encoding:
+            self._file = open(target, 'r', encoding=self.encoding)
+        else:
+            self._file = open(target, 'rb', encoding=self.encoding)
         return self._file
 
     def checksum_contents(self, target, blocksize=8192):
