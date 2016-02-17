@@ -1,6 +1,6 @@
 import csv
 import datetime
-import paramiko
+import io
 from collections import OrderedDict
 from pipeline.exceptions import IsHeaderException
 from xlrd import open_workbook, xldate_as_tuple, XL_CELL_DATE
@@ -111,6 +111,7 @@ class CSVExtractor(TableExtractor):
 class ExcelExtractor(TableExtractor):
     '''TableExtractor subclass for Microsft Excel spreadsheet files (xls, xlsx)
     '''
+
     def __init__(self, connection, *args, **kwargs):
         super(ExcelExtractor, self).__init__(connection, *args, **kwargs)
         self.firstline_headers = kwargs.get('firstline_headers', True)
@@ -120,8 +121,8 @@ class ExcelExtractor(TableExtractor):
 
     def process_connection(self):
         data = []
-        contents = self.connection.read()
         self.connection.seek(0)
+        contents = self.connection.read()
         workbook = open_workbook(file_contents=contents)
         sheet = workbook.sheet_by_index(self.sheet_index)
         self.datemode = workbook.datemode

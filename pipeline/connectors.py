@@ -1,3 +1,4 @@
+import io
 import hashlib
 import requests
 import urllib
@@ -142,7 +143,7 @@ class SFTPConnector(FileConnector):
                 username=self.username, password=self.password
             )
             self.conn = paramiko.SFTPClient.from_transport(self.transport)
-            self._file = self.conn.open(self.root_dir + target, 'r')
+            self._file = io.BytesIO(self.conn.open(self.root_dir + target, 'r').read())
 
         except IOError as e:
             raise e

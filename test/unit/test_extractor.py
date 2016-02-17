@@ -53,8 +53,8 @@ class TestCSVExtractor(unittest.TestCase):
         self.assertEquals(extractor.delimiter, '\t')
         f = extractor.process_connection()
 
-        self.assertEquals(
-            extractor.handle_line(next(f)),
+        test = extractor.handle_line(next(f))
+        self.assertEquals( test,
             {'one': '10', 'two_words': '20'}
         )
 
@@ -90,7 +90,9 @@ class TestExcellExtractor(unittest.TestCase):
 
     def test_extract_line(self):
         line = self.extractor.process_connection()
+        with self.assertRaises(pl.IsHeaderException):
+            self.extractor.handle_line(next(line))
         self.assertEquals(
             self.extractor.handle_line(next(line)),
-            {'one': '1', 'two': 'a', 'three_things': 'ccc'}
+            {'one': 1, 'two': 'a', 'three_things': 'ccc'}
         )
