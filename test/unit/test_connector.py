@@ -1,4 +1,5 @@
 import os
+import io
 import unittest
 
 from io import TextIOBase, TextIOWrapper, StringIO
@@ -99,10 +100,14 @@ class TestSFTPConnector(unittest.TestCase):
 
     @patch('pipeline.connectors.paramiko.SFTPClient')
     @patch('pipeline.connectors.paramiko.Transport')
-    def test_connector(self, Transport, SFTPClient):
+    @patch('pipeline.connectors.paramiko.SFTPFile')
+    def test_connector(self, SFTPFile, Transport, SFTPClient):
         self.assertTrue(self.connector.conn is None)
         self.assertTrue(self.connector.transport is None)
         self.assertTrue(self.connector._file is None)
+
+        SFTPFile.open.return_value = io.BytesIO(initial_bytes=None)
+        SFTPClient.from_transport.return_value = SFTPFile
         self.connector.connect('myfile.txt')
 
         self.assertTrue(self.connector.transport is not None)
@@ -128,7 +133,10 @@ class TestSFTPConnector(unittest.TestCase):
 
     @patch('pipeline.connectors.paramiko.SFTPClient')
     @patch('pipeline.connectors.paramiko.Transport')
-    def test_connector_closes_connections(self, Transport, SFTPClient):
+    @patch('pipeline.connectors.paramiko.SFTPFile')
+    def test_connector_closes_connections(self, SFTPFile, Transport, SFTPClient):
+        SFTPFile.open.return_value = io.BytesIO(initial_bytes=None)
+        SFTPClient.from_transport.return_value = SFTPFile
         self.connector.connect('myfile.txt')
         self.connector._file = StringIO()
         self.assertFalse(self.connector._file.closed)
