@@ -1,3 +1,4 @@
+import io
 import hashlib
 import requests
 import urllib
@@ -51,7 +52,10 @@ class FileConnector(Connector):
         Returns:
             A `file-object`_
         '''
-        self._file = open(target, 'r', encoding=self.encoding)
+        if self.encoding:
+            self._file = open(target, 'r', encoding=self.encoding)
+        else:
+            self._file = open(target, 'rb', encoding=self.encoding)
         return self._file
 
     def checksum_contents(self, target, blocksize=8192):
@@ -139,7 +143,7 @@ class SFTPConnector(FileConnector):
                 username=self.username, password=self.password
             )
             self.conn = paramiko.SFTPClient.from_transport(self.transport)
-            self._file = self.conn.open(self.root_dir + target, 'r')
+            self._file = io.BytesIO(self.conn.open(self.root_dir + target, 'r').read())
 
         except IOError as e:
             raise e

@@ -1,4 +1,4 @@
-from pipeline.extractors import CSVExtractor
+from pipeline.extractors import CSVExtractor, ExcelExtractor
 from pipeline.connectors import (
     FileConnector, RemoteFileConnector, HTTPConnector,
     SFTPConnector
