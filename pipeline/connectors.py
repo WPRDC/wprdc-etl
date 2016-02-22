@@ -102,7 +102,7 @@ class RemoteFileConnector(FileConnector):
         Returns:
             :py:class:`io.TextIOWrapper` around the opened URL.
         '''
-        self._file = TextIOWrapper(urllib.request.urlopen(target))
+        self._file = TextIOWrapper(urllib.request.urlopen(target), encoding=self.encoding)
         return self._file
 
 class HTTPConnector(Connector):
