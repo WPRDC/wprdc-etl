@@ -218,24 +218,6 @@ class CKANLoader(Loader):
         )
         return update.status_code
 
-    def fix_headers(self, data, fix):
-        '''
-        Params:
-            data: list of dicts representing data to be inserted/upserted
-            fix: method used to modify dictionary key, and therefore table header
-                in ckan datastore. (e.g. str.upper, str.lower)
-        Returns:
-            `data` with dictionary keys modified via `fix`
-        '''
-        new_data = []
-        for datum in data:
-            new_datum = {}
-            for k, v in datum.items():
-                new_datum[fix(k)] = datum[k]
-            new_data.append(new_datum)
-
-        return new_data
-
 class CKANDatastoreLoader(CKANLoader):
     '''Store data in CKAN using an upsert strategy
     '''
@@ -286,8 +268,6 @@ class CKANDatastoreLoader(CKANLoader):
             and metadata update calls
         '''
         self.generate_datastore(self.fields)
-        if self.header_fix is not None:
-            data = self.fix_headers(data,self.header_fix)
         upsert_status = self.upsert(self.resource_id, data, self.method)
         update_status = self.update_metadata(self.resource_id)
 
