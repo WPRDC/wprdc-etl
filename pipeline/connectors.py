@@ -144,6 +144,8 @@ class SFTPConnector(FileConnector):
             )
             self.conn = paramiko.SFTPClient.from_transport(self.transport)
             self._file = io.BytesIO(self.conn.open(self.root_dir + target, 'r').read())
+            if self.encoding:
+                self._file = io.TextIOWrapper(self._file, self.encoding)
 
         except IOError as e:
             raise e
