@@ -170,7 +170,7 @@ class Pipeline(object):
                 loaded.errors.__str__(), data
             ))
         else:
-            self.data.append(loaded.data)
+            self.data.append(self.__schema.dump(loaded.data).data)
 
     def enforce_full_pipeline(self):
         '''Ensure that a pipeline has an extractor, schema, and loader

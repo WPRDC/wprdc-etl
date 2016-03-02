@@ -245,6 +245,7 @@ class CKANDatastoreLoader(CKANLoader):
         self.fields = kwargs.get('fields', None)
         self.key_fields = kwargs.get('key_fields', None)
         self.method = kwargs.get('method', 'upsert')
+        self.header_fix = kwargs.get('header_fix', None)
 
         if self.fields is None:
             raise RuntimeError('Fields must be specified.')
