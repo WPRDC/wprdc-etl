@@ -83,7 +83,7 @@ class TableExtractor(Extractor):
                 spaces replaced with underscores
         '''
         return [
-            i.lower().replace(' ', '_') for i in
+            i.lower().replace(' ', '_').replace('-', '_') for i in
             headers
             ]
 
