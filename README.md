@@ -2,7 +2,7 @@
 
 # WPRDC-ETL
 
-ETL Processes for the Western Pennsylvania Regional DataCenter (www.wprdc.org).
+ETL Processes for the [Western Pennsylvania Regional DataCenter](www.wprdc.org). 
 
 ### Develop
 
@@ -26,10 +26,10 @@ cp settings.json.example settings.json
 # be ready to create the status database. by installing the package above
 # you should have access to two command-line commands, one of which
 # will create the database for you
-create_monitoring_db --server <name of your server>
+create_monitoring_db <path/to/settings.json>
 # note, if you need to destroy and recreate the status data at any point
 # you can do so with:
-# create_monitoring_db --server <name of your server> --drop
+# create_monitoring_db <path/to/settings.json> --drop
 ```
 
 ### Docs
