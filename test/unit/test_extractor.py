@@ -18,18 +18,18 @@ class TestCSVExtractor(unittest.TestCase):
         self.conn.close()
 
     def test_initialization(self):
-        self.assertListEqual(self.extractor.headers, ['One', 'Two words'])
-        self.assertListEqual(self.extractor.schema_headers, ['one', 'two_words'])
+        self.assertListEqual(self.extractor.headers, ['One', 'Two words', 'Trailing spaces   '])
+        self.assertListEqual(self.extractor.schema_headers, ['one', 'two_words', 'trailing_spaces'])
         self.assertEquals(self.extractor.delimiter, ',')
 
     def test_headers_change(self):
-        self.assertListEqual(self.extractor.schema_headers, ['one', 'two_words'])
+        self.assertListEqual(self.extractor.schema_headers, ['one', 'two_words', 'trailing_spaces'])
         self.extractor.set_headers(['new', 'new_two'])
         self.assertListEqual(self.extractor.schema_headers, ['new', 'new_two'])
 
     def test_raises_headers_exception(self):
         with self.assertRaises(pl.IsHeaderException):
-            self.extractor.handle_line(['One', 'Two words'])
+            self.extractor.handle_line(['One', 'Two words', 'Trailing spaces   '])
 
     def test_no_headers_error(self):
         with self.assertRaises(RuntimeError):
@@ -42,7 +42,7 @@ class TestCSVExtractor(unittest.TestCase):
         f = self.extractor.process_connection()
         self.assertEquals(
             self.extractor.handle_line(next(f)),
-            {'one': '1', 'two_words': '2'}
+            {'one': '1', 'two_words': '2', 'trailing_spaces': '1'}
         )
 
     def test_extract_custom_delimiter(self):
@@ -59,7 +59,7 @@ class TestCSVExtractor(unittest.TestCase):
         )
 
 
-class TestExcellExtractor(unittest.TestCase):
+class TestExcelExtractor(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(HERE, '../mock/excel_mock.xlsx')
         self.conn = pl.FileConnector('', encoding=None)
@@ -69,17 +69,17 @@ class TestExcellExtractor(unittest.TestCase):
         self.conn.close()
 
     def test_initialization(self):
-        self.assertListEqual(self.extractor.headers, ['One', 'Two', 'Three Things'])
-        self.assertListEqual(self.extractor.schema_headers, ['one', 'two', 'three_things'])
+        self.assertListEqual(self.extractor.headers, ['One', 'Two', 'Three Things', 'Trailing spaces   '])
+        self.assertListEqual(self.extractor.schema_headers, ['one', 'two', 'three_things', 'trailing_spaces'])
 
     def test_headers_change(self):
-        self.assertListEqual(self.extractor.schema_headers, ['one', 'two', 'three_things'])
-        self.extractor.set_headers(['new', 'new_two'])
-        self.assertListEqual(self.extractor.schema_headers, ['new', 'new_two'])
+        self.assertListEqual(self.extractor.schema_headers, ['one', 'two', 'three_things', 'trailing_spaces'])
+        self.extractor.set_headers(['new', 'new_two', 'new_spaces'])
+        self.assertListEqual(self.extractor.schema_headers, ['new', 'new_two', 'new_spaces'])
 
     def test_raises_headers_exception(self):
         with self.assertRaises(pl.IsHeaderException):
-            self.extractor.handle_line(['One', 'Two', 'Three Things'])
+            self.extractor.handle_line(['One', 'Two', 'Three Things', 'Trailing spaces   '])
 
     def test_no_headers_error(self):
         with self.assertRaises(RuntimeError):
@@ -94,5 +94,6 @@ class TestExcellExtractor(unittest.TestCase):
             self.extractor.handle_line(next(line))
         self.assertEquals(
             self.extractor.handle_line(next(line)),
-            {'one': 1, 'two': 'a', 'three_things': 'ccc'}
+            {'one': 1, 'two': 'a', 'three_things': 'ccc', 'trailing_spaces': 123}
         )
+
