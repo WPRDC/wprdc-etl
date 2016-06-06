@@ -1,10 +1,8 @@
-import os
 import unittest
 
+import os
 import pipeline as pl
-from jobs.fatal_od import FatalODSchema
-
-from test.jobs.base import TestLoader, TestBase
+from test.base import TestLoader, TestBase, TestSchema
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -93,7 +91,7 @@ class TestStatusLogging(TestBase):
         ) \
             .connect(pl.FileConnector, os.path.join(HERE, '../mock/fatal_od_mock.csv')) \
             .extract(pl.CSVExtractor, firstline_headers=True) \
-            .schema(FatalODSchema) \
+            .schema(TestSchema) \
             .load(self.Loader)
 
         od_pipeline.run()

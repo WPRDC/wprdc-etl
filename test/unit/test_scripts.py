@@ -1,14 +1,11 @@
-import os
 import sqlite3
-
 from unittest import TestCase
 
-from click.testing import CliRunner
-
+import os
 import pipeline as pl
+from click.testing import CliRunner
 from pipeline.scripts import create_db, run_job
-
-from test.jobs.base import TestLoader, TestExtractor, TestConnector
+from test.base import TestLoader, TestExtractor, TestConnector
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 SETTINGS_FILE = os.path.join(HERE, '../mock/first_test_settings.json')
