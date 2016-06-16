@@ -89,7 +89,6 @@ class TestCreateDBScript(TestCase):
 
 test_pipeline = pl.Pipeline(
     'test', 'Test',
-    settings_file=SETTINGS_FILE,
     log_status=False
 ).connect(TestConnector, None) \
     .extract(TestExtractor) \

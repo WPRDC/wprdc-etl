@@ -14,8 +14,7 @@ class Connector(object):
     Subclasses must implement ``connect``, ``checksum_contents``,
     and ``close`` methods.
     '''
-    def __init__(self, config, *args, **kwargs):
-        self.config = config
+    def __init__(self, *args, **kwargs):
         self.encoding = kwargs.get('encoding', 'utf-8')
         self.checksum = None
 
@@ -71,12 +70,13 @@ class FileConnector(Connector):
         Returns:
             A hexidecimal representation of a file's contents.
         '''
-        _file = self.connect(target)
+        _file = self._file if self._file else self.connect(target)
         m = hashlib.md5()
         for chunk in iter(lambda: _file.read(blocksize, ), b''):
             if not chunk:
                 break
             m.update(chunk.encode(self.encoding) if self.encoding else chunk)
+        self._file.seek(0)
         return m.hexdigest()
 
     def close(self):
@@ -127,13 +127,13 @@ class HTTPConnector(Connector):
 class SFTPConnector(FileConnector):
     ''' Connect to remote file via SFTP
     '''
-    def __init__(self, config, *args, **kwargs):
-        super(SFTPConnector, self).__init__(config, *args, **kwargs)
-        self.host = self.config.get('host', None)
-        self.username = self.config.get('username', '')
-        self.password = self.config.get('password', '')
-        self.port = self.config.get('port', 22)
-        self.root_dir = self.config.get('root_dir', '').rstrip('/') + '/'
+    def __init__(self, *args, **kwargs):
+        super(SFTPConnector, self).__init__(*args, **kwargs)
+        self.host = kwargs.get('host', None)
+        self.username = kwargs.get('username', '')
+        self.password = kwargs.get('password', '')
+        self.port = kwargs.get('port', 22)
+        self.root_dir = kwargs.get('root_dir', '').rstrip('/') + '/'
         self.conn, self.transport, self._file = None, None, None
 
     def connect(self, target):

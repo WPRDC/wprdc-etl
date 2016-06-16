@@ -1,5 +1,6 @@
 import unittest
 import os
+import json
 
 from unittest.mock import Mock, patch, PropertyMock
 
@@ -14,12 +15,12 @@ class TestCKANDatastoreBase(unittest.TestCase):
     def setUp(self):
         self.pipeline = pl.Pipeline(
             'test', 'Test',
-            settings_file=os.path.join(HERE, '../mock/first_test_settings.json'),
             log_status=False
         )
-        self.ckan_config = self.pipeline.parse_config_piece(
-            'loader', 'ckan'
-        )
+        settings_file = os.path.join(HERE, '../mock/first_test_settings.json')
+        with open(settings_file) as f:
+            self.ckan_config = json.load(f)['loader']['ckan']
+        pass
 
 
 class TestCKANDatastore(TestCKANDatastoreBase):
@@ -30,7 +31,7 @@ class TestCKANDatastore(TestCKANDatastoreBase):
             {'id': {'someNumber': []}},
         ]
         super(TestCKANDatastore, self).setUp()
-        self.ckan_loader = CKANLoader(self.ckan_config)
+        self.ckan_loader = CKANLoader(**self.ckan_config)
         patcher.stop()
 
     def test_datapusher_init(self):
@@ -118,6 +119,7 @@ class TestCKANDatastore(TestCKANDatastoreBase):
         type(post.return_value).status_code = PropertyMock(return_value=200)
         self.assertEquals(self.ckan_loader.update_metadata(None), 200)
 
+
 class TestCKANDatastoreLoader(TestCKANDatastoreBase):
     def setUp(self):
         patcher = patch('requests.post')
@@ -128,12 +130,12 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
         ]
         super(TestCKANDatastoreLoader, self).setUp()
         self.insert_loader = pl.CKANDatastoreLoader(
-            self.ckan_config, fields=[],
+            **self.ckan_config, fields=[],
             method='insert'
         )
 
         self.upsert_loader = pl.CKANDatastoreLoader(
-            self.ckan_config,
+            **self.ckan_config,
             method='upsert',
             fields=[
                 {
@@ -157,7 +159,7 @@ class TestCKANDatastoreLoader(TestCKANDatastoreBase):
             {'id': {'someNumber': []}}
         ]
         with self.assertRaises(RuntimeError):
-            pl.CKANDatastoreLoader(self.ckan_config)
+            pl.CKANDatastoreLoader(**self.ckan_config)
 
     @patch('requests.post')
     def test_datastore_load__insert_successful(self, post):

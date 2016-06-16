@@ -5,8 +5,8 @@ import datetime
 from pipeline.exceptions import CKANException
 
 class Loader(object):
-    def __init__(self, config, *args, **kwargs):
-        self.config = config
+    def __init__(self, *args, **kwargs):
+        pass
 
     def load(self, data):
         '''Main load method for Loaders to implement
@@ -19,11 +19,11 @@ class Loader(object):
 class CKANLoader(Loader):
     """Connection to ckan datastore"""
 
-    def __init__(self, config, *args, **kwargs):
-        super(CKANLoader, self).__init__(config, *args, **kwargs)
-        self.ckan_url = self.config['ckan_root_url'].rstrip('/') + '/api/3/'
-        self.dump_url = self.config['ckan_root_url'].rstrip('/') + '/datastore/dump/'
-        self.key = self.config['ckan_api_key']
+    def __init__(self, *args, **kwargs):
+        super(CKANLoader, self).__init__(*args, **kwargs)
+        self.ckan_url = kwargs.get('ckan_root_url').rstrip('/') + '/api/3/'
+        self.dump_url = kwargs.get('ckan_root_url').rstrip('/') + '/datastore/dump/'
+        self.key = kwargs.get('ckan_api_key')
         self.package_id = kwargs.get('package_id')
         self.resource_name = kwargs.get('resource_name')
         self.resource_id = self.get_resource_id(self.package_id, self.resource_name)
@@ -222,7 +222,7 @@ class CKANDatastoreLoader(CKANLoader):
     '''Store data in CKAN using an upsert strategy
     '''
 
-    def __init__(self, config, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         '''Constructor for new CKANDatastoreLoader
 
         Arguments:
@@ -241,7 +241,7 @@ class CKANDatastoreLoader(CKANLoader):
             RuntimeError if fields is not specified or method is
             ``upsert`` and no ``key_fields`` are passed.
         '''
-        super(CKANDatastoreLoader, self).__init__(config, *args, **kwargs)
+        super(CKANDatastoreLoader, self).__init__(*args, **kwargs)
         self.fields = kwargs.get('fields', None)
         self.key_fields = kwargs.get('key_fields', None)
         self.method = kwargs.get('method', 'upsert')

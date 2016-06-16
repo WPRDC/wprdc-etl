@@ -83,7 +83,7 @@ class TestHTTPConnector(unittest.TestCase):
 
 class TestSFTPConnector(unittest.TestCase):
     def setUp(self):
-        self.connector = pl.SFTPConnector({
+        self.connector = pl.SFTPConnector(**{
             'username': 'hello',
             'password': 'world',
             'host': 'afunhost@localhost'
