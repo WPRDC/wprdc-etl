@@ -8,7 +8,6 @@ from pipeline.scripts import create_db, run_job
 from test.base import TestLoader, TestExtractor, TestConnector
 
 HERE = os.path.abspath(os.path.dirname(__file__))
-SETTINGS_FILE = os.path.join(HERE, '../mock/first_test_settings.json')
 
 
 class TestCreateDBScript(TestCase):
@@ -17,15 +16,7 @@ class TestCreateDBScript(TestCase):
 
     def test_create_database(self):
         with self.runner.isolated_filesystem():
-            with open('test_settings.json', 'w') as f:
-                f.write('''
-                {
-                    "general": {
-                        "statusdb": "test.db"
-                    }
-                }''')
-
-            result = self.runner.invoke(create_db, ['test_settings.json'])
+            result = self.runner.invoke(create_db, ['test.db'])
 
             self.assertEquals(result.exit_code, 0)
             self.assertTrue('test.db' in os.listdir())
@@ -42,15 +33,7 @@ class TestCreateDBScript(TestCase):
 
             self.assertTrue('test.db' in os.listdir())
 
-            with open('test_settings.json', 'w') as f:
-                f.write('''
-                {
-                    "general": {
-                        "statusdb": "test.db"
-                    }
-                }''')
-
-            result = self.runner.invoke(create_db, ['test_settings.json', '--drop'])
+            result = self.runner.invoke(create_db, ['test.db', '--drop'])
 
             self.assertEquals(result.exit_code, 0)
             self.assertTrue('test.db' in os.listdir())
@@ -64,28 +47,12 @@ class TestCreateDBScript(TestCase):
             self.assertEquals(status_count, 0)
             os.unlink(os.path.join(os.getcwd(), 'test.db'))
 
-    def test_bad_config_path(self):
+    def test_missing_path_argument(self):
         with self.runner.isolated_filesystem():
-            result = self.runner.invoke(create_db, ['./no_file_here.txt'])
-            self.assertNotEquals(result.exit_code, 0)
-            self.assertTrue('"./no_file_here.txt" does not exist' in result.output)
+            result = self.runner.invoke(create_db, ['--drop'])
 
-    def test_malformed_config(self):
-        with self.runner.isolated_filesystem():
-            with open('test_settings.json', 'w') as f:
-                f.write('''This isn't valid JSON doc!''')
-            result = self.runner.invoke(create_db, ['test_settings.json'])
             self.assertNotEquals(result.exit_code, 0)
-            self.assertTrue('invalid JSON in settings file' in result.output)
-
-    def test_no_statusdb_in_config(self):
-        with self.runner.isolated_filesystem():
-            with open('test_settings.json', 'w') as f:
-                f.write('''{"lolnostatusdb": "test.db"}''')
-            result = self.runner.invoke(create_db, ['test_settings.json'])
-            self.assertNotEquals(result.exit_code, 0)
-            self.assertTrue('CONFIG must contain a location for a statusdb' in result.output)
-
+            self.assertTrue('Missing argument' in result.output)
 
 test_pipeline = pl.Pipeline(
     'test', 'Test',
@@ -132,7 +99,6 @@ class TestRunJobScript(TestCase):
         result = self.runner.invoke(
             run_job, [
                 'test.unit.test_scripts:test_pipeline',
-                '--config', SETTINGS_FILE,
             ]
         )
         self.assertEquals(result.exit_code, 0)

@@ -21,17 +21,14 @@ pip install -e .
 # if you want to develop, you'll need to install additional requirements
 # (such as the test runner):
 pip install -r requirements.txt
-# create a copy of the settings
-cp settings.json.example settings.json
-# after the settings have been copied, you will need to go in and
-# edit the various values for your setup. at this point, you should
-# be ready to create the status database. by installing the package above
+# At this point, if you'd like to track the status of your etl jobs, you should
+# be ready to create the status database. By installing the package above
 # you should have access to two command-line commands, one of which
 # will create the database for you
-create_monitoring_db <path/to/settings.json>
+create_monitoring_db <path/to/status_database.db>
 # note, if you need to destroy and recreate the status data at any point
 # you can do so with:
-# create_monitoring_db <path/to/settings.json> --drop
+# create_monitoring_db <path/to/status_database.db> --drop
 ```
 
 ### Docs

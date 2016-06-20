@@ -4,10 +4,10 @@ import sqlite3
 import time
 
 from pipeline.exceptions import (
-    IsHeaderException, InvalidConfigException, DuplicateFileException
+    IsHeaderException, DuplicateFileException, MissingDatabaseName
 )
 from pipeline.status import Status
-from pipeline.exceptions import InvalidConfigException
+
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 PARENT = os.path.join(HERE, '..')
@@ -23,8 +23,8 @@ class Pipeline(object):
     '''
 
     def __init__(
-        self, name, display_name,
-        log_status=False, conn=None, last_run_checksum=None
+        self, name, display_name, log_status=False,
+        conn=None, conn_name=None
     ):
         '''
         Arguments:
@@ -47,6 +47,7 @@ class Pipeline(object):
         self.display_name = display_name
 
         self.log_status = log_status
+        self.conn_name = conn_name
 
         if conn:
             self.conn = conn
@@ -54,7 +55,6 @@ class Pipeline(object):
         else:
             self.passed_conn = False
 
-        self.last_run_checksum = last_run_checksum
 
     def connect(self, connector, target, *args, **kwargs):
         self._connector = connector
@@ -156,8 +156,11 @@ class Pipeline(object):
 
         self.enforce_full_pipeline()
 
-        if not self.passed_conn:
-            self.conn = sqlite3.Connection(self.config['general']['statusdb'])
+        if self.log_status and not self.passed_conn:
+            if self.conn_name:
+                self.conn = sqlite3.Connection(self.conn_name)
+            else:
+                raise MissingDatabaseName
 
         return start_time
 

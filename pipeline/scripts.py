@@ -9,27 +9,18 @@ from pipeline.exceptions import InvalidPipelineError, DuplicateFileException
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 @click.command()
-@click.argument('config', type=click.Path(exists=True))
+@click.argument('db_path', type=click.Path())
 @click.option(
     '--drop', type=click.BOOL, is_flag=True,
     help='Whether or not to drop and recreate the table.')
-def create_db(config, drop):
-    '''Create a status table based on the passed CONFIG json file
+def create_db(db_path, drop):
+    '''Create a status table
     '''
-    with open(config) as f:
-        try:
-            settings = json.loads(f.read())
-
-        except json.decoder.JSONDecodeError:
-            raise click.ClickException(
-                'invalid JSON in settings file'
-            )
-
     try:
-        conn = sqlite3.connect(settings['general']['statusdb'])
+        conn = sqlite3.connect(db_path)
     except KeyError:
         raise click.ClickException(
-            'CONFIG must contain a location for a statusdb'
+            'A valid path is required'
         )
     cur = conn.cursor()
 
@@ -56,10 +47,7 @@ def create_db(config, drop):
 
 @click.command()
 @click.argument('job_path', type=click.STRING)
-@click.option(
-    '--config', type=click.Path(exists=True),
-    help='Path to a configuration object to use')
-def run_job(job_path, config):
+def run_job(job_path):
     '''Run a pipeline based on the given input JOB_PATH
 
     Directories should be separated based on the . character
@@ -76,9 +64,6 @@ def run_job(job_path, config):
         pipeline = getattr(pipeline_module, pipeline)
         if not isinstance(pipeline, Pipeline):
             raise InvalidPipelineError
-
-        if config:
-            pipeline.set_config_from_file(config)
 
         pipeline.run()
 

@@ -37,7 +37,7 @@ class TestPipeline(unittest.TestCase):
 
 class TestStatusLogging(TestBase):
     def test_checksum_duplicate_prevention(self):
-        od_pipeline = pl.Pipeline(
+        pipeline = pl.Pipeline(
             'fatal_od_pipeline', 'Fatal OD Pipeline',
             conn=self.conn, log_status=True
         ) \
@@ -46,13 +46,36 @@ class TestStatusLogging(TestBase):
             .schema(TestSchema) \
             .load(self.Loader)
 
-        od_pipeline.run()
+        pipeline.run()
 
         status = self.cur.execute('select * from status').fetchall()
         self.assertEquals(len(status), 1)
 
         with self.assertRaises(pl.DuplicateFileException):
-            od_pipeline.run()
+            pipeline.run()
 
         status = self.cur.execute('select * from status').fetchall()
         self.assertEquals(len(status), 1)
+
+    def test_missing_connection_name(self):
+        pipeline = pl.Pipeline(
+            'fatal_od_pipeline', 'Fatal OD Pipeline',
+            log_status=True
+        ) \
+            .connect(pl.FileConnector, os.path.join(HERE, '../mock/simple_mock.csv')) \
+            .extract(pl.CSVExtractor, firstline_headers=True) \
+            .schema(TestSchema) \
+            .load(self.Loader)
+
+        with self.assertRaises(pl.MissingDatabaseName):
+            pipeline.run()
+
+    def test_connection_creation(self):
+        pipeline = pl.Pipeline(
+            'fatal_od_pipeline', 'Fatal OD Pipeline',
+            conn_name=":memory:",log_status=True
+        ) \
+            .connect(pl.FileConnector, os.path.join(HERE, '../mock/simple_mock.csv')) \
+            .extract(pl.CSVExtractor, firstline_headers=True) \
+            .schema(TestSchema) \
+            .load(self.Loader)
