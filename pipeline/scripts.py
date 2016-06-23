@@ -9,28 +9,42 @@ from pipeline.exceptions import InvalidPipelineError, DuplicateFileException
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 @click.command()
-@click.argument('config', type=click.Path(exists=True))
 @click.option(
-    '--drop', type=click.BOOL, is_flag=True,
+    '--config', '-c', type=click.Path(exists=True),
+    help='Path to a configuration object to use.')
+@click.option(
+    '--db', '-D', default='./status.db', type=click.Path(),
+    help='Path at which to create sqlite3 database.')
+@click.option(
+    '--drop', '-d', type=click.BOOL, is_flag=True,
     help='Whether or not to drop and recreate the table.')
-def create_db(config, drop):
-    '''Create a status table based on the passed CONFIG json file
+def create_db(config, db, drop):
+    '''Create a status table based on the passed CONFIG json file or destination path
     '''
-    with open(config) as f:
-        try:
-            settings = json.loads(f.read())
+    if config:
+        with open(config) as f:
+            try:
+                settings = json.loads(f.read())
+                conn = sqlite3.connect(settings['general']['statusdb'])
 
-        except json.decoder.JSONDecodeError:
+            except json.decoder.JSONDecodeError:
+                raise click.ClickException(
+                    'invalid JSON in settings file'
+                )
+            except KeyError:
+                raise click.ClickException(
+                    'CONFIG must contain a location for a statusdb'
+                )
+
+    else:
+        try:
+            conn = sqlite3.connect(db)
+        except KeyError:
             raise click.ClickException(
-                'invalid JSON in settings file'
+                'Must provide a valid path to create statusdb'
             )
 
-    try:
-        conn = sqlite3.connect(settings['general']['statusdb'])
-    except KeyError:
-        raise click.ClickException(
-            'CONFIG must contain a location for a statusdb'
-        )
+
     cur = conn.cursor()
 
     if drop:

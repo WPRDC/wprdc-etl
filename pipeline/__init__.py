@@ -8,5 +8,5 @@ from pipeline.pipeline import Pipeline
 from pipeline.schema import BaseSchema
 from pipeline.exceptions import (
     InvalidConfigException, IsHeaderException, HTTPConnectorError,
-    DuplicateFileException
+    DuplicateFileException, MissingStatusDatabaseError
 )
