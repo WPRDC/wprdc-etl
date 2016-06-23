@@ -1,0 +1,22 @@
+{
+  "general": {
+    "statusdb": ":memory:"
+  },
+  "connector": {
+    "sftp": {
+      "county_sftp": {
+        "username": "my_username",
+        "password": "my_password"
+      }
+    }
+  },
+  "loader": {
+    "ckan": {
+      "ckan_api_key": "your ckan api key",
+      "ckan_root_url": "your ckan root url",
+      "ckan_organization": {
+        "Name": "ckan-generated-hash"
+      }
+    }
+  }
+}

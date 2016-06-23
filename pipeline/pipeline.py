@@ -4,10 +4,10 @@ import sqlite3
 import time
 
 from pipeline.exceptions import (
-    IsHeaderException, DuplicateFileException, MissingDatabaseName
+    IsHeaderException, InvalidConfigException, DuplicateFileException
 )
 from pipeline.status import Status
-
+from pipeline.exceptions import InvalidConfigException
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 PARENT = os.path.join(HERE, '..')
@@ -23,8 +23,8 @@ class Pipeline(object):
     '''
 
     def __init__(
-        self, name, display_name, log_status=False,
-        conn=None, conn_name=None
+            self, name, display_name, settings_file=None,
+            settings_from_file=True, log_status=False, conn=None,
     ):
         '''
         Arguments:
@@ -38,7 +38,8 @@ class Pipeline(object):
             log_status: boolean for whether or not to log the status
                 of the pipeline. useful to turn off for testing
             conn: optionally passed sqlite3 connection object. if no
-                connection is passed
+                connection is passed, one will be instantiated when the
+                pipeline's ``run`` method is called
         '''
         self.data = []
         self._connector, self._extractor, self._schema, self._loader = \
@@ -46,8 +47,12 @@ class Pipeline(object):
         self.name = name
         self.display_name = display_name
 
+        if settings_from_file:
+            settings_file = settings_file if settings_file else \
+                os.path.join(PARENT, 'settings.json')
+            self.set_config_from_file(settings_file)
+
         self.log_status = log_status
-        self.conn_name = conn_name
 
         if conn:
             self.conn = conn
@@ -55,12 +60,66 @@ class Pipeline(object):
         else:
             self.passed_conn = False
 
+    def get_config(self):
+        return self.config
 
-    def connect(self, connector, target, *args, **kwargs):
+    def set_config_from_file(self, file):
+        '''Sets the pipeline's configuration from file
+
+        Arguments:
+            file: Location of the configuration to load
+
+        Raises:
+            InvalidConfigException: if configuration is found or
+            the found configuration is not valid json
+        '''
+        try:
+            with open(file) as f:
+                self.config = json.loads(f.read())
+
+        except (KeyError, IOError, FileNotFoundError):
+            raise InvalidConfigException(
+                'No config file found, or config not properly formatted'
+            )
+
+    def parse_config_piece(self, pipeline_piece, config_piece_string):
+        '''Parse out a small piece of the overall pipeline configuration
+
+        This is used to pass only the relevant parts of configuration
+        to the relevant loaders. The structure allows configuration to
+        grow larger without forcing implementing functions to know exactly
+        how the configuration must be structured.
+
+        Arguments:
+            pipeline_piece: which part of the pipeline to use (for example,
+                'loader'). This should not be modified by the user.
+            config_piece_string: passed by the user, allows accessing
+                a deeper nested part of the configuration
+
+        Returns:
+            Isolated configuration only for the specified piece
+
+        Raises:
+            InvalidConfigException when the specified configuration
+            piece cannot be found
+        '''
+        config_piece = self.config[pipeline_piece]
+
+        if config_piece_string:
+            for piece in config_piece_string.split('.'):
+                try:
+                    config_piece = config_piece[piece]
+                except KeyError:
+                    raise InvalidConfigException
+
+        return config_piece
+
+    def connect(self, connector, target, config_string=None, *args, **kwargs):
         self._connector = connector
+        connector_config = self.parse_config_piece('connector', config_string) if hasattr(self, 'config') else {}
         self.target = target
         self.connector_args = list(args)
-        self.connector_kwargs = dict(**kwargs)
+        self.connector_kwargs = {**kwargs, **connector_config}
         return self
 
     def extract(self, extractor, *args, **kwargs):
@@ -87,7 +146,7 @@ class Pipeline(object):
         self._schema = schema
         return self
 
-    def load(self, loader, *args, **kwargs):
+    def load(self, loader, config_string=None, *args, **kwargs):
         '''Sets the loader class
 
         Arguments:
@@ -97,8 +156,9 @@ class Pipeline(object):
             modified Pipeline object
         '''
         self._loader = loader
+        loader_config = self.parse_config_piece('loader', config_string) if hasattr(self, 'config') else {}
         self.loader_args = list(args)
-        self.loader_kwargs = dict(**kwargs)
+        self.loader_kwargs = {**kwargs, **loader_config}
         return self
 
     def load_line(self, data):
@@ -134,7 +194,7 @@ class Pipeline(object):
     def get_last_run_checksum(self):
         if self.log_status:
             result = self.conn.execute('''
-		        SELECT input_checksum, max(last_ran)
+                SELECT input_checksum, max(last_ran)
                 FROM status
                 WHERE name = ?
                 AND display_name = ?
@@ -156,11 +216,8 @@ class Pipeline(object):
 
         self.enforce_full_pipeline()
 
-        if self.log_status and not self.passed_conn:
-            if self.conn_name:
-                self.conn = sqlite3.Connection(self.conn_name)
-            else:
-                raise MissingDatabaseName
+        if not self.passed_conn:
+            self.conn = sqlite3.Connection(self.config['general']['statusdb'])
 
         return start_time
 
