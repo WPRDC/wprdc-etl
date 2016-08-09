@@ -84,23 +84,23 @@ class TestPipeline(unittest.TestCase):
 
 class TestStatusLogging(TestBase):
     def test_checksum_duplicate_prevention(self):
-        od_pipeline = pl.Pipeline(
+        pipeline = pl.Pipeline(
             'fatal_od_pipeline', 'Fatal OD Pipeline',
             settings_file=self.settings_file,
-            conn=self.conn
+            log_status=True, conn=self.conn
         ) \
             .connect(pl.FileConnector, os.path.join(HERE, '../mock/simple_mock.csv')) \
             .extract(pl.CSVExtractor, firstline_headers=True) \
             .schema(TestSchema) \
             .load(self.Loader)
 
-        od_pipeline.run()
+        pipeline.run()
 
         status = self.cur.execute('select * from status').fetchall()
         self.assertEquals(len(status), 1)
 
         with self.assertRaises(pl.DuplicateFileException):
-            od_pipeline.run()
+            pipeline.run()
 
         status = self.cur.execute('select * from status').fetchall()
         self.assertEquals(len(status), 1)

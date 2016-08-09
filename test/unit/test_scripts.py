@@ -25,7 +25,7 @@ class TestCreateDBScript(TestCase):
                     }
                 }''')
 
-            result = self.runner.invoke(create_db, ['test_settings.json'])
+            result = self.runner.invoke(create_db, ['-c', 'test_settings.json'])
 
             self.assertEquals(result.exit_code, 0)
             self.assertTrue('test.db' in os.listdir())
@@ -50,7 +50,7 @@ class TestCreateDBScript(TestCase):
                     }
                 }''')
 
-            result = self.runner.invoke(create_db, ['test_settings.json', '--drop'])
+            result = self.runner.invoke(create_db, ['-c', 'test_settings.json', '--drop'])
 
             self.assertEquals(result.exit_code, 0)
             self.assertTrue('test.db' in os.listdir())
@@ -66,7 +66,7 @@ class TestCreateDBScript(TestCase):
 
     def test_bad_config_path(self):
         with self.runner.isolated_filesystem():
-            result = self.runner.invoke(create_db, ['./no_file_here.txt'])
+            result = self.runner.invoke(create_db, ['-c', './no_file_here.txt'])
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('"./no_file_here.txt" does not exist' in result.output)
 
@@ -74,7 +74,7 @@ class TestCreateDBScript(TestCase):
         with self.runner.isolated_filesystem():
             with open('test_settings.json', 'w') as f:
                 f.write('''This isn't valid JSON doc!''')
-            result = self.runner.invoke(create_db, ['test_settings.json'])
+            result = self.runner.invoke(create_db, ['-c', 'test_settings.json'])
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('invalid JSON in settings file' in result.output)
 
@@ -82,9 +82,21 @@ class TestCreateDBScript(TestCase):
         with self.runner.isolated_filesystem():
             with open('test_settings.json', 'w') as f:
                 f.write('''{"lolnostatusdb": "test.db"}''')
-            result = self.runner.invoke(create_db, ['test_settings.json'])
+            result = self.runner.invoke(create_db, ['-c', 'test_settings.json'])
             self.assertNotEquals(result.exit_code, 0)
             self.assertTrue('CONFIG must contain a location for a statusdb' in result.output)
+
+    def test_create_from_path(self):
+        with self.runner.isolated_filesystem():
+            result = self.runner.invoke(create_db, ['--db', './status.db'])
+            self.assertEquals(result.exit_code, 0)
+
+    def test_create_from_default_path(self):
+        with self.runner.isolated_filesystem():
+            result = self.runner.invoke(create_db, ['--db', ''])
+            self.assertEquals(result.exit_code, 0)
+
+
 
 
 test_pipeline = pl.Pipeline(

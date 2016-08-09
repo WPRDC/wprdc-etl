@@ -4,9 +4,9 @@ from pipeline.connectors import (
     SFTPConnector
 )
 from pipeline.loaders import CKANDatastoreLoader
-from pipeline.pipeline import Pipeline, InvalidConfigException
+from pipeline.pipeline import Pipeline
 from pipeline.schema import BaseSchema
 from pipeline.exceptions import (
     InvalidConfigException, IsHeaderException, HTTPConnectorError,
-    DuplicateFileException
+    DuplicateFileException, MissingStatusDatabaseError
 )

@@ -23,3 +23,6 @@ class DuplicateFileException(Exception):
 
 class InvalidPipelineError(Exception):
     pass
+
+class MissingStatusDatabaseError(Exception):
+    pass

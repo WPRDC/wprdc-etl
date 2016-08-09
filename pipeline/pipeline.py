@@ -4,13 +4,14 @@ import sqlite3
 import time
 
 from pipeline.exceptions import (
-    IsHeaderException, InvalidConfigException, DuplicateFileException
+    IsHeaderException, InvalidConfigException, DuplicateFileException, MissingStatusDatabaseError
 )
 from pipeline.status import Status
 from pipeline.exceptions import InvalidConfigException
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 PARENT = os.path.join(HERE, '..')
+
 
 class Pipeline(object):
     '''Main pipeline class
@@ -20,9 +21,10 @@ class Pipeline(object):
     Pipeline methods return the pipeline object, allowing
     for methods to be chained together.
     '''
+
     def __init__(
-        self, name, display_name, settings_file=None,
-        log_status=True, conn=None
+            self, name, display_name, settings_file=None,
+            settings_from_file=True, log_status=False, conn=None, conn_name=None
     ):
         '''
         Arguments:
@@ -45,10 +47,13 @@ class Pipeline(object):
         self.name = name
         self.display_name = display_name
 
-        settings_file = settings_file if settings_file else \
-            os.path.join(PARENT, 'settings.json')
-        self.set_config_from_file(settings_file)
+        if settings_from_file:
+            settings_file = settings_file if settings_file else \
+                os.path.join(PARENT, 'settings.json')
+            self.set_config_from_file(settings_file)
+
         self.log_status = log_status
+        self.conn_name = conn_name
 
         if conn:
             self.conn = conn
@@ -112,10 +117,10 @@ class Pipeline(object):
 
     def connect(self, connector, target, config_string=None, *args, **kwargs):
         self._connector = connector
-        self.connector_config = self.parse_config_piece('connector', config_string)
+        connector_config = self.parse_config_piece('connector', config_string) if hasattr(self, 'config') else {}
         self.target = target
         self.connector_args = list(args)
-        self.connector_kwargs = dict(**kwargs)
+        self.connector_kwargs = {**kwargs, **connector_config}
         return self
 
     def extract(self, extractor, *args, **kwargs):
@@ -152,9 +157,9 @@ class Pipeline(object):
             modified Pipeline object
         '''
         self._loader = loader
-        self.loader_config = self.parse_config_piece('loader', config_string)
+        loader_config = self.parse_config_piece('loader', config_string) if hasattr(self, 'config') else {}
         self.loader_args = list(args)
-        self.loader_kwargs = dict(**kwargs)
+        self.loader_kwargs = {**kwargs, **loader_config}
         return self
 
     def load_line(self, data):
@@ -212,8 +217,13 @@ class Pipeline(object):
 
         self.enforce_full_pipeline()
 
-        if not self.passed_conn:
-            self.conn = sqlite3.Connection(self.config['general']['statusdb'])
+        if self.log_status and not self.passed_conn:
+            if self.conn_name:
+                self.conn = sqlite3.Connection(self.conn_name)
+            elif hasattr(self, 'config'):
+                self.conn = sqlite3.Connection(self.config['general']['statusdb'])
+            else:
+                raise MissingStatusDatabaseError("A connection name must be provided.")
 
         return start_time
 
@@ -251,9 +261,11 @@ class Pipeline(object):
             # instantiate a new connection based on the
             # passed connector class
             _connector = self._connector(
-                self.connector_config, *(self.connector_args),
-                **(self.connector_kwargs)
+                *(self.connector_args), **(self.connector_kwargs)
             )
+
+            # connect and retreive source data
+            connection = _connector.connect(self.target)
 
             input_checksum = _connector.checksum_contents(self.target)
             if input_checksum == self.get_last_run_checksum():
@@ -268,9 +280,6 @@ class Pipeline(object):
             # log the status
             if self.log_status:
                 self.status.write()
-
-            # TODO: this is called when running checksum
-            connection = _connector.connect(self.target)
 
             # instantiate a new extrator instance based on
             # the passed extract class
@@ -296,8 +305,7 @@ class Pipeline(object):
 
             # load the data
             _loader = self._loader(
-                self.loader_config, *(self.loader_args),
-                **(self.loader_kwargs)
+                *(self.loader_args), **(self.loader_kwargs)
             )
             _loader.load(self.data)
 
