@@ -4,7 +4,8 @@ FIELD_TO_CKAN_TYPE_MAPPING = {
     fields.String: 'text',
     fields.Number: 'numeric', fields.Integer: 'numeric',
     fields.DateTime: 'timestamp', fields.Date: 'date',
-    fields.Float: 'float', fields. Boolean: 'bool'
+    fields.Float: 'float', fields. Boolean: 'bool',
+    fields.Time: 'time'
 }
 
 class BaseSchema(Schema):

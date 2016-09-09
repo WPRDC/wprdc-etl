@@ -26,7 +26,8 @@ class CKANLoader(Loader):
         self.key = kwargs.get('ckan_api_key')
         self.package_id = kwargs.get('package_id')
         self.resource_name = kwargs.get('resource_name')
-        self.resource_id = self.get_resource_id(self.package_id, self.resource_name)
+        self.resource_id = kwargs.get('resource_id',
+                                      self.get_resource_id(self.package_id, self.resource_name))
 
     def get_resource_id(self, package_id, resource_name):
         """Search for resource within CKAN dataset and returns its id
@@ -51,7 +52,7 @@ class CKANLoader(Loader):
         )
         # todo: handle bad request
         response_json = response.json()
-        return next((i['id'] for i in response_json['result']['resources'] if resource_name in i['name']), None)
+        return next((i['id'] for i in response_json['result']['resources'] if resource_name == i['name']), None)
 
     def resource_exists(self, package_id, resource_name):
         """Search for resource the existence of a resource on ckan instance
@@ -138,12 +139,19 @@ class CKANLoader(Loader):
 
         return create_datastore['result']['resource_id']
 
-    def generate_datastore(self, fields):
-        if self.resource_id is None:
-            self.resource_id = self.create_resource(self.package_id, self.resource_name)
-            self.create_datastore(self.resource_id, fields)
 
+    def generate_datastore(self, fields, clear):
+        if clear:
+            delete_status = self.delete_datastore(self.resource_id)
+            if str(delete_status)[0] in ['4', '5']:
+                raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
+
+        elif self.resource_id is None:
+            self.resource_id = self.create_resource(self.package_id, self.resource_name)
+
+        self.create_datastore(self.resource_id, fields)
         return self.resource_id
+
 
     def delete_datastore(self, resource_id):
         """Deletes datastore table for resource
@@ -246,11 +254,14 @@ class CKANDatastoreLoader(CKANLoader):
         self.key_fields = kwargs.get('key_fields', None)
         self.method = kwargs.get('method', 'upsert')
         self.header_fix = kwargs.get('header_fix', None)
+        self.clear_first = kwargs.get('clear_first', False)
 
         if self.fields is None:
             raise RuntimeError('Fields must be specified.')
         if self.method == 'upsert' and self.key_fields is None:
             raise RuntimeError('Upsert method requires primary key(s).')
+        if self.clear_first and not self.resource_id:
+            raise RuntimeError('Resource must be already exist in order to be cleared.')
 
     def load(self, data):
         '''Load data to CKAN using an upsert strategy
@@ -267,7 +278,7 @@ class CKANDatastoreLoader(CKANLoader):
             A two-tuple of the status codes for the upsert
             and metadata update calls
         '''
-        self.generate_datastore(self.fields)
+        self.generate_datastore(self.fields, self.clear_first)
         upsert_status = self.upsert(self.resource_id, data, self.method)
         update_status = self.update_metadata(self.resource_id)
 
