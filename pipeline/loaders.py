@@ -140,8 +140,8 @@ class CKANLoader(Loader):
         return create_datastore['result']['resource_id']
 
 
-    def generate_datastore(self, fields, clear):
-        if clear:
+    def generate_datastore(self, fields, clear, first):
+        if clear and first:
             delete_status = self.delete_datastore(self.resource_id)
             if str(delete_status)[0] in ['4', '5']:
                 raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
@@ -255,6 +255,7 @@ class CKANDatastoreLoader(CKANLoader):
         self.method = kwargs.get('method', 'upsert')
         self.header_fix = kwargs.get('header_fix', None)
         self.clear_first = kwargs.get('clear_first', False)
+        self.first_pass = True
 
         if self.fields is None:
             raise RuntimeError('Fields must be specified.')
@@ -278,9 +279,11 @@ class CKANDatastoreLoader(CKANLoader):
             A two-tuple of the status codes for the upsert
             and metadata update calls
         '''
-        self.generate_datastore(self.fields, self.clear_first)
+        self.generate_datastore(self.fields, self.clear_first, self.first_pass)
+        self.first_pass = False
         upsert_status = self.upsert(self.resource_id, data, self.method)
         update_status = self.update_metadata(self.resource_id)
+
 
         if str(upsert_status)[0] in ['4', '5']:
             raise RuntimeError('Upsert failed with status code {}.'.format(str(upsert_status)))

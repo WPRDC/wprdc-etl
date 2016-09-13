@@ -1,4 +1,5 @@
 import io
+import os
 import hashlib
 import requests
 import urllib
@@ -7,6 +8,8 @@ import paramiko
 from io import TextIOWrapper
 
 from pipeline.exceptions import HTTPConnectorError
+
+SFTP_MAX_FILE_SIZE = 50000 #KiB
 
 class Connector(object):
     '''Base connector class.
@@ -143,7 +146,15 @@ class SFTPConnector(FileConnector):
                 username=self.username, password=self.password
             )
             self.conn = paramiko.SFTPClient.from_transport(self.transport)
-            self._file = io.BytesIO(self.conn.open(self.root_dir + target, 'r').read())
+
+            if self.conn.stat(self.root_dir + target).st_size > SFTP_MAX_FILE_SIZE:
+                # For large files, copy to local folder first
+                # prevents re-downloading data for checksum and extraction
+                self.conn.get(self.root_dir + target, os.path.basename(target))
+                self._file = open(os.path.basename(target), 'r')
+            else:
+                self._file = io.BytesIO(self.conn.open(self.root_dir + target, 'r').read())
+
             if self.encoding:
                 self._file = io.TextIOWrapper(self._file, self.encoding)
 

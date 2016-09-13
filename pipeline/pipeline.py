@@ -24,7 +24,9 @@ class Pipeline(object):
 
     def __init__(
             self, name, display_name, settings_file=None,
-            settings_from_file=True, log_status=False, conn=None, conn_name=None
+            settings_from_file=True, log_status=False,
+            conn=None, conn_name=None,
+            chunk_size=2500
     ):
         '''
         Arguments:
@@ -46,6 +48,7 @@ class Pipeline(object):
             None, None, None, None
         self.name = name
         self.display_name = display_name
+        self.chunk_size = chunk_size
 
         if settings_from_file:
             settings_file = settings_file if settings_file else \
@@ -267,18 +270,18 @@ class Pipeline(object):
             # connect and retreive source data
             connection = _connector.connect(self.target)
 
-            input_checksum = _connector.checksum_contents(self.target)
-            if input_checksum == self.get_last_run_checksum():
-                raise DuplicateFileException
 
             if self.log_status:
+                input_checksum = _connector.checksum_contents(self.target)
+                if input_checksum == self.get_last_run_checksum():
+                    raise DuplicateFileException
+
                 self.status = Status(
                     self.conn, self.name, self.display_name, None,
                     start_time, 'new', None, None, None
                 )
 
-            # log the status
-            if self.log_status:
+                # log the status
                 self.status.write()
 
             # instantiate a new extrator instance based on
@@ -290,24 +293,40 @@ class Pipeline(object):
             # instantiate our schema
             self.__schema = self._schema()
 
+
             # build the data
             raw = _extractor.process_connection()
 
-            try:
-                for line in raw:
-                    try:
-                        data = _extractor.handle_line(line)
-                        self.load_line(data)
-                    except IsHeaderException:
-                        continue
-            finally:
-                _connector.close()
-
-            # load the data
+            # instantiate our loader
             _loader = self._loader(
                 *(self.loader_args), **(self.loader_kwargs)
             )
-            _loader.load(self.data)
+
+            while True:
+                try:
+                    # Get `chunk_size` number of records
+                    for i in range(self.chunk_size):
+                        try:
+                            line = next(raw)
+                            data = _extractor.handle_line(line)
+                            self.load_line(data)
+                        except IsHeaderException:
+                            continue
+                        except:
+                            raise
+
+                    _loader.load(self.data)
+                    self.data = []
+
+                except StopIteration:
+                    _loader.load(self.data)
+                    break
+                except Exception as e:
+                    raise(e)
+                    break
+                finally:
+                    _connector.close()
+
 
             if self.log_status:
                 self.status.update(status='success', input_checksum=input_checksum)
