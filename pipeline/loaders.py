@@ -145,11 +145,12 @@ class CKANLoader(Loader):
             delete_status = self.delete_datastore(self.resource_id)
             if str(delete_status)[0] in ['4', '5']:
                 raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
+            self.create_datastore(self.resource_id, fields)
 
         elif self.resource_id is None:
             self.resource_id = self.create_resource(self.package_id, self.resource_name)
+            self.create_datastore(self.resource_id, fields)
 
-        self.create_datastore(self.resource_id, fields)
         return self.resource_id
 
 

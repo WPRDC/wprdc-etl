@@ -102,7 +102,8 @@ class TestCKANDatastore(TestCKANDatastoreBase):
         ]
         post.return_value = mock_post
 
-        self.assertEquals(self.ckan_loader.generate_datastore([]), 1)
+        self.assertEquals(self.ckan_loader.generate_datastore([], False, False), 1)
+        self.assertEquals(self.ckan_loader.generate_datastore([], True, False), 1)
 
     @patch('requests.post')
     def test_delete_datastore(self, post):

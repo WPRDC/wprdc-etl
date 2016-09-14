@@ -108,6 +108,7 @@ class TestSFTPConnector(unittest.TestCase):
 
         SFTPFile.open.return_value = io.BytesIO(initial_bytes=None)
         SFTPClient.from_transport.return_value = SFTPFile
+        SFTPClient.from_transport().stat.return_value = Mock(st_size=5)
         self.connector.connect('myfile.txt')
 
         self.assertTrue(self.connector.transport is not None)
@@ -128,6 +129,7 @@ class TestSFTPConnector(unittest.TestCase):
     @patch('pipeline.connectors.paramiko.Transport')
     def test_bad_sftp(self, Transport, SFTPClient):
         SFTPClient.from_transport().open.side_effect = IOError()
+        SFTPClient.from_transport().stat.return_value = Mock(st_size=5)
         with self.assertRaises(IOError):
             self.connector.connect('')
 
@@ -137,6 +139,7 @@ class TestSFTPConnector(unittest.TestCase):
     def test_connector_closes_connections(self, SFTPFile, Transport, SFTPClient):
         SFTPFile.open.return_value = io.BytesIO(initial_bytes=None)
         SFTPClient.from_transport.return_value = SFTPFile
+        SFTPClient.from_transport().stat.return_value = Mock(st_size=5)
         self.connector.connect('myfile.txt')
         self.connector._file = StringIO()
         self.assertFalse(self.connector._file.closed)

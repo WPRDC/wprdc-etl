@@ -47,7 +47,7 @@ class TestConnector(Connector):
 
 class TestExtractor(Extractor):
     def process_connection(self):
-        return []
+        return iter([])
 
     def handle_line(self, line):
         return []
