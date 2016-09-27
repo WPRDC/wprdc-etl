@@ -320,12 +320,12 @@ class Pipeline(object):
 
                 except StopIteration:
                     _loader.load(self.data)
+                    _connector.close()
                     break
                 except Exception as e:
+                    _connector.close()
                     raise(e)
                     break
-                finally:
-                    _connector.close()
 
 
             if self.log_status:
