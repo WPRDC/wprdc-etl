@@ -1,7 +1,7 @@
 from pipeline.extractors import CSVExtractor, ExcelExtractor
 from pipeline.connectors import (
     FileConnector, RemoteFileConnector, HTTPConnector,
-    SFTPConnector
+    SFTPConnector, FTPConnector
 )
 from pipeline.loaders import CKANDatastoreLoader
 from pipeline.pipeline import Pipeline

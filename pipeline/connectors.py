@@ -4,6 +4,7 @@ import hashlib
 import requests
 import urllib
 import paramiko
+import ftplib
 
 from io import TextIOWrapper
 
@@ -168,3 +169,40 @@ class SFTPConnector(FileConnector):
         self.transport.close()
         if not self._file.closed:
             self._file.close()
+
+
+class FTPConnector(FileConnector):
+    ''' Connect to remote file via SFTP
+    '''
+    def __init__(self, *args, **kwargs):
+        super(FTPConnector, self).__init__(*args, **kwargs)
+        self.host = kwargs.get('host', None)
+        self.username = kwargs.get('username', '')
+        self.password = kwargs.get('password', '')
+        self.passive = kwargs.get('passive', False)
+        self.ftp = None
+        self.file_text = ''
+
+    def connect(self, target):
+        try:
+            self.ftp = ftplib.FTP(self.host)
+            self.ftp.login(self.username, self.password)
+            self.ftp.set_pasv(self.passive)
+            self.ftp.retrlines('RETR ' + target, self.add_to_file)
+            self._file = io.StringIO(self.file_text)
+
+        except IOError as e:
+            raise e
+
+        return self._file
+
+    def close(self):
+        try:
+            self.ftp.quit()
+        except:
+            pass
+        if not self._file.closed:
+            self._file.close()
+
+    def add_to_file(self, line):
+        self.file_text += line + "\n"

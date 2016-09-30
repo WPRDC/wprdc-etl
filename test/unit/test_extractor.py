@@ -94,6 +94,6 @@ class TestExcelExtractor(unittest.TestCase):
             self.extractor.handle_line(next(line))
         self.assertEquals(
             self.extractor.handle_line(next(line)),
-            {'one': 1, 'two': 'a', 'three_things': 'ccc', 'trailing_spaces': 123}
+            {'one': 1, 'two': 'aaa', 'three_things': '1/1/2016', 'trailing_spaces': 123}
         )
 
