@@ -10,7 +10,7 @@ from io import TextIOWrapper
 
 from pipeline.exceptions import HTTPConnectorError
 
-SFTP_MAX_FILE_SIZE = 50000 #KiB
+SFTP_MAX_FILE_SIZE = 500000 #KiB
 
 class Connector(object):
     '''Base connector class.
@@ -189,6 +189,9 @@ class FTPConnector(FileConnector):
             self.ftp.login(self.username, self.password)
             self.ftp.set_pasv(self.passive)
             self.ftp.retrlines('RETR ' + target, self.add_to_file)
+            if 'latin-sig' in self.encoding:
+                b = self.file_text.encode('latin-1')
+                self.file_text = b.decode('utf-8-sig')
             self._file = io.StringIO(self.file_text)
 
         except IOError as e:

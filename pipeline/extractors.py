@@ -139,8 +139,13 @@ class ExcelExtractor(TableExtractor):
         for col in range(sheet.ncols):
             cell = sheet.cell(row, col)
             if cell.ctype == XL_CELL_DATE:
-                date = datetime.datetime(*xldate_as_tuple(cell.value, self.datemode))
-                dt = date.strftime('%m/%d/%Y')  # todo: return datetime and handle the formatting elsewhere
+                xldate_tuple = xldate_as_tuple(cell.value, self.datemode)
+                if xldate_tuple[0]:
+                    date = datetime.datetime(*xldate_as_tuple(cell.value, self.datemode))
+                    dt = date.strftime('%m/%d/%Y')  # todo: return datetime and handle the formatting elsewhere
+                else:
+                    time = datetime.time(*xldate_tuple[3:])
+                    dt = time.strftime('%H:%M:%S')
                 line.append(dt)
             else:
                 line.append(cell.value)
