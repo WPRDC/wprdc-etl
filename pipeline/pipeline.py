@@ -42,6 +42,12 @@ class Pipeline(object):
             conn: optionally passed sqlite3 connection object. if no
                 connection is passed, one will be instantiated when the
                 pipeline's ``run`` method is called
+            chunk_size: specifies the number of rows of data to be
+                upserted at a time (defaults to 2500)
+            start_from_chunk: gives the index of the first chunk of data
+                to be upserted (defaults to 0) [This is useful when
+                a large ETL job fails at some point and you wish to
+                fix something and then resume uploading in the middle.]
         '''
         self.data = []
         self._connector, self._extractor, self._schema, self._loader = \
