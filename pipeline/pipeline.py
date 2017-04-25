@@ -257,7 +257,7 @@ class Pipeline(object):
         4. Instantiate our schema
         5. Iterate through the iterable returned from the connector's
            connect method, handling each element with the extractor's
-           ``handle_line`` method before passing it to the the
+           ``handle_line`` method before passing it to the
            ``load_line`` method to attach each row to the pipeline's
            data.
         6. After iteration, clean up the connector
