@@ -263,7 +263,7 @@ class CKANDatastoreLoader(CKANLoader):
         if self.method == 'upsert' and self.key_fields is None:
             raise RuntimeError('Upsert method requires primary key(s).')
         if self.clear_first and not self.resource_id:
-            raise RuntimeError('Resource must be already exist in order to be cleared.')
+            raise RuntimeError('Resource must already exist in order to be cleared.')
 
     def load(self, data):
         '''Load data to CKAN using an upsert strategy
