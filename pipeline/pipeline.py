@@ -26,7 +26,7 @@ class Pipeline(object):
             self, name, display_name, settings_file=None,
             settings_from_file=True, log_status=False,
             conn=None, conn_name=None,
-            chunk_size=2500
+            chunk_size=2500, start_from_chunk=0
     ):
         '''
         Arguments:
@@ -49,6 +49,7 @@ class Pipeline(object):
         self.name = name
         self.display_name = display_name
         self.chunk_size = chunk_size
+        self.start_from_chunk = start_from_chunk
 
         if settings_from_file:
             settings_file = settings_file if settings_file else \
@@ -302,21 +303,26 @@ class Pipeline(object):
                 *(self.loader_args), **(self.loader_kwargs)
             )
 
+            chunk_count = 0
             while True:
                 try:
                     # Get `chunk_size` number of records
+                    if chunk_count >= self.start_from_chunk:
+                        print("Working on chunk {} (lines {}-{})".format(chunk_count,1+self.chunk_size*chunk_count,self.chunk_size*(chunk_count+1)))
                     for i in range(self.chunk_size):
                         try:
                             line = next(raw)
-                            data = _extractor.handle_line(line)
-                            self.load_line(data)
+                            if chunk_count >= self.start_from_chunk:
+                                data = _extractor.handle_line(line)
+                                self.load_line(data)
                         except IsHeaderException:
                             continue
                         except:
                             raise
+                    if chunk_count >= self.start_from_chunk:
+                        _loader.load(self.data)
+                        self.data = []
 
-                    _loader.load(self.data)
-                    self.data = []
 
                 except StopIteration:
                     _loader.load(self.data)
@@ -326,6 +332,7 @@ class Pipeline(object):
                     _connector.close()
                     raise(e)
                     break
+                chunk_count += 1
 
 
             if self.log_status:
