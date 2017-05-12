@@ -289,6 +289,6 @@ class CKANDatastoreLoader(CKANLoader):
         if str(upsert_status)[0] in ['4', '5']:
             raise RuntimeError('Upsert failed with status code {}.'.format(str(upsert_status)))
         elif str(update_status)[0] in ['4', '5']:
-            raise RuntimeError('Metadata update failed with status code {}'.format(str(upsert_status)))
+            raise RuntimeError('Metadata update failed with status code {}'.format(str(update_status)))
         else:
             return upsert_status, update_status
