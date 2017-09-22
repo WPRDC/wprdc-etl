@@ -144,7 +144,10 @@ class CKANLoader(Loader):
         if clear and first:
             delete_status = self.delete_datastore(self.resource_id)
             if str(delete_status)[0] in ['4', '5']:
-                raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
+                if str(delete_status) == '404':
+                    print("The datastore currently doesn't exist, so let's create it!.")
+                else:
+                    raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
             self.create_datastore(self.resource_id, fields)
 
         elif self.resource_id is None:
