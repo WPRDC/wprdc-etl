@@ -42,6 +42,12 @@ class Pipeline(object):
             conn: optionally passed sqlite3 connection object. if no
                 connection is passed, one will be instantiated when the
                 pipeline's ``run`` method is called
+            chunk_size: specifies the number of rows of data to be
+                upserted at a time (defaults to 2500)
+            start_from_chunk: gives the index of the first chunk of data
+                to be upserted (defaults to 0) [This is useful when
+                a large ETL job fails at some point and you wish to
+                fix something and then resume uploading in the middle.]
         '''
         self.data = []
         self._connector, self._extractor, self._schema, self._loader = \
@@ -49,6 +55,7 @@ class Pipeline(object):
         self.name = name
         self.display_name = display_name
         self.chunk_size = chunk_size
+        self.start_from_chunk = start_from_chunk
 
         if settings_from_file:
             settings_file = settings_file if settings_file else \
@@ -255,7 +262,7 @@ class Pipeline(object):
         4. Instantiate our schema
         5. Iterate through the iterable returned from the connector's
            connect method, handling each element with the extractor's
-           ``handle_line`` method before passing it to the the
+           ``handle_line`` method before passing it to the
            ``load_line`` method to attach each row to the pipeline's
            data.
         6. After iteration, clean up the connector
@@ -305,21 +312,26 @@ class Pipeline(object):
                 *(self.loader_args), **(self.loader_kwargs)
             )
 
+            chunk_count = 0
             while True:
                 try:
                     # Get `chunk_size` number of records
+                    if chunk_count >= self.start_from_chunk:
+                        print("Working on chunk {} (lines {}-{})".format(chunk_count,1+self.chunk_size*chunk_count,self.chunk_size*(chunk_count+1)))
                     for i in range(self.chunk_size):
                         try:
                             line = next(raw)
-                            data = _extractor.handle_line(line)
-                            self.load_line(data)
+                            if chunk_count >= self.start_from_chunk:
+                                data = _extractor.handle_line(line)
+                                self.load_line(data)
                         except IsHeaderException:
                             continue
                         except:
                             raise
+                    if chunk_count >= self.start_from_chunk:
+                        _loader.load(self.data)
+                        self.data = []
 
-                    _loader.load(self.data)
-                    self.data = []
 
                 except StopIteration:
                     _loader.load(self.data)
@@ -329,6 +341,7 @@ class Pipeline(object):
                     _connector.close()
                     raise (e)
                     break
+                chunk_count += 1
 
             if self.log_status:
                 self.status.update(status='success', input_checksum=input_checksum)

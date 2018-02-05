@@ -144,7 +144,10 @@ class CKANLoader(Loader):
         if clear and first:
             delete_status = self.delete_datastore(self.resource_id)
             if str(delete_status)[0] in ['4', '5']:
-                raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
+                if str(delete_status) == '404':
+                    print("The datastore currently doesn't exist, so let's create it!.")
+                else:
+                    raise RuntimeError('Delete failed with status code {}.'.format(str(delete_status)))
             self.create_datastore(self.resource_id, fields)
 
         elif self.resource_id is None:
@@ -263,7 +266,7 @@ class CKANDatastoreLoader(CKANLoader):
         if self.method == 'upsert' and self.key_fields is None:
             raise RuntimeError('Upsert method requires primary key(s).')
         if self.clear_first and not self.resource_id:
-            raise RuntimeError('Resource must be already exist in order to be cleared.')
+            raise RuntimeError('Resource must already exist in order to be cleared.')
 
     def load(self, data):
         '''Load data to CKAN using an upsert strategy
@@ -289,6 +292,6 @@ class CKANDatastoreLoader(CKANLoader):
         if str(upsert_status)[0] in ['4', '5']:
             raise RuntimeError('Upsert failed with status code {}.'.format(str(upsert_status)))
         elif str(update_status)[0] in ['4', '5']:
-            raise RuntimeError('Metadata update failed with status code {}'.format(str(upsert_status)))
+            raise RuntimeError('Metadata update failed with status code {}'.format(str(update_status)))
         else:
             return upsert_status, update_status
