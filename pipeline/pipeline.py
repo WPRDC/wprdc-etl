@@ -26,7 +26,7 @@ class Pipeline(object):
             self, name, display_name, settings_file=None,
             settings_from_file=True, log_status=False,
             conn=None, conn_name=None,
-            chunk_size=2500, start_from_chunk=0
+            chunk_size=2500, strict_load=True
     ):
         '''
         Arguments:
@@ -64,6 +64,7 @@ class Pipeline(object):
 
         self.log_status = log_status
         self.conn_name = conn_name
+        self.strict_load = strict_load
 
         if conn:
             self.conn = conn
@@ -181,9 +182,13 @@ class Pipeline(object):
         '''
         loaded = self.__schema.load(data)
         if loaded.errors:
-            raise RuntimeError('There were errors in the input data: {} (passed data: {})'.format(
+            error_message = 'There were errors in the input data: {} (passed data: {})'.format(
                 loaded.errors.__str__(), data
-            ))
+            )
+            if self.strict_load:
+                raise RuntimeError(error_message)
+            else:
+                print(error_message)
         else:
             self.data.append(self.__schema.dump(loaded.data).data)
 
@@ -277,7 +282,6 @@ class Pipeline(object):
             # connect and retreive source data
             connection = _connector.connect(self.target)
 
-
             if self.log_status:
                 input_checksum = _connector.checksum_contents(self.target)
                 if input_checksum == self.get_last_run_checksum():
@@ -299,7 +303,6 @@ class Pipeline(object):
 
             # instantiate our schema
             self.__schema = self._schema()
-
 
             # build the data
             raw = _extractor.process_connection()
@@ -336,10 +339,9 @@ class Pipeline(object):
                     break
                 except Exception as e:
                     _connector.close()
-                    raise(e)
+                    raise (e)
                     break
                 chunk_count += 1
-
 
             if self.log_status:
                 self.status.update(status='success', input_checksum=input_checksum)
@@ -365,3 +367,4 @@ class Pipeline(object):
         if not self.passed_conn and hasattr(self, 'conn'):
             self.conn.close()
         self.__schema = None
+
