@@ -1,0 +1,10 @@
+# TEMPLATE. Replace the domain and the basic-auth hash (or drop this in favour
+# of oauth2-proxy for SSO). Generate a hash with:  caddy hash-password
+dagster.example.org {
+	encode gzip
+	basic_auth {
+		# username  <bcrypt hash>
+		wprdc $2a$14$REPLACE_WITH_caddy_hash-password_OUTPUT
+	}
+	reverse_proxy webserver:3000
+}

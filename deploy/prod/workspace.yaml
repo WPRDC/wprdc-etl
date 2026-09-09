@@ -1,0 +1,8 @@
+# Production workspace: the webserver and daemon load the code location from
+# the long-lived gRPC server (the `code-location` service in compose.prod.yaml),
+# not by importing the module in-process. Copied to $DAGSTER_HOME in the image.
+load_from:
+  - grpc_server:
+      host: code-location
+      port: 4000
+      location_name: wprdc_etl

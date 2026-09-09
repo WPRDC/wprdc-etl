@@ -1,0 +1,15 @@
+.git
+.venv
+.idea
+.dg
+.tmp_dagster_home_*
+_dryrun
+dev/sftp
+tests
+scripts
+**/__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+compose.yaml

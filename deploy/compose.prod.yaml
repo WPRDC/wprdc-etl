@@ -1,0 +1,103 @@
+# Production stack for a single VM. TEMPLATE — fill in the image ref, the
+# domain, and the secrets path before use.
+#
+#   docker compose -f deploy/compose.prod.yaml up -d
+#
+# Secrets (DAGSTER_PG_URL, CKAN_API_KEY, per-source SFTP creds,
+# DAGSTER_SLACK_BOT_TOKEN, ...) come from AWS Secrets Manager / SSM, written by
+# the deploy step to a root-owned 0600 file at the path below. Non-secret env is
+# inline here.
+#
+# The VM needs an IAM instance profile granting: s3 R/W on the landing +
+# runtime buckets, and secretsmanager:GetSecretValue on the secret(s).
+
+x-app: &app
+  image: ${WPRDC_ETL_IMAGE:?set WPRDC_ETL_IMAGE to the pushed image ref}
+  restart: unless-stopped
+  env_file:
+    - /opt/wprdc-etl/prod.env          # secrets, deploy-time from Secrets Manager
+  environment:
+    ENVIRONMENT: production
+    AWS_REGION: us-east-1
+    LANDING_BUCKET: wprdc-etl-landing
+    DAGSTER_RUNTIME_BUCKET: wprdc-dagster-runtime
+    DAGSTER_MAX_CONCURRENT_RUNS: "4"
+    CKAN_URL: https://data.wprdc.org
+    DAGSTER_WEBSERVER_URL: https://dagster.example.org
+    WPRDC_ALERT_SLACK_CHANNEL: "#wprdc-etl-alerts"
+    DAGSTER_HOME: /opt/dagster/home
+  volumes:
+    - dagster-local:/opt/dagster/home/local   # compute-log staging + artifacts
+
+services:
+  # Long-lived gRPC code server. DefaultRunLauncher launches each run as a
+  # SUBPROCESS of this container — size its resources for
+  # DAGSTER_MAX_CONCURRENT_RUNS concurrent pandas jobs + one `heavy` outlier.
+  code-location:
+    <<: *app
+    command:
+      - dagster
+      - code-server
+      - start
+      - -m
+      - wprdc_etl.definitions
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4000"
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+    healthcheck:
+      test: ["CMD", "dagster-webserver", "--help"]  # process-alive smoke
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  daemon:
+    <<: *app
+    command: ["dagster-daemon", "run"]
+    depends_on: [code-location]
+    healthcheck:
+      test: ["CMD", "dagster-daemon", "liveness-check"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  webserver:
+    <<: *app
+    command:
+      - dagster-webserver
+      - -h
+      - 0.0.0.0
+      - -p
+      - "3000"
+      - -w
+      - /opt/dagster/home/workspace.yaml
+    depends_on: [code-location]
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:3000/server_info').status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Authenticating reverse proxy in front of the (auth-less) webserver.
+  # Swap Caddy basic-auth for oauth2-proxy if you need SSO.
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [webserver]
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  dagster-local:
+  caddy-data:
+  caddy-config:

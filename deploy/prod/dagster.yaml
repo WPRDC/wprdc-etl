@@ -1,0 +1,103 @@
+# Production Dagster instance config.
+#
+# This file is NOT the repo-root dagster.yaml. `dg dev` / `dg check` read
+# $CWD/dagster.yaml (the 4-line dev one); this file only takes effect when
+# DAGSTER_HOME points at the directory holding it (the container sets
+# DAGSTER_HOME=/opt/dagster/home and this is copied there).
+#
+# First prod boot and every `dagster` version bump: run `dagster instance
+# migrate` before starting the webserver / daemon. The container entrypoint
+# does this idempotently.
+#
+# Required long-lived processes: dagster-webserver, dagster-daemon (schedules,
+# sensors, run-queue dequeue, run monitoring, the run-failure alert sensor),
+# and the code-location gRPC server.
+
+# --- run / event / schedule storage: managed Postgres --------------------
+storage:
+  postgres:
+    postgres_url:
+      env: DAGSTER_PG_URL
+
+# --- run queue: bound concurrency for dozens–100+ scheduled datasets -----
+run_coordinator:
+  module: dagster._core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs:
+      env: DAGSTER_MAX_CONCURRENT_RUNS      # int-coerced; tune without a redeploy
+    tag_concurrency_limits:
+      # never run a dataset concurrently with itself (scheduled tick vs. a
+      # manual re-run / backfill). run_tags() stamps wprdc/dataset = stem.
+      - key: "wprdc/dataset"
+        value:
+          applyLimitPerUniqueValue: true
+        limit: 1
+      # don't hammer one agency's SFTP endpoint with parallel pulls.
+      - key: "wprdc/publisher"
+        value:
+          applyLimitPerUniqueValue: true
+        limit: 2
+      # one memory-heavy full-frame decode at a time (defs.yaml: heavy: true).
+      - key: "wprdc/heavy"
+        value: "true"
+        limit: 1
+    dequeue_use_threads: true
+    dequeue_num_workers: 4
+
+# --- run launcher: subprocesses of the code-server on this VM ------------
+run_launcher:
+  module: dagster._core.launcher
+  class: DefaultRunLauncher
+
+# --- compute logs -> S3 (survive container restarts) --------------------
+compute_logs:
+  module: dagster_aws.s3.compute_log_manager
+  class: S3ComputeLogManager
+  config:
+    bucket:
+      env: DAGSTER_RUNTIME_BUCKET
+    prefix: dagster/compute-logs
+    local_dir: /opt/dagster/home/local/compute-logs
+    skip_empty_files: true
+    upload_interval: 30
+    # region resolves from AWS_REGION / the IAM role; no keys, no endpoint_url
+
+# --- local scratch: a mounted volume, not container-ephemeral ----------
+local_artifact_storage:
+  module: dagster._core.storage.root
+  class: LocalArtifactStorage
+  config:
+    base_dir: /opt/dagster/home/local/artifacts
+
+# --- schedule/sensor TICK retention (does NOT purge runs/events) -------
+# Run/event-log growth for 100+ daily datasets needs a separate retention
+# job against the managed Postgres — owned by whoever runs the DB.
+retention:
+  schedule:
+    purge_after_days: 90
+  sensor:
+    purge_after_days:
+      skipped: 7
+      failure: 90
+      success: 7
+
+# --- detect dead run workers so QUEUED slots aren't leaked ------------
+run_monitoring:
+  enabled: true
+  start_timeout_seconds: 300
+  cancel_timeout_seconds: 300
+  max_resume_run_attempts: 0             # DefaultRunLauncher can't resume; keep 0
+  poll_interval_seconds: 120
+
+# --- auto-retry runs that died to infra, not to a data/asset error ---
+run_retries:
+  enabled: true
+  max_retries: 1
+  retry_on_asset_or_op_failure: false
+
+telemetry:
+  enabled: false
+
+code_servers:
+  local_startup_timeout: 360             # importing 100+ components can be slow

@@ -1,0 +1,14 @@
+# Runs on `git commit` after:  uv run pre-commit install
+#
+# The black hook is `repo: local` so it uses the version pinned in
+# pyproject.toml / uv.lock (via `uv run`) — one source of truth, no separate
+# `rev:` to keep in sync. CI still runs `black --check` as the backstop.
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: uv run black
+        language: system
+        types: [python]
+        require_serial: true

@@ -1,0 +1,50 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# NOTE: this instance is currently pointed at the LOCAL DEV stack (compose
+# sftp service + local sink). Flip the source back to production before
+# deploying — the production values are in the commented block below.
+#
+# PRODUCTION source:
+#   source:
+#     type: sftp
+#     host: sftp.alleghenycounty.us     # CONFIRM how WPRDC actually acquires this
+#     path: /outbound/assessments/*.csv  # CONFIRM full-snapshot filename pattern
+#     secret_ref: ALLEGHENY_SFTP
+#   schedule: "0 6 1 * *"                # 6am on the 1st
+
+attributes:
+  publisher: allegheny_county
+  department: real_estate               # Allegheny County Dept. of Real Estate
+  dataset: assessments
+  source:
+    type: sftp
+    host: localhost                     # DEV: compose `sftp` service
+    port: 2222
+    path: /outbound/assessments.csv               # drop a real assessments extract in dev/sftp/
+    secret_ref: WPRDC_LOCAL_SFTP        # export WPRDC_LOCAL_SFTP=wprdc:wprdc
+  # No schedule in dev -> a placeholder sensor (won't auto-run); materialize
+  # manually from the UI / CLI.
+  partition: monthly                     # one snapshot per month
+  ingest: snapshot                       # full-state file -> DataPusher+ replace
+  transforms:                            # shared primitives, run in order
+    # Date formats DIFFER per the data dictionary — verify against a sample.
+    - op: iso_date
+      columns: [SALEDATE, RECORDDATE]
+      fmt: "%d/%m/%Y"                    # documented dd/mm/yyyy
+    - op: iso_date
+      columns: [PREVSALEDATE, PREVSALEDATE2]
+      fmt: "%m/%d/%Y"                    # documented mm/dd/yyyy
+    - op: coerce_numeric
+      columns: [SALEPRICE, PREVSALEPRICE, PREVSALEPRICE2,
+                FAIRMARKETLAND, FAIRMARKETBUILDING, FAIRMARKETTOTAL,
+                COUNTYTOTAL, LOCALTOTAL, LOTAREA]
+    - op: strip
+    - op: drop_nulls
+      columns: [PARID]                   # a parcel row with no parcel id is junk
+  # full_address derivation (bespoke) lives in the co-located transform.py.
+  # Column contract (all columns, each required) lives in schema.py.
+  geocode: false                         # parcels resolve via geometry join, not address geocoding
+  ckan:
+    # With WPRDC_ETL_SINK_DIR set, the loader writes locally and never calls
+    # CKAN, so this can stay a placeholder for dev.
+    resource_id: "REPLACE-WITH-CKAN-RESOURCE-UUID"

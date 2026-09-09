@@ -1,0 +1,69 @@
+# Local dev dependencies for wprdc-etl.
+#
+#   docker compose up -d
+#
+# Brings up an S3 (LocalStack), a Postgres for Dagster, and an SFTP server you
+# can use as a test source. CKAN is NOT here — it's a heavy multi-service stack
+# and you already have a dockerized deployment; point CKAN_URL at that (see
+# dev/README.md). For most iteration you don't need CKAN at all: set
+# WPRDC_ETL_SINK_DIR and the loaders write output to a local folder instead.
+
+services:
+  localstack:
+    image: localstack/localstack:3
+    container_name: wprdc-localstack
+    restart: unless-stopped
+    environment:
+      SERVICES: s3
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  postgres:
+    image: postgres:17
+    container_name: wprdc-dagster-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dagster
+      POSTGRES_PASSWORD: dagster
+      POSTGRES_DB: dagster
+    ports:
+      - "5432:5432"
+    volumes:
+      - dagster_pg:/var/lib/postgresql/data
+
+  sftp:
+    image: atmoz/sftp:alpine
+    container_name: wprdc-sftp
+    restart: unless-stopped
+    # user:password:uid:gid:dir  -> creates /home/wprdc/outbound
+    command: "wprdc:wprdc:1001:1001:outbound"
+    ports:
+      - "2222:22"     # connect to localhost:2222 (source.port: 2222)
+    volumes:
+      # Drop test files in dev/sftp/ and they appear under /outbound on the server.
+      - ./dev/sftp:/home/wprdc/outbound
+
+volumes:
+  localstack_data:
+  dagster_pg:
+
+# ---------------------------------------------------------------------------
+# First-run setup (once, after `docker compose up -d`):
+#   aws --endpoint-url http://localhost:4566 s3 mb s3://wprdc-etl-landing
+#
+# .env for LOCAL DEV:
+#   S3_ENDPOINT_URL=http://localhost:4566
+#   AWS_ACCESS_KEY_ID=test
+#   AWS_SECRET_ACCESS_KEY=test
+#   AWS_REGION=us-east-1
+#   LANDING_BUCKET=wprdc-etl-landing
+#   WPRDC_LOCAL_SFTP=wprdc:wprdc          # matches the sftp service creds
+#   CKAN_API_KEY=...                      # only if testing against real/local CKAN
+#   # WPRDC_ETL_SINK_DIR=./_dryrun        # uncomment to skip CKAN and dump output locally
+#
+# A test source's defs.yaml would use:
+#   source: { type: sftp, host: localhost, port: 2222,
+#             path: /outbound/*.csv, secret_ref: WPRDC_LOCAL_SFTP }
+# ---------------------------------------------------------------------------

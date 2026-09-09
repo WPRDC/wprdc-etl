@@ -1,0 +1,21 @@
+{
+  "Rules": [
+    {
+      "ID": "landing-tiering",
+      "Status": "Enabled",
+      "Filter": {
+        "ObjectSizeGreaterThan": 131072
+      },
+      "Transitions": [
+        {
+          "Days": 90,
+          "StorageClass": "STANDARD_IA"
+        },
+        {
+          "Days": 365,
+          "StorageClass": "GLACIER"
+        }
+      ]
+    }
+  ]
+}
