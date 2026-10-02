@@ -69,10 +69,12 @@ class SftpFileExtractor(Extractor):
                 "the var named in this dataset's defs.yaml source block"
             )
         if not src.secret_ref:
-            raise dg.Failure("source.secret_ref is required for sftp sources")
+            raise dg.Failure(
+                "source.secret_ref is required for sftp sources", allow_retries=False
+            )
         secret = os.environ.get(src.secret_ref)
         if not secret:
-            raise dg.Failure(f"env var {src.secret_ref} not set")
+            raise dg.Failure(f"env var {src.secret_ref} not set", allow_retries=False)
         user, _, password = secret.partition(":")  # expected "user:password"
         port = src.port or 22
 
@@ -144,7 +146,9 @@ class HttpFileExtractor(Extractor):
 
         url = src.url or src.path
         if not url:
-            raise dg.Failure("source.url is required for http sources")
+            raise dg.Failure(
+                "source.url is required for http sources", allow_retries=False
+            )
 
         auth = _basic_auth(src.secret_ref)
         return _download_and_land(
@@ -158,7 +162,7 @@ def _basic_auth(secret_ref: str | None) -> tuple[str, str] | None:
         return None
     secret = os.environ.get(secret_ref)
     if not secret:
-        raise dg.Failure(f"env var {secret_ref} not set")
+        raise dg.Failure(f"env var {secret_ref} not set", allow_retries=False)
     user, _, password = secret.partition(":")  # expected "user:password"
     return (user, password)
 
@@ -362,7 +366,8 @@ def resolve_arcgis_distribution(
         dcat_format, dist_title, _ = ARCGIS_FORMATS[fmt]
     except KeyError:
         raise dg.Failure(
-            f"source.format {fmt!r} is not one of {sorted(ARCGIS_FORMATS)}"
+            f"source.format {fmt!r} is not one of {sorted(ARCGIS_FORMATS)}",
+            allow_retries=False,
         )
 
     matches = [d for d in catalog if d.get("title") == title]
@@ -390,7 +395,8 @@ def resolve_arcgis_distribution(
         hint = f" Close titles: {near[:5]}" if near else ""
         raise dg.Failure(
             f"no dataset titled {title!r} in the catalogue "
-            f"({len(catalog)} entries).{hint}"
+            f"({len(catalog)} entries).{hint}",
+            allow_retries=False,
         )
 
     candidates = [
@@ -412,7 +418,8 @@ def resolve_arcgis_distribution(
         )
         raise dg.Failure(
             f"{title!r} publishes no {dcat_format}/{dist_title} download; "
-            f"it offers {have}"
+            f"it offers {have}",
+            allow_retries=False,
         )
 
     return _distribution_url(dist), {
@@ -458,9 +465,14 @@ class ArcGisExtractor(Extractor):
         src = cfg.source
 
         if not src.catalog:
-            raise dg.Failure("source.catalog (the site's data.json) is required")
+            raise dg.Failure(
+                "source.catalog (the site's data.json) is required", allow_retries=False
+            )
         if not src.title:
-            raise dg.Failure("source.title (the layer's catalogue title) is required")
+            raise dg.Failure(
+                "source.title (the layer's catalogue title) is required",
+                allow_retries=False,
+            )
 
         fmt = (src.format or "csv").lower()
         catalog = fetch_catalog(src.catalog)
@@ -512,7 +524,10 @@ def resolve_pasda_download(dataset_id: str, fmt: str) -> tuple[str, dict[str, An
     try:
         pattern, ext = PASDA_FORMATS[fmt]
     except KeyError:
-        raise dg.Failure(f"source.format {fmt!r} is not one of {sorted(PASDA_FORMATS)}")
+        raise dg.Failure(
+            f"source.format {fmt!r} is not one of {sorted(PASDA_FORMATS)}",
+            allow_retries=False,
+        )
 
     page = f"{PASDA_SUMMARY}?dataset={dataset_id}"
     resp = requests.get(
@@ -529,7 +544,8 @@ def resolve_pasda_download(dataset_id: str, fmt: str) -> tuple[str, dict[str, An
         )
         raise dg.Failure(
             f"PASDA dataset {dataset_id} offers no {fmt} download "
-            f"(found: {offered or 'nothing recognisable'}). See {page}"
+            f"(found: {offered or 'nothing recognisable'}). See {page}",
+            allow_retries=False,
         )
     url = urljoin(page, match)
     return url, {
@@ -566,7 +582,9 @@ class PasdaExtractor(Extractor):
         partition = context.partition_key if context.has_partition_key else "current"
         src = cfg.source
         if not src.dataset_id:
-            raise dg.Failure("source.dataset_id is required for pasda sources")
+            raise dg.Failure(
+                "source.dataset_id is required for pasda sources", allow_retries=False
+            )
 
         fmt = (src.format or "shapefile").lower()
         url, provenance = resolve_pasda_download(str(src.dataset_id), fmt)

@@ -103,7 +103,8 @@ def _link_url(entry: dict[str, Any], kind: str) -> str:
         return entry["landingPage"]
     raise dg.Failure(
         f"catalogue entry {entry.get('title')!r} has no {wanted} distribution "
-        f"to point the {kind} resource at"
+        f"to point the {kind} resource at",
+        allow_retries=False,
     )
 
 
@@ -118,7 +119,8 @@ def _resource_id(
     if not cfg.ckan.package_id:
         raise dg.Failure(
             f"mirror {mirror.format!r} has no resource_id, so it must be "
-            "created — which needs ckan.package_id"
+            "created — which needs ckan.package_id",
+            allow_retries=False,
         )
     found = ckan.find_resource(cfg.ckan.package_id, name, ckan_fmt)
     if found:
@@ -280,7 +282,12 @@ def _landed_copy(
 
 
 def _download(url: str, path: str) -> None:
-    """Stream a distribution to `path`, refusing the Pending placeholder."""
+    """Stream a distribution to `path`, refusing the Pending placeholder.
+
+    `_distribution` has already waited out a cold export (arcgis_ready_url).
+    One still building after that wait — police_zones' KML and Feature
+    Collection were — fails here and is retried by the step's retry policy.
+    """
     import requests
 
     with requests.get(url, stream=True, timeout=300) as resp:
@@ -321,7 +328,9 @@ def sync_package_metadata(
     pushed.
     """
     if not cfg.ckan.package_id:
-        raise dg.Failure("ckan.sync_metadata needs ckan.package_id")
+        raise dg.Failure(
+            "ckan.sync_metadata needs ckan.package_id", allow_retries=False
+        )
 
     notes = package_description(
         entry,

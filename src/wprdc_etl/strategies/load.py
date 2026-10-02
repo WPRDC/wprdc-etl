@@ -25,10 +25,11 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
+import dagster as dg
+
 from wprdc_etl.runtime import sink_dir
 
 if TYPE_CHECKING:
-    import dagster as dg
     import pandas as pd
 
     from wprdc_etl.components.models import PipelineConfig
@@ -170,14 +171,16 @@ def _guard_replace(
     if report["type_changes"]:
         problems.append(f"type changes ({_fmt_changes(report['type_changes'])})")
     if problems:
-        raise RuntimeError(
-            "replace aborted: the output's shape differs from the live CKAN "
+        # allow_retries=False: the column change is still there a minute later.
+        raise dg.Failure(
+            allow_retries=False,
+            description="replace aborted: the output's shape differs from the live CKAN "
             f"table — {'; '.join(problems)}. The reload truncates rather than "
             "drops, so the table keeps its current columns and types and can't "
             "take this. If the change is intended, set `ckan.rebuild: true` to "
             "drop and recreate the table — but note that discards anything else "
             "added to it, including ckanext-spatialdata's geometry column and "
-            "indexes, which then need regenerating."
+            "indexes, which then need regenerating.",
         )
 
 
@@ -187,11 +190,12 @@ def _guard_upsert(
     if not report["live_exists"]:
         return
     if report["type_changes"]:
-        raise RuntimeError(
-            "upsert aborted: column type(s) differ from the live CKAN table "
+        raise dg.Failure(
+            allow_retries=False,
+            description="upsert aborted: column type(s) differ from the live CKAN table "
             f"({_fmt_changes(report['type_changes'])}). If this change is "
             "intended, reset the DataStore table (datastore_delete) so it can be "
-            "recreated with the new types, then re-run."
+            "recreated with the new types, then re-run.",
         )
     if report["removed"] and context is not None:
         context.log.warning(

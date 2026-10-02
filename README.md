@@ -1,6 +1,6 @@
 # wprdc-etl
 
-Civic-data ETL for the [WPRDC](https://www.wprdc.org/) open data portal, built on
+ETL for the [WPRDC](https://www.wprdc.org/) open data portal, built on
 [Dagster](https://dagster.io/) components. Each dataset is a small YAML file; the
 framework handles acquisition, an immutable S3 landing zone, transformation,
 validation, and publishing to CKAN.

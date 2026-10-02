@@ -37,6 +37,7 @@ from wprdc_etl.resources import (
 from wprdc_etl.components._common import (
     partitions_for,
     resolve_modes,
+    network_retry_policy,
     run_tags,
     schedule_or_sensor,
     taxonomy,
@@ -213,6 +214,7 @@ class TabularPipeline(Component, Model, Resolvable):
         # -- landed -------------------------------------------------------
         @dg.asset(
             key=[*key_prefix, "landed"],
+            retry_policy=network_retry_policy(),
             partitions_def=partitions,
             group_name=group,
         )
@@ -307,6 +309,7 @@ class TabularPipeline(Component, Model, Resolvable):
 
             @dg.asset(
                 key=[*key_prefix, "loaded"],
+                retry_policy=network_retry_policy(),
                 partitions_def=partitions,
                 ins={"to_publish": dg.AssetIn(key=[*key_prefix, upstream])},
                 group_name=group,
@@ -507,6 +510,7 @@ def _make_representation_asset(
 
     @dg.asset(
         key=[*key_prefix, "published", fmt],
+        retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,
@@ -545,7 +549,10 @@ def _catalog_entry(cfg: "TabularPipeline") -> dict:
         wanted = (title or "").strip()
         matches = [d for d in catalog if (d.get("title") or "").strip() == wanted]
     if not matches:
-        raise dg.Failure(f"no catalogue entry titled {title!r} in {cfg.source.catalog}")
+        raise dg.Failure(
+            f"no catalogue entry titled {title!r} in {cfg.source.catalog}",
+            allow_retries=False,
+        )
     matches.sort(key=lambda d: d.get("modified") or "", reverse=True)
     return matches[0]
 
@@ -568,6 +575,7 @@ def _make_mirror_asset(
 
     @dg.asset(
         key=[*key_prefix, "mirrored", fmt],
+        retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
         group_name=group,
@@ -605,6 +613,7 @@ def _make_metadata_asset(
 
     @dg.asset(
         key=[*key_prefix, "package_metadata"],
+        retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
         group_name=group,
@@ -632,6 +641,7 @@ def _make_region_layer_asset(
 
     @dg.asset(
         key=[*key_prefix, "region_layer"],
+        retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,
@@ -674,6 +684,7 @@ def _make_key_layer_asset(
 
     @dg.asset(
         key=[*key_prefix, "key_layer"],
+        retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,

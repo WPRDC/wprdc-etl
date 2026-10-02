@@ -180,6 +180,17 @@ genuinely dataset-specific logic.
   `changed` is False when nothing was rewritten. The saving is the write, not
   the run: download and decode still dominate. Landing still snapshots every
   partition — at ~28 GB/yr across all 107 datasets, dedupe isn't worth it.
+- **Network steps retry in production; permanent failures must say so.**
+  `network_retry_policy()` (`_common.py`) puts a 3-retry, ~1/2/4-min jittered
+  backoff on every step that talks to the outside world — landing,
+  `loaded`, representations, mirrors, metadata, PostGIS layers — and on
+  nothing in dev, where a failure should surface in seconds. ArcGIS is why:
+  `arcgis_ready_url` waits 95s for an export to build, and a cold KML or
+  Feature Collection can take longer. A failure no retry can fix (missing
+  config, a title gone from the catalogue, the replace/upsert column guard)
+  is raised as `dg.Failure(..., allow_retries=False)` so it alerts at once.
+  **New code raising a permanent error must do the same**, or it burns ~7
+  minutes of backoff before anyone hears about it.
 - **`ingest` and `publish` are separate axes.** `ingest` is how data arrives
   (`snapshot` | `incremental`), `publish` is how it reaches CKAN (`replace` |
   `upsert`); unset, `publish` derives the old pairing. `incremental` + `replace`

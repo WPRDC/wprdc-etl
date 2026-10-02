@@ -28,6 +28,7 @@ import dagster as dg
 from dagster.components import Component, Model, Resolvable
 
 from wprdc_etl.components._common import (
+    network_retry_policy,
     partitions_for,
     run_tags,
     schedule_or_sensor,
@@ -57,7 +58,10 @@ class FilePipeline(Component, Model, Resolvable):
 
         # -- landed: pull the blob and land it (raw bytes + manifest) --------
         @dg.asset(
-            key=[*key_prefix, "landed"], partitions_def=partitions, group_name=group
+            key=[*key_prefix, "landed"],
+            partitions_def=partitions,
+            group_name=group,
+            retry_policy=network_retry_policy(),
         )
         def landed(
             context: dg.AssetExecutionContext,
@@ -72,6 +76,7 @@ class FilePipeline(Component, Model, Resolvable):
         @dg.asset(
             key=[*key_prefix, "published"],
             partitions_def=partitions,
+            retry_policy=network_retry_policy(),
             deps=[landed],
             group_name=group,
         )

@@ -17,7 +17,7 @@ x-app: &app
   env_file:
     - /opt/wprdc-etl/prod.env          # secrets, deploy-time from Secrets Manager
   environment:
-    ENVIRONMENT: production
+    ENVIRONMENT: ${ENVIRONMENT}
     AWS_REGION: us-east-1
     LANDING_BUCKET: wprdc-etl-landing
     DAGSTER_RUNTIME_BUCKET: wprdc-dagster-runtime

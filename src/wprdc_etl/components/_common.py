@@ -28,6 +28,31 @@ _START = "2024-01-01"
 SCHEDULE_TZ = "America/New_York"
 
 
+def network_retry_policy() -> dg.RetryPolicy | None:
+    """The retry policy for steps that talk to the outside world.
+
+    Production only. Sources and CKAN fail transiently — an ArcGIS export still
+    building after the in-code wait, a 5xx, a dropped SFTP session — and each
+    unretried one is a failed run and a Slack alert. Backoff of ~1, 2, 4 min
+    (jittered, so a Monday burst of 100 layers doesn't retry in lockstep).
+
+    Off in dev: a failure there should surface in seconds, not after seven
+    minutes of retries. Failures that can't fix themselves (missing config, a
+    title gone from the catalogue, the replace column guard) are raised with
+    `allow_retries=False` and skip this entirely.
+    """
+    from wprdc_etl.runtime import is_production
+
+    if not is_production():
+        return None
+    return dg.RetryPolicy(
+        max_retries=3,
+        delay=60,
+        backoff=dg.Backoff.EXPONENTIAL,
+        jitter=dg.Jitter.PLUS_MINUS,
+    )
+
+
 def resolve_modes(cfg: PipelineConfig) -> tuple[str, bool]:
     """Fill in `publish` and `accumulate` from `ingest` when they're unset.
 

@@ -50,7 +50,10 @@ def ensure_geo(
         return dataframe
     if geometry and geometry.wkt:
         if geometry.wkt not in dataframe.columns:
-            raise dg.Failure(f"{what}: geometry.wkt column {geometry.wkt!r} not found")
+            raise dg.Failure(
+                f"{what}: geometry.wkt column {geometry.wkt!r} not found",
+                allow_retries=False,
+            )
         geom = gpd.GeoSeries.from_wkt(dataframe[geometry.wkt].astype("string"))
         return gpd.GeoDataFrame(
             dataframe.drop(columns=[geometry.wkt]), geometry=geom, crs="EPSG:4326"
@@ -60,12 +63,16 @@ def ensure_geo(
             c for c in (geometry.lat, geometry.lng) if c not in dataframe.columns
         ]
         if missing:
-            raise dg.Failure(f"{what}: geometry lat/lng columns {missing} not found")
+            raise dg.Failure(
+                f"{what}: geometry lat/lng columns {missing} not found",
+                allow_retries=False,
+            )
         geom = gpd.points_from_xy(dataframe[geometry.lng], dataframe[geometry.lat])
         return gpd.GeoDataFrame(dataframe.copy(), geometry=geom, crs="EPSG:4326")
     raise dg.Failure(
         f"{what} needs geometry: the frame isn't geospatial and the dataset has "
-        "no `geometry:` block naming a wkt column or a lat/lng pair"
+        "no `geometry:` block naming a wkt column or a lat/lng pair",
+        allow_retries=False,
     )
 
 
@@ -99,7 +106,8 @@ def publish_representation(
     if fmt not in GEO_FORMATS:
         raise dg.Failure(
             f"unknown representation format {rep.format!r} "
-            f"(implemented: {sorted(GEO_FORMATS)})"
+            f"(implemented: {sorted(GEO_FORMATS)})",
+            allow_retries=False,
         )
     # Dispatch first, THEN build geometry: it's a requirement of the geospatial
     # formats, not of publishing a representation. A non-geo format added here
