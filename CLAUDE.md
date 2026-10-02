@@ -357,6 +357,13 @@ Things that will bite you here:
   Stubbed descriptions (new package or empty notes) come from the catalogue
   minus the county's harvest boilerplate, and the defs say STUB — review
   before publishing.
+- **`source.title` is a lookup key, not a display title.** The extractor
+  finds the layer by that exact catalogue title, so "tidying" it breaks
+  landing (`bin/arcgis --list` reports DRIFT). A nicer CKAN title or URL name
+  for a NEW package goes in `PACKAGE_TITLES` / `PACKAGE_NAMES`, which render
+  `ckan.package_title` / `ckan.package_name` — read only when the package is
+  created (`bin/seed-ckan`, the catch-up script). The name defaults to a slug
+  of the title.
 - **Type inference refuses `num()` for identifiers.** A FIPS code, GEOID, zip or
   zero-padded coordinate parses as a number but is a label; `num()` eats the
   leading zeros and, on a blank-bearing column, fails `schema_ok` outright.

@@ -32,20 +32,37 @@ attributes:
   partition: weekly
   ingest: snapshot
   ckan:
-    # NOT YET CREATED. This id is minted from the catalogue title and
-    # is stable, but no package carries it: run `bin/seed-ckan --write`
-    # against the target portal before publishing.
-    package_id: "783a9bdb-6c7b-53d9-ba2b-e191077fe09c"
+    package_id: "78115312-761a-4841-8fd6-2442acdb7cce"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
+    # STUB from the publisher's catalogue description (harvest
+    # boilerplate removed). REVIEW before publishing: it replaces
+    # the package notes on every run.
+    description: |-
+      Shows the location of all blazed and unblazed trails in all Allegheny County parks. This is
+      the same data used in the Allegheny County Parks Trails Mobile App, available for Apple and Android devices.
+
+      **Category:**  Recreation
+
+      **Organization:**  Allegheny County
+
+      **Department:**  Parks Department
+
+      **Temporal Coverage:**  present
     mirror:
       - format: geojson
+        resource_id: "5990b107-06b2-4ea7-95cc-0e7fb1b6a27b"
         datastore: false   # needs the spatial load endpoint (not built yet)
       - format: csv
+        resource_id: "3c9a5709-5567-4b6f-bcae-d62062db3596"
         datastore: false   # flip to true if a queryable table is ever wanted
       - format: shapefile
+        resource_id: "427b31fe-02a6-41bf-9c0f-c915dd39a08a"
       - format: kml
+        resource_id: "e8fa4979-a003-4493-a381-8957d2d98d4b"
       - format: hub_page
+        resource_id: "87a73d31-63a4-4568-a76b-de316b50537c"
       - format: rest_api
+        resource_id: "12e5b620-7d8a-4582-9f9e-a697e92840e0"

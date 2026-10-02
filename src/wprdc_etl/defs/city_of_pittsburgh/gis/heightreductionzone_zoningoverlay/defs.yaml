@@ -35,6 +35,7 @@ attributes:
     # NOT YET CREATED. This id is minted from the catalogue title and
     # is stable, but no package carries it: run `bin/seed-ckan --write`
     # against the target portal before publishing.
+    package_title: "Height Reduction Zone Zoning Overlay"
     package_id: "5376db52-e60f-5859-a8fe-96a4deb7b53e"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is

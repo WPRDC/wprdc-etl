@@ -135,6 +135,13 @@ class CkanModel(Model, Resolvable):
     # isn't a write to `resource_id` itself: patching the description/tags,
     # and finding or creating the mirrored resources.
     package_id: str | None = None
+    # The package's display title and URL name, used only when the package is
+    # CREATED (by `bin/seed-ckan` or the production catch-up script) — the
+    # pipeline itself addresses packages by id. NOT `source.title`: that is the
+    # catalogue lookup key, and changing it breaks extraction. Unset, the
+    # title is the catalogue title and the name is a slug of the title.
+    package_title: str | None = None
+    package_name: str | None = None
     # Upstream distributions to copy onto their own CKAN resources.
     mirror: list[MirrorModel] | None = None
     # Overwrite the package's description and tags from the catalogue entry.

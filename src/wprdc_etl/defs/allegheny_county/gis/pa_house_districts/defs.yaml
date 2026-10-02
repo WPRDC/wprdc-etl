@@ -35,6 +35,7 @@ attributes:
     # NOT YET CREATED. This id is minted from the catalogue title and
     # is stable, but no package carries it: run `bin/seed-ckan --write`
     # against the target portal before publishing.
+    package_name: "allegheny-county-pa-house-of-representative-districts"
     package_id: "9dc40eff-d140-5f1a-9511-9deeb5948a3a"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is

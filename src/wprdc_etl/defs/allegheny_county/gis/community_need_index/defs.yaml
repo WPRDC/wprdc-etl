@@ -35,11 +35,71 @@ attributes:
     # NOT YET CREATED. This id is minted from the catalogue title and
     # is stable, but no package carries it: run `bin/seed-ckan --write`
     # against the target portal before publishing.
+    package_title: "Allegheny County Community Need Index"
     package_id: "9d2da172-d79b-586a-8405-28da0d4cb2df"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
+    # STUB from the publisher's catalogue description (harvest
+    # boilerplate removed). REVIEW before publishing: it replaces
+    # the package notes on every run.
+    description: |-
+      ## What is the Community Need Index?
+
+      The Allegheny County Department of Human Services (DHS) conducts a
+      Community Need Index (CNI) to identify specific areas that are in
+      greater need, and face larger socioeconomic barriers, relative to
+      others. The [newest version of the CNI index](https://www.alleghenycountyanalytics.us/wp-content/uploads/2021/05/24-ACDHS-05-CNI-Report_v2.pdf) ranks neighborhoods by need level by looking at:
+
+      - The percentage of families who live below the poverty line
+      - The percentage of unemployed or unattached males
+      - The percentage of those aged 25 and up without at least a Bachelor’s degree
+      - The percentage of single parent households
+      - The percentage of households without internet access
+      - Rate of homicide per 100,000 residents
+      - Rate of fatal overdoses per 100,000 residents
+
+      The researchers used a [census tract level](https://www.census.gov/programs-surveys/geography/about/glossary.html#:~:text=Census%20Tract,-Census%20Tracts%20are&text=Census%20tracts%20generally%20have%20a,optimum%20size%20of%204%2C000%20people.) to break up the region and assess needs. Census tracts are static, relatively small subdivisions of a county.
+
+      (See https://www.alleghenycountyanalytics.us/2024/05/31/allegheny-county-community-need-index/ for more information.)
+
+      If viewing this description on the Western Pennsylvania
+      Regional Data Center’s open data portal (https://www.wprdc.org), this
+      dataset is harvested on a weekly basis from Allegheny County’s GIS data portal
+      (https://openac.alcogis.opendata.arcgis.com/). The
+      full metadata record for this dataset can also be found on Allegheny County’s
+      GIS portal. You can access the metadata record and other resources on the GIS
+      portal by clicking on the “Explore” button (and choosing the “Go to resource”
+      option) to the right of the “ArcGIS Open Dataset” text below.
+
+      **Category:**  Human & Social Services
+
+      **Organization:**  Allegheny County
+
+      **Department:**  Department of Human Services
+
+      **Temporal Coverage:**  2022
+
+      **Data Notes:**  
+
+      Coordinate System:  GCS_North_American_1983
+
+      Development Notes:  see https://www.alleghenycountyanalytics.us/2024/05/31/allegheny-county-community-need-index/
+
+      **Related Document(s):**  2024 report: https://www.alleghenycountyanalytics.us/wp-content/uploads/2021/05/24-ACDHS-05-CNI-Report_v2.pdf
+
+      **Frequency - Data Change:**  as needed
+
+      **Frequency - Publishing:**  as needed
+
+      **Data Steward Name:**  Nicholas Cotter
+
+      **Data Steward Email:**  [DHS-Research@alleghenycounty.us](mailto:DHS-Research@alleghenycounty.us)
+    # Appended to the description on every sync. Hand-added: the generator
+    # doesn't emit suffixes, so an --overwrite-defs regeneration drops it.
+    description_suffix: |-
+      Used in the 2024 report.
     mirror:
       - format: geojson
         datastore: false   # needs the spatial load endpoint (not built yet)

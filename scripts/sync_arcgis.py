@@ -267,6 +267,10 @@ class Entry:
     # True when the REST layer is a plain table (no geometry): the CSV is the
     # source and only TABLE_MIRRORS are published.
     table: bool = False
+    # URL name for a minted package, from PACKAGE_NAMES ("" = slug of title).
+    package_name: str = ""
+    # Display title for a minted package, from PACKAGE_TITLES ("" = title).
+    package_title: str = ""
     # Set for a folder in GEOMETRY_JOINS: the frame is joined to a key layer
     # and published to `resource_id` rather than copied.
     join: "GeometryJoinSpec | None" = None
@@ -386,10 +390,60 @@ FOLDER_ALIASES = {
 # package. That package is itself being replaced: its link resources point at
 # Street Aliases and its GeoJSON is an empty placeholder.
 MINT = "mint"
+#   <id> publish to this existing package — for a layer the portal already
+#        carries under a title the catalogue no longer uses.
 PACKAGE_OVERRIDES: dict[str, dict[str, str]] = {
     "allegheny_county": {
         "Allegheny County Addressing Street Aliases": "",
         "Allegheny County Addressing Landmarks": MINT,
+        # Same REST service (Blocks/FeatureServer/0); WPRDC titles it
+        # "Allegheny County Block Areas".
+        "Allegheny County Block Index": "31d1d279-7f81-466d-8aca-83a78719eaf8",
+        # The county replaced "Trails Locations" (Trails service) with this
+        # layer (Allegheny_County_Trails) in Sept 2026; the package is its
+        # home on WPRDC.
+        "Allegheny County Trails": "78115312-761a-4841-8fd6-2442acdb7cce",
+        # A county extract. The statewide layer keeps its own package
+        # (a95a1fbd, now named pa-house-of-representative-districts).
+        "Allegheny County PA House Districts": MINT,
+    },
+    "city_of_pittsburgh": {
+        # Service renamed CityBoundary -> City_Boundary; same layer.
+        "Pittsburgh Boundary": "ebfb03b2-4cf0-4423-8041-a8ec923ceb7c",
+        # Production keeps both maps in one package (8249c8b6) by mistake; the
+        # user is retiring it, and each map gets a package of its own.
+        "Pittsburgh Council Districts 2022 (Current)": MINT,
+        "Council Districts 2012": MINT,
+    },
+}
+
+# Display titles for packages this generator mints, where the catalogue title
+# reads badly on WPRDC. Used only when the package is created; the URL name
+# follows it (slug) unless PACKAGE_NAMES says otherwise.
+PACKAGE_TITLES: dict[str, dict[str, str]] = {
+    "allegheny_county": {
+        # "used in 2024 report" goes in the dataset's description_suffix.
+        "Allegheny County Community Need Index (used in 2024 report)": (
+            "Allegheny County Community Need Index"
+        ),
+    },
+    "city_of_pittsburgh": {
+        "Census Tract 2020": "Pittsburgh Census Tracts 2020",
+        "HeightReductionZone ZoningOverlay": "Height Reduction Zone Zoning Overlay",
+        "InclusionaryHousingOverlayDistrict": "Inclusionary Housing Districts",
+        "SchoolDistricts2022": "School Districts (2022)",
+    },
+}
+
+# URL names for packages this generator mints, where the slug of the title
+# isn't the name wanted. Used only when the package is created.
+PACKAGE_NAMES: dict[str, dict[str, str]] = {
+    "allegheny_county": {
+        # The name the statewide package held before it was renamed; it
+        # belongs to the county extract.
+        "Allegheny County PA House Districts": (
+            "allegheny-county-pa-house-of-representative-districts"
+        ),
     },
     "city_of_pittsburgh": {},
 }
@@ -938,11 +992,16 @@ def is_table(entry: dict[str, Any] | None) -> bool | None:
         return None
 
 
+# Portal notes that are HTML, not the Markdown CKAN renders.
+_HTML_NOTES = re.compile(r"<(p|a|b|br|span|div|strong|em)\b", re.I)
+
 # The county appends this to every description. It explains the OLD harvest
 # ("harvested on a weekly basis … click the Explore button"), which is false
 # for a dataset this pipeline publishes, so it is dropped from stubs.
+# Older packages word it "This dataset is harvested on a weekly basis…".
 _HARVEST_BOILERPLATE = re.compile(
-    r"^If viewing this description on the Western Pennsylvania Regional Data Center"
+    r"^(If viewing this description on the Western Pennsylvania Regional Data "
+    r"Center|This dataset is harvested on a weekly basis)"
 )
 # Word nests bold spans, which converts to `**A:****  **B` — an empty bold
 # run, then a closing `**` after whitespace, which CommonMark won't close.
@@ -1188,11 +1247,16 @@ def _render_new_package(entry: Entry) -> str:
     """
     if not entry.new_package:
         return ""
-    return (
+    note = (
         "    # NOT YET CREATED. This id is minted from the catalogue title and\n"
         "    # is stable, but no package carries it: run `bin/seed-ckan --write`\n"
         "    # against the target portal before publishing.\n"
     )
+    if entry.package_title:
+        note += f"    package_title: {json.dumps(entry.package_title)}\n"
+    if entry.package_name:
+        note += f'    package_name: "{entry.package_name}"\n'
+    return note
 
 
 def _render_description(entry: Entry) -> str:
@@ -1418,6 +1482,11 @@ def sync(
             else:
                 e.package_id = minted_package_id(e.title)
                 e.new_package = True
+        if e.new_package:
+            # However the id was minted (MINT, or nothing found on the portal),
+            # a new package takes any chosen display title / URL name.
+            e.package_name = PACKAGE_NAMES.get(publisher, {}).get(e.title, "")
+            e.package_title = PACKAGE_TITLES.get(publisher, {}).get(e.title, "")
         if claimed.get(e.package_id, e.folder) != e.folder:
             # Another dataset already publishes to that package. Keep the
             # incumbent — it is a live publish target — and refuse to wire
@@ -1441,6 +1510,13 @@ def sync(
                 resources = package.get("resources", [])
                 if PUBLISHERS[publisher].get("portal_description"):
                     e.description = (package.get("notes") or "").strip()
+                    # Some packages still carry the county's raw HTML harvest
+                    # text rather than curated Markdown (trails did). Pushed
+                    # as-is, CKAN shows the tags literally — so convert it,
+                    # drop the harvest boilerplate, and flag it for review.
+                    if _HTML_NOTES.search(e.description):
+                        e.description = stub_description({"description": e.description})
+                        e.description_stub = bool(e.description)
             except CkanLookupFailed as exc:
                 # NOT a skip: we don't know whether a target exists, so
                 # failing is the honest outcome. A skip here would look like a

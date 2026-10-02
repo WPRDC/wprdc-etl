@@ -32,25 +32,32 @@ attributes:
   partition: weekly
   ingest: snapshot
   ckan:
-    # NOT YET CREATED. This id is minted from the catalogue title and
-    # is stable, but no package carries it: run `bin/seed-ckan --write`
-    # against the target portal before publishing.
-    package_id: "2d669273-678d-59ef-9c49-ca1f40e2e79b"
+    package_id: "31d1d279-7f81-466d-8aca-83a78719eaf8"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
+    # Replaces the publisher's description. Sourced from this
+    # dataset's curated text on data.wprdc.org.
+    description: |-
+      This dataset overlays a grid on the County to assist in locating a parcel. The grid squares are 3,500 by 4,500 square feet. The data was derived from original MAPINDX: Map Index Sheets from Block and Lot Grid of Property Assessment and based on aerial photography. Tiles are numbered in a clockwise spiral fashion starting with #1 at the point in downtown Pittsburgh. Each tile contains 16 Blocks. Each Index Sheet contains 16 lot/block sheets, labeled from left to right, top to bottom (4 across, 4 down): A, B, C, D, E, F, G, H, J, K, L, M, N, P, R, S. The first (4) numeric characters in a parcelID indicate the Index sheet in which the parcel can be found, the alpha character identifies the block in which most (or all) of the property lies.
     mirror:
       - format: geojson
+        resource_id: "f4528690-966a-44d5-b83b-2687d5bb7bd5"
         datastore: false   # needs the spatial load endpoint (not built yet)
       - format: csv
+        resource_id: "0637da66-2681-44f5-b343-281db3df7ffc"
         datastore: false   # flip to true if a queryable table is ever wanted
       - format: shapefile
+        resource_id: "7290c028-8c2e-40ff-97a2-546ffaa1292e"
       - format: kml
+        resource_id: "14db2dea-83fd-40ce-bbc1-44aac8fdf2bf"
       - format: file_geodatabase
       - format: feature_collection
       - format: xlsx
       - format: geopackage
       - format: sqlite
       - format: hub_page
+        resource_id: "3cc266e9-735d-46b6-8191-c5cf7e44883c"
       - format: rest_api
+        resource_id: "656b6cac-9023-4085-b6f7-1a4f3c08fd48"

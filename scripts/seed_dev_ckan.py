@@ -72,6 +72,8 @@ class Target:
     title: str
     publisher: str = ""
     notes: str = ""
+    # ckan.package_name, when the defs choose the URL name.
+    name: str = ""
     # (resource_id, ckan_format, resource_name)
     resources: list[tuple[str, str, str]] = field(default_factory=list)
 
@@ -88,9 +90,10 @@ def discover() -> list[Target]:
         target = Target(
             dataset=path.parent.name,
             package_id=pid,
-            title=title,
+            title=(ckan.get("package_title") or "").strip() or title,
             publisher=attrs.get("publisher") or "",
             notes=(ckan.get("description") or "").strip(),
+            name=(ckan.get("package_name") or "").strip(),
         )
         # The frame's DataStore target, when the dataset has one.
         if ckan.get("resource_id"):
@@ -131,6 +134,8 @@ def _ckan_name(target: Target) -> str:
     """A url-safe CKAN `name` for a seeded package."""
     import re
 
+    if target.name:
+        return target.name
     base = re.sub(r"[^a-z0-9]+", "-", target.title.strip().lower()).strip("-")
     return (base or target.dataset)[:90]
 

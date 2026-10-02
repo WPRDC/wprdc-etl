@@ -35,6 +35,7 @@ attributes:
     # NOT YET CREATED. This id is minted from the catalogue title and
     # is stable, but no package carries it: run `bin/seed-ckan --write`
     # against the target portal before publishing.
+    package_title: "Inclusionary Housing Districts"
     package_id: "19d4bc02-cd0a-5033-aa29-1a8de3c8d4d3"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is

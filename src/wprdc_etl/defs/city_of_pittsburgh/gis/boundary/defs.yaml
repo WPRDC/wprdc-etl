@@ -32,20 +32,23 @@ attributes:
   partition: weekly
   ingest: snapshot
   ckan:
-    # NOT YET CREATED. This id is minted from the catalogue title and
-    # is stable, but no package carries it: run `bin/seed-ckan --write`
-    # against the target portal before publishing.
-    package_id: "c2ca4c48-f137-5a7b-b0be-93f4f227a624"
+    package_id: "ebfb03b2-4cf0-4423-8041-a8ec923ceb7c"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
     mirror:
       - format: geojson
+        resource_id: "11af0bf9-2d04-4e71-b28c-a0dfb3078080"
         datastore: false   # needs the spatial load endpoint (not built yet)
       - format: csv
+        resource_id: "7d953137-afb8-4ec4-a832-a264a008652e"
         datastore: false   # flip to true if a queryable table is ever wanted
       - format: shapefile
+        resource_id: "569aced1-6761-4a9d-acbc-79a20efc2bb4"
       - format: kml
+        resource_id: "656fbf76-cc5e-4ca9-9630-f277f67153b8"
       - format: hub_page
+        resource_id: "81923b8c-8500-42a6-9ea9-c2a776b8c370"
       - format: rest_api
+        resource_id: "49cbc87f-07b1-4e07-b4f9-8bd6560ac01f"

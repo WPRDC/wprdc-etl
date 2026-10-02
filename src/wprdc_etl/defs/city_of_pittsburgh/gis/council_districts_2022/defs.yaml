@@ -32,26 +32,23 @@ attributes:
   partition: weekly
   ingest: snapshot
   ckan:
-    package_id: "8249c8b6-37c6-4849-abe7-c9abbcdf6197"
+    # NOT YET CREATED. This id is minted from the catalogue title and
+    # is stable, but no package carries it: run `bin/seed-ckan --write`
+    # against the target portal before publishing.
+    package_id: "86131bba-110b-52b5-a493-71c0a2bcb7d5"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
     mirror:
       - format: geojson
-        resource_id: "eb8d8237-16d5-4b19-ab71-ed89343aa448"
         datastore: false   # needs the spatial load endpoint (not built yet)
       - format: csv
-        resource_id: "0bb41014-d21f-444b-b373-0c646b8ae801"
         datastore: false   # flip to true if a queryable table is ever wanted
       - format: shapefile
-        resource_id: "cbf2ed8c-b2b7-42f8-9ed7-366f3d8fefca"
       - format: kml
-        resource_id: "630a94a7-605f-42c2-88f4-a535c63fae2d"
       - format: hub_page
-        resource_id: "95281345-2b95-4e4e-b615-a0bb1f36b55b"
       - format: rest_api
-        resource_id: "a05227e3-19ce-41d7-aba3-ef183733cfcd"
   # Also feeds the PostGIS admin-region store, which is what
   # reverse_geocode resolves points against. Needs the geojson source:
   # replace_layer requires a GeoDataFrame.
