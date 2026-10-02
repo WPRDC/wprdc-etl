@@ -10,6 +10,9 @@ validation, so a reused instance can collide.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Any
+
 import pandas as pd
 import pandera.pandas as pa
 
@@ -17,12 +20,12 @@ import pandera.pandas as pa
 # --------------------------------------------------------------------------
 # Column builders
 # --------------------------------------------------------------------------
-def txt(**checks) -> pa.Column:
+def txt(**checks: Any) -> pa.Column:
     """Nullable text column."""
     return pa.Column(str, nullable=True, **checks)
 
 
-def num(**checks) -> pa.Column:
+def num(**checks: Any) -> pa.Column:
     """Nullable numeric column (coerced at the schema level)."""
     return pa.Column(float, nullable=True, **checks)
 
@@ -37,12 +40,12 @@ def ge0() -> pa.Column:
     return num(checks=pa.Check.ge(0))
 
 
-def ranged(low, high) -> pa.Column:
+def ranged(low: float, high: float) -> pa.Column:
     """Nullable numeric constrained to [low, high]."""
     return num(checks=pa.Check.in_range(low, high))
 
 
-def coded(values) -> pa.Column:
+def coded(values: Iterable[str]) -> pa.Column:
     """Nullable text constrained to a small set of codes."""
     return txt(checks=pa.Check.isin(list(values)))
 
@@ -53,7 +56,7 @@ def year(low: int = 1700) -> pa.Column:
 
 
 def frame(
-    columns: dict, *, strict: bool = False, coerce: bool = True
+    columns: dict[str, pa.Column], *, strict: bool = False, coerce: bool = True
 ) -> pa.DataFrameSchema:
     """Build a DataFrameSchema with the project defaults: superset-friendly
     (strict=False allows extra columns) and coercing CSV values to dtype.
@@ -64,7 +67,7 @@ def frame(
 # --------------------------------------------------------------------------
 # Reusable column groups (spread into a schema's columns dict with **)
 # --------------------------------------------------------------------------
-def geo_point_columns(lat: str = "lat", lng: str = "lng") -> dict:
+def geo_point_columns(lat: str = "lat", lng: str = "lng") -> dict[str, pa.Column]:
     """A lat/lng pair with valid coordinate ranges. Names are configurable
     since sources vary (lat/lon, latitude/longitude, y/x)."""
     return {

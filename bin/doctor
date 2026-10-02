@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Health-check the dev environment and say what's wrong AND how to fix it.
+#
+#     bin/doctor
+#
+# Written to be the first thing you run when something behaves oddly: it reports
+# the publish mode (the single most common source of "why is nothing in CKAN"),
+# the state of each service, and whether the region store actually has layers.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+
+problems=0
+note_bad() { bad "$1"; problems=$((problems + 1)); }
+
+head1 "publish mode"
+if [ "${ENVIRONMENT:-}" = "production" ]; then
+  note_bad "ENVIRONMENT=production — real writes. This should NEVER be set in dev."
+elif [ -n "${WPRDC_CKAN_WRITE:-}" ] && [[ "${WPRDC_CKAN_WRITE,,}" =~ ^(1|true|yes)$ ]]; then
+  ok "publishing to CKAN at $CKAN_URL (WPRDC_CKAN_WRITE is set)"
+  case "$CKAN_URL" in
+    *localhost*|*127.0.0.1*|*://ckan*) ;;
+    *) note_bad "CKAN_URL is not local — guard_ckan_write will refuse it" ;;
+  esac
+  [ -n "${CKAN_API_KEY:-}" ] || note_bad "CKAN_API_KEY is empty; writes will 403"
+else
+  ok "dry run — publish steps write to ${WPRDC_ETL_SINK_DIR:-_dryrun}/, CKAN untouched"
+  dim "set WPRDC_CKAN_WRITE=1 in .env to publish to $CKAN_URL"
+fi
+echo
+
+head1 "docker services"
+if ! docker info >/dev/null 2>&1; then
+  note_bad "docker isn't running"
+else
+  running="$(docker compose ps --services --status running 2>/dev/null || true)"
+  for svc in localstack postgres postgis sftp; do
+    if grep -qx "$svc" <<<"$running"; then ok "$svc"
+    else note_bad "$svc is not running — bin/up"; fi
+  done
+fi
+echo
+
+head1 "landing bucket (LocalStack)"
+if awslocal s3api head-bucket --bucket "$LANDING_BUCKET" >/dev/null 2>&1; then
+  n="$(awslocal s3 ls "s3://$LANDING_BUCKET" --recursive 2>/dev/null | wc -l | tr -d ' ')"
+  ok "s3://$LANDING_BUCKET ($n object(s))"
+else
+  note_bad "s3://$LANDING_BUCKET missing — bin/up creates it"
+fi
+echo
+
+head1 "region store (PostGIS)"
+if psql "$SPATIAL_DSN" -tAc 'select 1' >/dev/null 2>&1; then
+  ok "reachable on port $POSTGIS_PORT"
+  if psql "$SPATIAL_DSN" -tAc \
+      "select 1 from pg_extension where extname='postgis'" 2>/dev/null | grep -q 1; then
+    ok "postgis extension present"
+  else
+    note_bad "postgis extension missing in this database"
+  fi
+  if psql "$SPATIAL_DSN" -tAc "select to_regclass('admin_region')" 2>/dev/null | grep -q admin_region
+  then
+    psql "$SPATIAL_DSN" -tAc \
+      "select '    ' || layer || ' — ' || count(*) || ' region(s)'
+         from admin_region group by layer order by layer" 2>/dev/null
+  else
+    warn "no admin_region table yet — bin/boundaries to load the layers"
+  fi
+else
+  note_bad "cannot reach $SPATIAL_DSN — is postgis up, and POSTGIS_PORT right?"
+fi
+echo
+
+head1 "dagster storage"
+if psql "$DAGSTER_PG_URL" -tAc 'select 1' >/dev/null 2>&1; then
+  ok "reachable (dg check / dg dev will work)"
+else
+  note_bad "cannot reach DAGSTER_PG_URL — dg check defs will fail on connect"
+fi
+echo
+
+head1 "ckan"
+code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 "$CKAN_URL/api/3/action/status_show" 2>/dev/null || true)"
+if [ "$code" = "200" ]; then ok "$CKAN_URL responding"
+elif [ -z "$code" ] || [ "$code" = "000" ]; then warn "$CKAN_URL not reachable (only needed for a real publish)"
+else warn "$CKAN_URL returned HTTP $code"; fi
+echo
+
+if [ "$problems" -eq 0 ]; then head1 "no problems found"
+else head1 "$problems problem(s) above"; exit 1; fi

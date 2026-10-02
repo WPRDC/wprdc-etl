@@ -1,17 +1,20 @@
 """Load strategies: how transformed data reaches CKAN.
 
-Derived from the component's `ingest` mode — the two are one-to-one, so the
-loader isn't a separately configurable field:
+Selected by the component's `publish` mode, which is independent of `ingest`
+(how the data arrived) — a watermark delta can be accumulated and published as a
+whole file, which is the point of the split:
 
-    snapshot    -> ReplaceLoader   (hand DataPusher+ the whole file; full reload)
-    incremental -> UpsertLoader    (DataStore upsert by primary key; deltas only)
+    replace -> ReplaceLoader   (hand DataPusher+ the whole file; full reload)
+    upsert  -> UpsertLoader    (DataStore upsert by primary key; deltas only)
 
 Both run a COMPATIBILITY CHECK against the live CKAN schema before writing,
 comparing the output's columns/types to what's currently published. The policy
 differs by mode:
-  * replace  -> WARN on removed columns / type changes (schema evolution is
-                often intentional, and DataPusher+ rebuilds the table anyway),
-                but surface it so consumer-breaking changes are visible.
+  * replace  -> BLOCK on any structural change. The reload TRUNCATES the table
+                rather than dropping it (so ckanext-spatialdata's columns and
+                indexes survive), which means the table keeps its existing
+                types and can't absorb a new or retyped column. `ckan.rebuild`
+                opts into the drop-and-recreate, and downgrades this to a WARN.
   * upsert   -> BLOCK on type changes to shared columns (upserting into an
                 existing typed table can fail or corrupt), WARN on columns the
                 table has that the output drops.
@@ -20,15 +23,29 @@ differs by mode:
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING, Any
 
 from wprdc_etl.runtime import sink_dir
 
+if TYPE_CHECKING:
+    import dagster as dg
+    import pandas as pd
 
-def _stem(cfg):
+    from wprdc_etl.components.models import PipelineConfig
+    from wprdc_etl.components.tabular_pipeline import TabularPipeline
+    from wprdc_etl.resources import CkanResource
+
+
+def _stem(cfg: PipelineConfig) -> str:
     return "__".join(x for x in [cfg.publisher, cfg.department, cfg.dataset] if x)
 
 
-def dump_local(cfg, dataframe, context, suffix="csv") -> bool:
+def dump_local(
+    cfg: PipelineConfig,
+    dataframe: pd.DataFrame,
+    context: dg.AssetExecutionContext | None,
+    suffix: str = "csv",
+) -> bool:
     """Write the frame to the dry-run sink and return True, or return False in
     production (real writes). Dry-run is the default (see wprdc_etl.runtime)."""
     d = sink_dir()
@@ -74,11 +91,13 @@ _COARSE = {
 }
 
 
-def _coarse(t):
+def _coarse(t: object) -> str:
     return _COARSE.get(str(t).lower(), "text")
 
 
-def compat_report(cfg, dataframe, ckan) -> dict:
+def compat_report(
+    cfg: TabularPipeline, dataframe: pd.DataFrame, ckan: CkanResource
+) -> dict[str, Any]:
     """Compare the output schema to CKAN's live schema.
 
     Returns {live_exists, removed, added, type_changes}. `removed` are columns
@@ -109,25 +128,62 @@ def compat_report(cfg, dataframe, ckan) -> dict:
     }
 
 
-def _fmt_changes(type_changes) -> str:
+def _fmt_changes(type_changes: dict[str, tuple[str, str]]) -> str:
     return ", ".join(f"{c}: {a}->{b}" for c, (a, b) in type_changes.items())
 
 
-def _warn_replace(report, context) -> None:
-    if not report["live_exists"] or context is None:
+def _guard_replace(
+    report: dict[str, Any],
+    rebuild: bool,
+    context: dg.AssetExecutionContext | None,
+) -> None:
+    """Structural drift policy for a replace publish.
+
+    A truncating reload keeps the table's existing columns and types, so a new,
+    dropped, or retyped column has nowhere to land — DataPusher+ either fails or
+    silently coerces. That's a hard stop unless `ckan.rebuild` says to drop and
+    recreate, in which case it's back to being informational.
+    """
+    if not report["live_exists"]:
+        return  # first load — replace() creates the table from the frame
+
+    if rebuild:
+        if context is None:
+            return
+        if report["removed"]:
+            context.log.warning(
+                "replace (rebuild): columns dropped vs live CKAN "
+                f"(consumers may break): {report['removed']}"
+            )
+        if report["type_changes"]:
+            context.log.warning(
+                "replace (rebuild): column type changes vs live CKAN: "
+                f"{_fmt_changes(report['type_changes'])}"
+            )
         return
+
+    problems = []
+    if report["added"]:
+        problems.append(f"new columns {report['added']}")
     if report["removed"]:
-        context.log.warning(
-            "replace: columns dropped vs live CKAN (consumers may break): "
-            f"{report['removed']}"
-        )
+        problems.append(f"columns no longer produced {report['removed']}")
     if report["type_changes"]:
-        context.log.warning(
-            f"replace: column type changes vs live CKAN: {_fmt_changes(report['type_changes'])}"
+        problems.append(f"type changes ({_fmt_changes(report['type_changes'])})")
+    if problems:
+        raise RuntimeError(
+            "replace aborted: the output's shape differs from the live CKAN "
+            f"table — {'; '.join(problems)}. The reload truncates rather than "
+            "drops, so the table keeps its current columns and types and can't "
+            "take this. If the change is intended, set `ckan.rebuild: true` to "
+            "drop and recreate the table — but note that discards anything else "
+            "added to it, including ckanext-spatialdata's geometry column and "
+            "indexes, which then need regenerating."
         )
 
 
-def _guard_upsert(report, context) -> None:
+def _guard_upsert(
+    report: dict[str, Any], context: dg.AssetExecutionContext | None
+) -> None:
     if not report["live_exists"]:
         return
     if report["type_changes"]:
@@ -145,25 +201,61 @@ def _guard_upsert(report, context) -> None:
 
 
 class Loader:
-    def load(self, cfg, dataframe, *, ckan, context=None) -> None:
+    def load(
+        self,
+        cfg: TabularPipeline,
+        dataframe: pd.DataFrame,
+        *,
+        ckan: CkanResource,
+        context: dg.AssetExecutionContext | None = None,
+    ) -> None:
         raise NotImplementedError
 
 
 class ReplaceLoader(Loader):
     """Full-refresh load via DataPusher+."""
 
-    def load(self, cfg, dataframe, *, ckan, context=None) -> None:
+    def load(
+        self,
+        cfg: TabularPipeline,
+        dataframe: pd.DataFrame,
+        *,
+        ckan: CkanResource,
+        context: dg.AssetExecutionContext | None = None,
+    ) -> None:
         if dump_local(cfg, dataframe, context):
             return
+        rebuild = bool(cfg.ckan.rebuild)
         if not dataframe.empty:
-            _warn_replace(compat_report(cfg, dataframe, ckan), context)
-        ckan.replace(cfg.ckan.resource_id, dataframe)
+            _guard_replace(compat_report(cfg, dataframe, ckan), rebuild, context)
+        changed = ckan.replace(
+            cfg.ckan.resource_id,
+            dataframe,
+            rebuild=rebuild,
+            # Only a spatial table needs regenerating; geometry lives on the
+            # dataset, so `spatial` is just the switch.
+            spatial=cfg.geometry if cfg.ckan.spatial else None,
+        )
+        if context is not None:
+            context.log.info(
+                f"replaced {len(dataframe)} rows in {cfg.ckan.resource_id}"
+                if changed
+                else f"unchanged: CKAN already holds these {len(dataframe)} rows — "
+                "skipped the upload and the DataPusher+ reload"
+            )
 
 
 class UpsertLoader(Loader):
     """Delta load: upsert changed rows by primary key via the DataStore API."""
 
-    def load(self, cfg, dataframe, *, ckan, context=None) -> None:
+    def load(
+        self,
+        cfg: TabularPipeline,
+        dataframe: pd.DataFrame,
+        *,
+        ckan: CkanResource,
+        context: dg.AssetExecutionContext | None = None,
+    ) -> None:
         if dump_local(cfg, dataframe, context):
             return
         if dataframe.empty:
@@ -173,15 +265,15 @@ class UpsertLoader(Loader):
 
 
 LOADERS: dict[str, Loader] = {
-    "snapshot": ReplaceLoader(),
-    "incremental": UpsertLoader(),
+    "replace": ReplaceLoader(),
+    "upsert": UpsertLoader(),
 }
 
 
-def get_loader(ingest: str) -> Loader:
+def get_loader(publish: str) -> Loader:
     try:
-        return LOADERS[ingest]
+        return LOADERS[publish]
     except KeyError:
         raise ValueError(
-            f"unknown ingest mode {ingest!r} (expected 'snapshot' or 'incremental')"
+            f"unknown publish mode {publish!r} (expected 'replace' or 'upsert')"
         )

@@ -1,16 +1,17 @@
 type: wprdc_etl.components.tabular_pipeline.TabularPipeline
 
-# NOTE: this instance is currently pointed at the LOCAL DEV stack (compose
-# sftp service + local sink). Flip the source back to production before
-# deploying — the production values are in the commented block below.
+# The SFTP server is PUBLISHER-level: every allegheny_county SFTP dataset reads
+# the same ALLEGHENY_SFTP_* vars, and the real hostname is deployment config, so
+# it is deliberately NOT in this repo. An unconfigured environment resolves the
+# host to "" and the extractor fails loudly on the first run.
 #
-# PRODUCTION source:
-#   source:
-#     type: sftp
-#     host: sftp.alleghenycounty.us     # CONFIRM how WPRDC actually acquires this
-#     path: /outbound/assessments/*.csv  # CONFIRM full-snapshot filename pattern
-#     secret_ref: ALLEGHENY_SFTP
-#   schedule: "0 6 1 * *"                # 6am on the 1st
+# To pull through an `ssh -L` tunnel (real server behind a jump host):
+#
+#   ssh -N -L 2223:<the-real-host>:22 you@jump-host
+#   ALLEGHENY_SFTP_HOST=localhost ALLEGHENY_SFTP_PORT=2223 uv run dg dev
+#
+# Templating only renders inside these blocks because every model in
+# components/models.py is Resolvable — see the note there before changing one.
 
 attributes:
   publisher: allegheny_county
@@ -18,13 +19,12 @@ attributes:
   dataset: assessments
   source:
     type: sftp
-    host: localhost                     # DEV: compose `sftp` service
-    port: 2222
-    path: /outbound/assessments.csv               # drop a real assessments extract in dev/sftp/
-    secret_ref: WPRDC_LOCAL_SFTP        # export WPRDC_LOCAL_SFTP=wprdc:wprdc
-  # No schedule in dev -> a placeholder sensor (won't auto-run); materialize
-  # manually from the UI / CLI.
-  partition: monthly                     # one snapshot per month
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: /WPRDC/Property_Assessments/ALLEGHENY_COUNTY_MASTER_FILE.csv
+    secret_ref: ALLEGHENY_SFTP
+  schedule: "0 6 1 * *"
+  partition: monthly
   ingest: snapshot                       # full-state file -> DataPusher+ replace
   transforms:                            # shared primitives, run in order
     # Date formats DIFFER per the data dictionary — verify against a sample.

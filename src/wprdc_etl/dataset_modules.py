@@ -11,9 +11,15 @@ import it without a circular dependency.
 from __future__ import annotations
 
 import importlib
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types import ModuleType
+
+    from wprdc_etl.components.models import PipelineConfig
 
 
-def load_dataset_module(cfg, name):
+def load_dataset_module(cfg: PipelineConfig, name: str) -> ModuleType | None:
     parts = ["wprdc_etl", "defs", cfg.publisher]
     if cfg.department:
         parts.append(cfg.department)

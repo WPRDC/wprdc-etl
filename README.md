@@ -19,11 +19,20 @@ Two component types cover everything:
 Both share the same substrate: extract strategies, the S3 landing zone, the
 taxonomy/asset-key scheme, scheduling, and the safety guards below.
 
+Deeper reference — this README is the tour, these are the manuals:
+
+- [`docs/pipelines.md`](docs/pipelines.md) — the component types: every
+  `defs.yaml` field, the assets each one builds, partitioning, run tags,
+  load-time invariants.
+- [`docs/strategies.md`](docs/strategies.md) — the stage logic: extractors,
+  readers, the transform primitive vocabulary, loaders, emitters, schema
+  builders, and how to add to each.
+
 ### Pipeline stages (tabular)
 
 | Stage | What it does |
 |-------|--------------|
-| **extract** | Pulls the source (SFTP today; HTTP/API stubbed) and lands raw bytes + a `manifest.json` in S3, checksum-idempotent. |
+| **extract** | Pulls the source (SFTP, HTTP; bulk-API stubbed) and lands raw bytes + a `manifest.json` in S3, checksum-idempotent. |
 | **read** | Parses the landed file by format — CSV, JSON, or geospatial (GeoJSON / zipped Shapefile → GeoDataFrame). |
 | **transform** | Declarative steps from the YAML (shared primitives) then an optional co-located `transform.py` for bespoke logic. |
 | **validate** | `schema_ok` check — the file must be a **superset** of the declared columns; missing a declared column is a hard error. |
@@ -52,6 +61,9 @@ wprdc-etl/
 ├── scripts/
 │   ├── scaffold_pipeline.py     # interactive `defs.yaml` generator
 │   └── _prompt.py               # shared questionary prompts
+├── docs/
+│   ├── pipelines.md             # component-type reference (defs.yaml fields, assets)
+│   └── strategies.md            # stage-logic reference (extract/read/transform/load/emit)
 ├── dev/
 │   ├── README.md                # local loop details
 │   └── sftp/                    # files here are served by the local SFTP server
@@ -133,11 +145,13 @@ attributes:
   department: real_estate            # optional middle tier
   dataset: assessments
   source:
-    type: sftp                       # sftp | http | api_bulk | api_incremental
+    type: sftp                       # sftp | http | arcgis | pasda | api_bulk | api_incremental
     host: sftp.example.gov
     port: 22                         # optional (defaults to 22)
     path: /outbound/*.csv
+    # url: https://host/data.csv     # for type: http (instead of host/path)
     secret_ref: ALLEGHENY_SFTP       # env var holding "user:password"
+                                     # (http: optional HTTP Basic auth)
   schedule: "0 6 1 * *"              # cron; omit for a placeholder sensor
   partition: monthly                 # none | daily | weekly | monthly
   ingest: snapshot                   # snapshot (replace) | incremental (upsert)
@@ -165,7 +179,69 @@ attributes:
   **required** for `api_incremental` sources.
 
 **Transform primitives:** `iso_date`, `strip`, `rename`, `coerce_numeric`,
-`drop_nulls`, `fill_na`, `select`, `drop_columns`, `snake_case_columns`, `to_crs`.
+`coerce_text`, `drop_nulls`, `fill_na`, `select`, `drop_columns`,
+`snake_case_columns`, `to_crs`, `reverse_geocode`.
+
+### Reverse geocoding to administrative regions
+
+`reverse_geocode` derives region columns — neighborhood, ward, council district,
+fire zone, DPW division, municipality — from a row's coordinates, by
+point-in-polygon against boundary layers held in a PostGIS store. Use it for a
+column the source stopped shipping, or never shipped:
+
+```yaml
+transforms:
+  - op: reverse_geocode
+    lat: latitude
+    lng: longitude
+    regions:
+      - neighborhood                  # -> column "neighborhood", the label
+      - layer: council_district       # -> column "district", the stable code
+        column: district
+        value: id
+```
+
+`value` defaults to `name` (the layer's human label, falling back to its code for
+layers that have none). Rows whose point falls outside every region are left
+null and counted in a warning — they don't fail the run.
+
+**The layers come from boundary datasets in this repo.** A dataset that *is* a
+boundary layer declares `region_layer:`, and materializing it refreshes the
+store — so the layers stay current as a side effect of publishing them, with no
+separate sync job:
+
+```yaml
+  region_layer:
+    name: council_district
+    value_field: DIST_ID            # source column -> the stable code
+    label_field: DIST_NAME          # source column -> the human label
+```
+
+Such a dataset may omit `ckan:` entirely if we consume the layer without
+republishing it; every pipeline needs at least one of `ckan` / `region_layer`.
+Features are dissolved by `value_field` on the way in (boundary files routinely
+split one region across several polygons) and run through `ST_MakeValid`.
+
+Shipped layers live in `defs/city_of_pittsburgh/boundaries/` and
+`defs/allegheny_county/boundaries/`. Note `municipality` is county-scoped — it
+adds nothing to a City of Pittsburgh dataset, which is a single municipality.
+
+Data that references geometry **by identifier** rather than carrying it — the
+county's Addressing Landmarks hold an `ADDRESS_ID` and nothing else spatial —
+uses `join_geometry` against a key layer instead:
+
+```yaml
+transforms:
+  - op: join_geometry
+    layer: address_point          # loaded by gis/address_points' key_layer: block
+    key: ADDRESS_ID
+    key_format: "SSAP{}"          # landmarks store 450843, the points SSAP450843
+```
+
+It adds `latitude` / `longitude`; unmatched keys stay blank and are counted.
+
+Derived columns must **not** be declared in `schema.py`: that contract validates
+the raw landed file, before transforms run.
 
 ## Safety model
 
@@ -201,7 +277,7 @@ AWS_REGION=us-east-1              # no S3_ENDPOINT_URL / AWS keys — use the IA
 LANDING_BUCKET=wprdc-etl-landing
 DAGSTER_RUNTIME_BUCKET=wprdc-dagster-runtime   # S3 IO-manager pickles + compute logs
 CKAN_URL=https://data.wprdc.org
-CKAN_API_KEY=...
+CKAN_API_TOKEN=...
 # per-source secrets, e.g. ALLEGHENY_SFTP=user:password
 
 # Dagster instance (config: deploy/prod/dagster.yaml):
@@ -238,8 +314,8 @@ bucket policies, the managed Postgres, and the reverse-proxy auth.
 
 ## Status / known gaps
 
-- Extractors: **SFTP** and **API-incremental** implemented; **HTTP** and **bulk-API**
-  are stubs.
+- Extractors: **SFTP**, **HTTP**, and **API-incremental** implemented; **bulk-API**
+  is a stub.
 - The `GeocoderResource` is a stub (only used when a dataset sets `geocode: true`).
 - Geo + `incremental` isn't supported (geometry isn't JSON-serializable for upsert).
 - Column names / date formats in the assessments example are drawn from the WPRDC

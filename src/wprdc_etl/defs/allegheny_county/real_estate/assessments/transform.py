@@ -9,13 +9,18 @@ address parts — dataset-specific composition, not a generic op.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pandas as pd
+
+if TYPE_CHECKING:
+    from wprdc_etl.components.tabular_pipeline import TabularPipeline
 
 # CONFIRM against the real extract header.
 ADDRESS_PARTS = ["PROPERTYHOUSENUM", "PROPERTYADDRESS", "PROPERTYCITY", "PROPERTYZIP"]
 
 
-def transform(df: pd.DataFrame, cfg=None) -> pd.DataFrame:
+def transform(df: pd.DataFrame, cfg: TabularPipeline | None = None) -> pd.DataFrame:
     parts = [c for c in ADDRESS_PARTS if c in df.columns]
     if parts:
         df["full_address"] = (

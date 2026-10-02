@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# The full verification loop CLAUDE.md asks for, in one command.
+#
+#     bin/check
+#
+# Runs everything rather than failing fast, so one broken thing doesn't hide
+# another. Exits non-zero if any stage failed.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+
+failed=()
+stage() {
+  local name="$1"; shift
+  head1 "$name"
+  if "$@"; then ok "$name passed"; else bad "$name FAILED"; failed+=("$name"); fi
+  echo
+}
+
+stage "black"     uv run black --check src tests scripts
+stage "pytest"    uv run pytest -q
+# Regenerated every run so IDE autocomplete follows the models and primitives;
+# it fails only if the schema can no longer be built.
+stage "editor schema" uv run python scripts/editor_schema.py
+# dg check needs the Dagster Postgres; say so plainly instead of a stack trace.
+if docker compose ps --services --status running 2>/dev/null | grep -qx postgres; then
+  stage "dg check defs" uv run dg check defs
+else
+  head1 "dg check defs"
+  warn "skipped — the compose postgres service isn't running (bin/up)"
+  echo
+fi
+
+if [ ${#failed[@]} -eq 0 ]; then
+  head1 "all checks passed"
+else
+  head1 "FAILED: ${failed[*]}"
+  exit 1
+fi

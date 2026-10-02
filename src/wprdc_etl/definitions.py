@@ -2,8 +2,8 @@
 
 This is the single place shared resources are instantiated. Every
 component instance's assets reference these by parameter name (landing,
-sftp, ckan, geocoder), so there is exactly one of each across all 100+
-publishers. The landing zone is AWS S3; see compose.yaml for the local
+sftp, ckan, geocoder, spatial), so there is exactly one of each across all
+100+ publishers. The landing zone is AWS S3; see compose.yaml for the local
 LocalStack option.
 
 `load_defs` walks the defs/ tree, finds every component.yaml, validates it
@@ -13,6 +13,7 @@ build_defs() output together. Resource binding happens at this merge.
 
 import logging
 import os
+from typing import Any
 
 import dagster as dg
 from dagster.components import load_defs
@@ -23,11 +24,12 @@ from wprdc_etl.resources import (
     GeocoderResource,
     LandingZoneResource,
     SFTPResource,
+    SpatialResource,
 )
 from wprdc_etl.runtime import is_production
 
 
-def _io_manager():
+def _io_manager() -> dg.ConfigurableIOManagerFactory:
     """The IO manager for asset-to-asset handoffs (only `validated -> loaded`
     and the representation assets actually cross it; everything else re-reads
     from the S3 landing zone).
@@ -68,7 +70,7 @@ def _io_manager():
     return dg.FilesystemIOManager()
 
 
-def _alert_sensors():
+def _alert_sensors() -> list[dg.SensorDefinition]:
     """Run-failure alerting — production only, and only when the Slack
     credentials are present (a misconfigured box still loads, just without
     alerts). dagster_slack is imported lazily."""
@@ -107,7 +109,7 @@ def _alert_sensors():
 # boto3 resolves credentials from the instance/task/IRSA IAM role, and talks to
 # real S3. For offline local dev, set S3_ENDPOINT_URL (LocalStack) and the flag
 # below flips to path-style with static dev creds.
-landing_kwargs = {
+landing_kwargs: dict[str, Any] = {
     "bucket": os.getenv("LANDING_BUCKET", "wprdc-etl-landing"),
     "region": os.getenv("AWS_REGION", "us-east-1"),
 }
@@ -128,9 +130,14 @@ defs = dg.Definitions.merge(
             "sftp": SFTPResource(),
             "ckan": CkanResource(
                 base_url=os.getenv("CKAN_URL", "https://data.wprdc.org"),
-                api_key=dg.EnvVar("CKAN_API_KEY"),
+                api_key=dg.EnvVar("CKAN_API_TOKEN"),
             ),
             "geocoder": GeocoderResource(),
+            # PostGIS admin-region store: written by region_layer pipelines,
+            # read by the reverse_geocode transform op. Empty DSN is tolerated
+            # at load time so a checkout with no database still loads; it fails
+            # loud only when a dataset actually needs it.
+            "spatial": SpatialResource(dsn=os.getenv("SPATIAL_DSN", "")),
         },
         sensors=_alert_sensors(),
     ),

@@ -1,0 +1,58 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# City of Pittsburgh water features (drinking fountains, spray parks, decorative
+# features) exported weekly from Cartegraph. Publishes to
+# https://data.wprdc.org/dataset/city-water-features — the tabular DataStore
+# resource plus a GeoJSON copy built from the lat/long columns.
+#
+# The export (moved to cartegraph/water_features.csv in Sept 2026) now ships 47
+# columns. Only the 17 already published are kept — publishing the rest would
+# add columns, which a replace blocks until `ckan.rebuild: true` is chosen on
+# purpose (see transform.py for the list).
+#
+# Region columns come from the PostGIS admin-region store, so they match the
+# boundaries WPRDC publishes rather than Cartegraph's copy of them. Checked
+# against the export's own columns on 288 rows: neighborhood, council_district,
+# ward, police_zone, tract and public_works_division (the export's
+# `dpw_streets`) agree on every row; fire_zone on 286 (the store says 1-14A
+# where Cartegraph says 1-14).
+# `pli_division` has no boundary layer, but on every live row it IS the ward,
+# so transform.py copies it.
+
+attributes:
+  publisher: city_of_pittsburgh
+  dataset: water_features
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/cartegraph/water_features.csv
+  schedule: "0 6 * * 1"
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: coerce_text
+      columns: [ id ]
+    - op: strip
+    - op: reverse_geocode
+      lat: latitude
+      lng: longitude
+      regions:
+        - neighborhood
+        - layer: council_district
+          value: id
+        - layer: census_tract
+          column: tract
+          value: id
+        - ward
+        - police_zone
+        - fire_zone
+        - public_works_division
+  geocode: false                 # lat/lng already in the source
+  ckan:
+    package_id: "city-water-features"
+    resource_id: "513290a6-2bac-4e41-8029-354cbda6a7b7"
+  geometry:
+    lat: latitude
+    lng: longitude
+  representations:
+    - format: geojson
+      resource_id: "f7c252a5-28be-43ab-95b5-f3eb0f1eef67" # Water Features (GeoJSON)

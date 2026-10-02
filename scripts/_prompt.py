@@ -11,6 +11,8 @@ Install the dependency once:  uv add questionary
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
+from typing import Any
 
 try:
     import questionary
@@ -24,7 +26,7 @@ except ImportError:  # pragma: no cover
     sys.exit(1)
 
 
-def _ask(question):
+def _ask(question: Any) -> Any:
     """Run a questionary prompt; treat Esc/Ctrl-C (which return None) as abort."""
     answer = question.ask()
     if answer is None:
@@ -33,11 +35,15 @@ def _ask(question):
     return answer
 
 
-def select(message, choices, default=None):
+def select(
+    message: str,
+    choices: Sequence[str | tuple[str, str]],
+    default: str | None = None,
+) -> str:
     """Arrow-key single-select. `choices` items are either a plain string, or a
     (value, description) tuple rendered as 'value — description'. Returns the
     chosen value. `default` is the value to preselect."""
-    built = []
+    built: list[Any] = []
     for c in choices:
         if isinstance(c, tuple):
             value, desc = c
@@ -47,12 +53,12 @@ def select(message, choices, default=None):
     return _ask(questionary.select(message, choices=built, default=default))
 
 
-def text(message, default="", required=False):
+def text(message: str, default: str = "", required: bool = False) -> str:
     """Free-text input. When required, empties are rejected inline."""
     validate = (lambda v: True if v.strip() else "required") if required else None
     return _ask(questionary.text(message, default=default, validate=validate)).strip()
 
 
-def confirm(message, default=False):
+def confirm(message: str, default: bool = False) -> bool:
     """Yes/no confirm."""
     return _ask(questionary.confirm(message, default=default))

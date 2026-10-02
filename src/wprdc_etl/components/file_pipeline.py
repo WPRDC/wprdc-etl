@@ -22,6 +22,7 @@ See the NOTE ON IMPORTS / VERSION in tabular_pipeline.py — same caveat here.
 import os
 import shutil
 import tempfile
+from typing import Any
 
 import dagster as dg
 from dagster.components import Component, Model, Resolvable
@@ -49,7 +50,7 @@ class FilePipeline(Component, Model, Resolvable):
     # Emits the wprdc/heavy run tag (prod coordinator: one heavy run at a time).
     heavy: bool = False
 
-    def build_defs(self, context) -> dg.Definitions:
+    def build_defs(self, context: dg.ComponentLoadContext) -> dg.Definitions:
         cfg = self
         key_prefix, group, stem = taxonomy(cfg)
         partitions = partitions_for(cfg.partition)  # None when partition == "none"
@@ -62,7 +63,7 @@ class FilePipeline(Component, Model, Resolvable):
             context: dg.AssetExecutionContext,
             landing: LandingZoneResource,
             sftp: SFTPResource,
-        ) -> dict:
+        ) -> dict[str, Any]:
             return get_extractor(cfg.source.type).extract(
                 context, cfg, landing=landing, sftp=sftp
             )
@@ -78,7 +79,7 @@ class FilePipeline(Component, Model, Resolvable):
             context: dg.AssetExecutionContext,
             landing: LandingZoneResource,
             ckan: CkanResource,
-        ):
+        ) -> None:
             partition = (
                 context.partition_key if context.has_partition_key else "current"
             )
@@ -110,8 +111,10 @@ class FilePipeline(Component, Model, Resolvable):
                     )
                     shutil.copyfile(tmp, out)
                     context.log.info(f"[dry-run] wrote {out} (skipped CKAN)")
-                else:
-                    ckan.publish_file(cfg.ckan.resource_id, tmp, filename)
+                elif not ckan.publish_file(cfg.ckan.resource_id, tmp, filename):
+                    context.log.info(
+                        f"unchanged: {cfg.ckan.resource_id} already holds this file"
+                    )
             finally:
                 if os.path.exists(tmp):
                     os.remove(tmp)

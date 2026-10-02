@@ -208,7 +208,18 @@ __marimo__/
 # dagster local
 .dagster_home/
 tmp*/
+# `dg launch` / `dg dev` with DAGSTER_HOME unset build a throwaway instance dir
+# in the CWD. The leading dot means `tmp*/` above does NOT catch it.
+.tmp_dagster_home_*/
 
 # dry-run output sink
 /_dryrun/
 
+
+old/
+
+# Generated IDE schema for defs.yaml (bin/editor-schema)
+.dg/
+
+# macOS Finder metadata
+.DS_Store

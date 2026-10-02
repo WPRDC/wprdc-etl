@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Stop the local dev stack.
+#
+#     bin/down            # stop containers, keep data
+#     bin/down --volumes  # also delete the volumes (Dagster run history,
+#                         # the region store, the landing bucket) — asks first
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+need docker
+
+if [ "${1:-}" = "--volumes" ] || [ "${1:-}" = "-v" ]; then
+  say "This deletes the compose VOLUMES:"
+  dim "  dagster_pg     Dagster run history, event log, schedule state"
+  dim "  spatial_pg     the PostGIS admin-region store (boundary layers)"
+  dim "  localstack     the landing bucket and everything landed in it"
+  printf 'Type %sdelete%s to confirm: ' "$C_B" "$C_0"
+  read -r reply
+  [ "$reply" = "delete" ] || die "aborted"
+  docker compose down --volumes
+  say ""
+  dim "re-create with: bin/up && bin/boundaries"
+else
+  docker compose down
+  dim "volumes kept; bin/down --volumes to wipe them too"
+fi

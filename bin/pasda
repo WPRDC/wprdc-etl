@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Generate the PASDA-sourced pipelines (Allegheny County layers the county's
+# own ArcGIS Hub only links to).
+#
+#     bin/pasda --list                 # the registry
+#     bin/pasda                        # dry run
+#     bin/pasda --write                # write defs.yaml + schema.py
+#     bin/pasda --only parcels --write --overwrite-schema
+#
+# PASDA publishes no catalogue, so the dataset registry is hand-maintained in
+# scripts/sync_pasda.py — adding a layer means adding a row. Sampling a schema
+# downloads the whole zip (18-116MB), since a shapefile's DBF cannot be
+# range-read; it decodes only the first rows.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+exec uv run python scripts/sync_pasda.py "$@"

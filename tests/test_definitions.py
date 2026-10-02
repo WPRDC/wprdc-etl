@@ -11,7 +11,7 @@ from wprdc_etl import definitions as d
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch):
+def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every test starts from a dev-like environment."""
     for var in (
         "ENVIRONMENT",
@@ -23,49 +23,58 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(var, raising=False)
 
 
-def test_code_location_builds():
+def test_code_location_builds() -> None:
     """`dg dev` / `dg check` load this module; make sure it resolves."""
     defs = d.defs
     assert isinstance(defs, dg.Definitions)
-    # the single live dataset's assets are present
+    # each live dataset's assets are present
     keys = {k.to_user_string() for k in defs.resolve_asset_graph().get_all_asset_keys()}
     assert "allegheny_county/real_estate/assessments/loaded" in keys
+    assert "city_of_pittsburgh/water_features/loaded" in keys
+    # the water_features geojson representation asset is wired
+    assert "city_of_pittsburgh/water_features/published/geojson" in keys
 
 
-def test_io_manager_defaults_to_filesystem_in_dev():
+def test_io_manager_defaults_to_filesystem_in_dev() -> None:
     assert isinstance(d._io_manager(), dg.FilesystemIOManager)
 
 
-def test_io_manager_fs_override(monkeypatch):
+def test_io_manager_fs_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("WPRDC_IO_MANAGER", "fs")
     assert isinstance(d._io_manager(), dg.FilesystemIOManager)
 
 
-def test_io_manager_s3_mode_selects_s3_pickle(monkeypatch):
+def test_io_manager_s3_mode_selects_s3_pickle(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WPRDC_IO_MANAGER", "s3")
     from dagster_aws.s3 import S3PickleIOManager
 
     assert isinstance(d._io_manager(), S3PickleIOManager)
 
 
-def test_io_manager_production_selects_s3_pickle(monkeypatch):
+def test_io_manager_production_selects_s3_pickle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     from dagster_aws.s3 import S3PickleIOManager
 
     assert isinstance(d._io_manager(), S3PickleIOManager)
 
 
-def test_alert_sensors_empty_outside_production():
+def test_alert_sensors_empty_outside_production() -> None:
     assert d._alert_sensors() == []
 
 
-def test_alert_sensors_empty_in_production_without_slack_creds(monkeypatch):
+def test_alert_sensors_empty_in_production_without_slack_creds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     assert d._alert_sensors() == []
 
 
-def test_alert_sensors_configured_in_production_with_slack_creds(monkeypatch):
+def test_alert_sensors_configured_in_production_with_slack_creds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("DAGSTER_SLACK_BOT_TOKEN", "xoxb-test")
     monkeypatch.setenv("WPRDC_ALERT_SLACK_CHANNEL", "#wprdc-etl-alerts")

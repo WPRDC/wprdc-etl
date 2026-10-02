@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Create the packages/resources the defs publish to, on the LOCAL dev CKAN.
+#
+#     bin/seed-ckan                  # dry run: what's missing
+#     bin/seed-ckan --write          # create it
+#     bin/seed-ckan --only greenways
+#
+# The defs name their destinations by production CKAN id, so a dev publish run
+# 404s until those ids exist locally. This creates them with the SAME ids, so
+# no defs.yaml has to change. Needs a LOCAL sysadmin token in CKAN_API_KEY;
+# it refuses to run against a non-local portal.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+exec uv run python scripts/seed_dev_ckan.py "$@"

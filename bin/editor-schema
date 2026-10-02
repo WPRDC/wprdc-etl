@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Give the IDE a JSON Schema for defs.yaml: autocomplete for every key, value
+# suggestions (source.type, partition, publish, mirror formats, transform ops
+# and their params) and inline errors on typos.
+#
+#     bin/editor-schema           # write .dg/defs.schema.json + map it in PyCharm
+#     bin/editor-schema --check   # exit 1 if the schema is stale
+#
+# `dg utils generate-component-schema` can't be used: in dagster 1.13 it never
+# reads this project's registry_modules, so its schema has no TabularPipeline
+# or FilePipeline in it. See scripts/editor_schema.py. bin/check regenerates
+# the schema on every run, so it follows changes to the models and primitives.
+#
+# PyCharm: the mapping is written to .idea/jsonSchemas.xml if that file doesn't
+# exist yet (it's per-checkout IDE config, gitignored with the rest of .idea).
+# If you already have schema mappings, add one by hand instead: Settings >
+# Languages & Frameworks > Schemas and DTDs > JSON Schema Mappings, schema file
+# .dg/defs.schema.json, file path pattern src/wprdc_etl/defs/**/defs.yaml.
+# VS Code (redhat.vscode-yaml): "yaml.schemas": {".dg/defs.schema.json":
+# "src/wprdc_etl/defs/**/defs.yaml"} in .vscode/settings.json.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+
+uv run python scripts/editor_schema.py "$@"
+[ "${1:-}" = "--check" ] && exit 0
+
+mapping=.idea/jsonSchemas.xml
+if [ -d .idea ] && [ ! -e "$mapping" ]; then
+  cat > "$mapping" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="JsonSchemaMappingsProjectConfiguration">
+    <state>
+      <map>
+        <entry key="wprdc defs.yaml">
+          <value>
+            <SchemaInfo>
+              <option name="name" value="wprdc defs.yaml" />
+              <option name="relativePathToSchema" value=".dg/defs.schema.json" />
+              <option name="schemaVersion" value="JSON Schema version 7" />
+              <option name="patterns">
+                <list>
+                  <Item>
+                    <option name="pattern" value="true" />
+                    <option name="path" value="src/wprdc_etl/defs/**/defs.yaml" />
+                    <option name="mappingKind" value="Pattern" />
+                  </Item>
+                </list>
+              </option>
+            </SchemaInfo>
+          </value>
+        </entry>
+      </map>
+    </state>
+  </component>
+</project>
+XML
+  ok "mapped .dg/defs.schema.json onto src/wprdc_etl/defs/**/defs.yaml in PyCharm"
+elif [ -e "$mapping" ] && ! grep -q "defs.schema.json" "$mapping"; then
+  warn "$mapping already has other mappings — add this one by hand (see the header of bin/editor-schema)"
+fi

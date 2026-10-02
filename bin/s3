@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Browse the LocalStack landing bucket without retyping the endpoint and keys.
+#
+#     bin/s3                         # flat listing of everything landed
+#     bin/s3 ls allegheny_county/    # any `aws s3` subcommand + args
+#     bin/s3 cp s3://.../data.csv -  # read an object to stdout
+#
+# Bare `bin/s3` lists the whole bucket; anything else is passed to `aws s3`.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+need aws
+
+if [ $# -eq 0 ]; then
+  head1 "s3://$LANDING_BUCKET"
+  awslocal s3 ls "s3://$LANDING_BUCKET" --recursive --human-readable | sed 's/^/  /'
+  echo
+  dim "_state/ holds the watermark, drift baseline and accumulator parquet"
+else
+  case "$1" in
+    # `awslocal` is a shell function from _common.sh, so it can't be exec'd.
+    ls|cp|mv|rm|sync) awslocal s3 "$@" ;;
+    *)                awslocal "$@" ;;
+  esac
+fi

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Generate/refresh the GIS pipelines from each publisher's ArcGIS Hub catalogue.
+#
+#     bin/arcgis --list                        # catalogue vs what's wired
+#     bin/arcgis                               # dry run: what a sync would change
+#     bin/arcgis --write                       # write files that don't exist yet
+#     bin/arcgis --write --overwrite-schema    # also regenerate existing schema.py
+#     bin/arcgis --write --overwrite-defs      # also regenerate existing defs.yaml
+#     bin/arcgis --write --force               # both overwrites
+#     bin/arcgis --only zip_codes --write
+#
+# Thin wrapper over scripts/sync_arcgis.py so it picks up .env like the rest of
+# bin/. Writes nothing without --write, and never replaces a file that already
+# exists unless you ask for that file specifically -- the decision is PER FILE,
+# so a dataset missing only its schema.py still gets one from a plain --write.
+#
+# `--overwrite-defs` DISCARDS hand edits: transforms, geometry, region_layer, a
+# corrected resource_id. Those blocks the generator owns (region_layer for the
+# boundary layers, the mirror list, ckan.description) are rewritten from its own
+# tables, so they survive; anything you added yourself does not.
+#
+# What it writes per dataset:
+#   defs.yaml   source addressed by catalogue TITLE, not URL -- a Hub download
+#               URL embeds the ArcGIS item id and changes when the layer is
+#               republished. Plus the ckan mirror set, and for the 13 boundary
+#               layers a region_layer block from REGION_LAYERS.
+#   schema.py   sampled from the real GeoJSON export's feature properties, NOT
+#               the CSV: the two are different column sets.
+#
+# Reads CKAN to resolve publish targets (--ckan, default data.wprdc.org) and,
+# for publishers flagged `portal_description`, to copy each dataset's curated
+# `notes` into ckan.description. Keep that pointed at production: a dev CKAN
+# would feed back whatever was last published there. Sends CKAN_API_TOKEN when
+# set, which is needed for private packages.
+#
+# Expect "export still pending" failures on a cold run -- ArcGIS builds each
+# format on first request and answers HTTP 202 until it is ready. Re-run; the
+# request itself is what warms it.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+exec uv run python scripts/sync_arcgis.py "$@"

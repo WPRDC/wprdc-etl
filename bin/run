@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Materialize one dataset, working out its partition key for you.
+#
+#     bin/run city_of_pittsburgh/water_features
+#     bin/run allegheny_county/boundaries/neighborhood
+#     bin/run --list                       # what can be run
+#
+# The partition key is the last COMPLETE window for that dataset's cadence, so a
+# weekly dataset run mid-week loads the finished week. Override with a second
+# argument if you want a specific one.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+
+if [ "${1:-}" = "--list" ] || [ "${1:-}" = "-n" ] || [ $# -eq 0 ]; then
+  head1 "datasets"
+  find src/wprdc_etl/defs -name defs.yaml | sed 's|src/wprdc_etl/defs/||;s|/defs.yaml||' | sort | sed 's/^/  /'
+  echo
+  dim "usage: bin/run <path> [partition-key]"
+  exit 0
+fi
+
+DATASET="$1"
+DEFS_FILE="src/wprdc_etl/defs/$DATASET/defs.yaml"
+[ -f "$DEFS_FILE" ] || die "no defs.yaml at $DEFS_FILE  (bin/run --list)"
+
+# Target the JOB, not an asset selection. build_defs gives every dataset one
+# job covering all of its assets, and its name is the directory path joined with
+# __ (see _common.py taxonomy()). `--assets "$DATASET/*"` looks right but isn't:
+# in Dagster selection syntax `*` means "and everything downstream", so the key
+# parses as "<dataset>/" and resolves to nothing.
+JOB="$(printf '%s' "$DATASET" | sed 's|/|__|g')__job"
+
+KEY="${2:-}"
+if [ -z "$KEY" ]; then
+  KEY="$(uv run python -c "
+import warnings; warnings.filterwarnings('ignore')
+import wprdc_etl.definitions as d
+job = d.defs.resolve_job_def('$JOB')
+print(job.partitions_def.get_last_partition_key() if job.partitions_def else '')
+" 2>/dev/null)" || die "couldn't resolve job $JOB for $DATASET"
+fi
+
+head1 "$DATASET"
+dim "job $JOB"
+if [ -n "$KEY" ]; then
+  dim "partition $KEY"
+  exec uv run dg launch --job "$JOB" --partition "$KEY"
+else
+  exec uv run dg launch --job "$JOB"
+fi

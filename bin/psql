@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# psql into a dev database.
+#
+#     bin/psql              # the spatial / admin-region store (default)
+#     bin/psql dagster      # Dagster's run + event storage
+#     bin/psql spatial -c 'select layer, count(*) from admin_region group by 1'
+#
+# Uses SPATIAL_DSN / DAGSTER_PG_URL from .env, so it follows POSTGIS_PORT.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+need psql
+
+target="spatial"
+case "${1:-}" in
+  spatial|dagster) target="$1"; shift ;;
+esac
+
+case "$target" in
+  spatial) exec psql "$SPATIAL_DSN" "$@" ;;
+  dagster) exec psql "$DAGSTER_PG_URL" "$@" ;;
+esac

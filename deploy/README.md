@@ -67,7 +67,7 @@ Everything left of the `aws` box is one `docker compose` stack. `code-location`,
 | **daemon** | `dagster-daemon run` | The clock and dispatcher: evaluates schedules/sensors, drains the run queue (`QueuedRunCoordinator` + `tag_concurrency_limits`), monitors for dead runs, fires the Slack run-failure sensor. Stateless — all working state is in Postgres. **Without it, nothing fires.** |
 | **webserver** | `dagster-webserver -w workspace.yaml` | UI + GraphQL. Read-mostly (run history, logs, asset status from Postgres); can launch runs on demand. Auth-less itself — never exposed directly. |
 | **proxy** | `caddy:2` | TLS termination + authentication. The only publicly reachable container; reverse-proxies to `webserver:3000`. |
-| **Postgres** *(managed)* | — | Run storage, event logs, schedule/sensor ticks, and the run queue. The shared coordination backbone for all three Dagster services (`DAGSTER_PG_URL`). |
+| **Postgres** *(managed)* | — | Two databases on one instance. `dagster`: run storage, event logs, schedule/sensor ticks, the run queue — the coordination backbone for all three Dagster services (`DAGSTER_PG_URL`). `spatial`: the PostGIS admin-region store backing `reverse_geocode` (`SPATIAL_DSN`), needs `CREATE EXTENSION postgis`. |
 | **S3** *(AWS)* | — | `landing` bucket: immutable raw source + watermarks. `runtime` bucket: the `validated → loaded` IO-manager pickles and step compute logs. |
 
 `webserver` and `daemon` reach `code-location` via `prod/workspace.yaml`
@@ -122,6 +122,21 @@ Prerequisites (provisioned separately): managed Postgres + `dagster` database;
 the two S3 buckets with policy/IAM; the VM's IAM instance role (S3 R/W +
 `secretsmanager:GetSecretValue`); secrets written to `/opt/wprdc-etl/prod.env`
 (0600) by the deploy step.
+
+Plus the spatial store, on the same managed instance — one extra database and
+one extension (RDS and Cloud SQL both ship PostGIS):
+
+```sql
+CREATE DATABASE spatial;
+\connect spatial
+CREATE EXTENSION postgis;
+```
+
+Set `SPATIAL_DSN` to it. The tables are created on first write by
+`SpatialResource.ensure_schema()`, and populated by materializing the
+`*/boundaries/*` jobs once — nothing to seed by hand. Until those run,
+`reverse_geocode` fails loud naming the layers it can't find, so bring the
+boundary layers up before any dataset that depends on them.
 
 ```bash
 export WPRDC_ETL_IMAGE=ghcr.io/<org>/wprdc-etl@sha256:...

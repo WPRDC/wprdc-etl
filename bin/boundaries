@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Load the PostGIS boundary layers that reverse_geocode reads.
+#
+#     bin/boundaries            # load them all
+#     bin/boundaries --list     # show what exists, run nothing
+#     bin/boundaries -l neighborhood fire_zone
+#
+# Thin wrapper over scripts/refresh_boundaries.py so it picks up .env the same
+# way the rest of bin/ does. Run once on a fresh database — datasets with a
+# reverse_geocode step fail until their layers are loaded.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+exec uv run python scripts/refresh_boundaries.py "$@"

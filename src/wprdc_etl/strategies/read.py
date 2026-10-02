@@ -15,22 +15,32 @@ from __future__ import annotations
 
 import os
 import tempfile
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import geopandas as gpd
+    import pandas as pd
+
+    from wprdc_etl.components.models import PipelineConfig
+    from wprdc_etl.resources import LandingZoneResource
 
 
-def _read_csv(path):
+def _read_csv(path: str) -> pd.DataFrame:
     import pandas as pd
 
     return pd.read_csv(path)
 
 
-def _read_json(path):
+def _read_json(path: str) -> pd.DataFrame:
     import pandas as pd
 
     # Refine orient / lines when the first JSON source appears.
     return pd.read_json(path)
 
 
-def _read_geo(path):
+def _read_geo(path: str) -> gpd.GeoDataFrame:
     """Read a geospatial file into a GeoDataFrame.
 
     Handles GeoJSON and zipped shapefiles. A shapefile is a multi-file bundle
@@ -44,7 +54,7 @@ def _read_geo(path):
     return gpd.read_file(path)
 
 
-READERS = {
+READERS: dict[str, Callable[[str], pd.DataFrame]] = {
     "csv": _read_csv,
     "json": _read_json,
     "geojson": _read_geo,
@@ -53,14 +63,16 @@ READERS = {
 }
 
 
-def get_reader(fmt: str):
+def get_reader(fmt: str) -> Callable[[str], pd.DataFrame]:
     try:
         return READERS[fmt]
     except KeyError:
         raise NotImplementedError(f"no reader for format {fmt!r}")
 
 
-def read_landed(landing, cfg, partition):
+def read_landed(
+    landing: LandingZoneResource, cfg: PipelineConfig, partition: str
+) -> pd.DataFrame:
     """Download the landed object for (cfg, partition) to a temp file and parse
     it with the format-appropriate reader. Returns a (Geo)DataFrame.
 

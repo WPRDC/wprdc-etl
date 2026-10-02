@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Bring the local dev stack up and make it usable.
+#
+#     bin/up
+#
+# Idempotent: safe to re-run. Starts the compose services, waits for the two
+# Postgres servers to accept connections, and creates the landing bucket if it
+# isn't there (a fresh LocalStack volume loses it, which otherwise shows up much
+# later as a confusing NoSuchBucket during `landed`).
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+need docker; need aws
+
+head1 "starting compose services"
+docker compose up -d
+echo
+
+head1 "waiting for postgres"
+for svc in postgres postgis; do
+  printf '  %-8s ' "$svc"
+  for i in $(seq 1 45); do
+    if docker compose exec -T "$svc" pg_isready -U dagster >/dev/null 2>&1; then
+      printf '%sready%s\n' "$C_OK" "$C_0"; break
+    fi
+    [ "$i" = 45 ] && { printf '%stimed out%s\n' "$C_ERR" "$C_0"; exit 1; }
+    sleep 1
+  done
+done
+echo
+
+head1 "landing bucket"
+if awslocal s3api head-bucket --bucket "$LANDING_BUCKET" >/dev/null 2>&1; then
+  ok "s3://$LANDING_BUCKET already exists"
+else
+  awslocal s3 mb "s3://$LANDING_BUCKET" >/dev/null && ok "created s3://$LANDING_BUCKET"
+fi
+
+echo
+dim "next: bin/doctor    (verify) "
+dim "      bin/boundaries (load the region store on a fresh database)"

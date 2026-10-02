@@ -23,6 +23,14 @@ dependencies = [
     "pyproj~=3.7.1",
     "paramiko~=5.0.0", # SFTP
     "requests~=2.34.0", # CKAN Action API
+    # PostGIS client for the admin-region store (SpatialResource). Not pickled by
+    # the IO manager, so the pinning note above doesn't apply to it.
+    "psycopg[binary]~=3.2",
+    # Parquet engine for the accumulator's canonical table
+    # (_state/.../current.parquet). Also not pickled by the IO manager, so the
+    # pinning note above doesn't apply. Floor is 22: that's the first release
+    # with cp314 wheels, and below it pip tries to build Arrow C++ from source.
+    "pyarrow~=25.0",
 ]
 
 [dependency-groups]

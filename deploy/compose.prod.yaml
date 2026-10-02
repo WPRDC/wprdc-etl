@@ -3,7 +3,7 @@
 #
 #   docker compose -f deploy/compose.prod.yaml up -d
 #
-# Secrets (DAGSTER_PG_URL, CKAN_API_KEY, per-source SFTP creds,
+# Secrets (DAGSTER_PG_URL, CKAN_API_TOKEN, per-source SFTP creds,
 # DAGSTER_SLACK_BOT_TOKEN, ...) come from AWS Secrets Manager / SSM, written by
 # the deploy step to a root-owned 0600 file at the path below. Non-secret env is
 # inline here.
