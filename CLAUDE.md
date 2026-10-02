@@ -16,7 +16,7 @@ for the architecture.
 
 ```bash
 uv sync                        # install deps
-uv run pre-commit install      # once: black runs on git commit
+uv run pre-commit install      # once: black + pytest run on git commit
 uv run dg dev                  # load + run the UI (http://localhost:3000)
 uv run dg check defs           # validate all defs.yaml (fast; run after YAML edits)
 uv run dg list components      # confirm component types are registered

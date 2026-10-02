@@ -12,3 +12,16 @@ repos:
         language: system
         types: [python]
         require_serial: true
+      # The whole suite, once per commit (not per file). It covers defs.yaml
+      # too — test_defs_invariants and test_editor_schema read every one — so
+      # it fires on YAML and pyproject changes as well as Python. pre-commit
+      # stashes unstaged edits first, so it tests exactly what is committed.
+      # Runs without .env: the 4 PostGIS round-trip tests skip here and run
+      # under bin/check. ~5s. Skip once with `git commit --no-verify`.
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q
+        language: system
+        types_or: [python, yaml, toml]
+        pass_filenames: false
+        require_serial: true
