@@ -223,3 +223,6 @@ old/
 
 # macOS Finder metadata
 .DS_Store
+
+dev/sftp/*
+!dev/sftp/README.md
