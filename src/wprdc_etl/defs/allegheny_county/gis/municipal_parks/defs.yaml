@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Municipal Parks"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "42 4 * * 0"  # Sunday 04:42 ET
   partition: weekly
   ingest: snapshot
   ckan:

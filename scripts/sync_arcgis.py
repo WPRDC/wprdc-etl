@@ -51,6 +51,8 @@ DEFS = REPO / "src" / "wprdc_etl" / "defs"
 sys.path.insert(0, str(REPO / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from schedule_slots import describe as describe_schedule
+from schedule_slots import schedule_for
 from schema_infer import builder_for  # noqa: E402  (scripts/ is on sys.path)
 from wprdc_etl.strategies.extract import (  # noqa: E402  (needs sys.path above)
     arcgis_ready_url,
@@ -63,7 +65,6 @@ PUBLISHERS = {
     "allegheny_county": {
         "catalog": "https://openac-alcogis.opendata.arcgis.com/data.json",
         "strip": ("Allegheny County-Owned", "Allegheny County", "Allegheny"),
-        "schedule": "0 7 * * 1",  # 07:00 America/New_York, Mondays
         # The county's ArcGIS descriptions are harvest boilerplate, so the
         # curated text already on data.wprdc.org is written into each
         # defs.yaml as `ckan.description`, replacing the publisher's.
@@ -73,7 +74,6 @@ PUBLISHERS = {
     "city_of_pittsburgh": {
         "catalog": "https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json",
         "strip": ("City of Pittsburgh", "Pittsburgh City", "Pittsburgh"),
-        "schedule": "30 7 * * 1",
         # The city's own descriptions are good; those datasets keep the
         # source text plus whatever `description_suffix` adds.
         "portal_description": False,
@@ -269,6 +269,9 @@ class Entry:
     table: bool = False
     # URL name for a minted package, from PACKAGE_NAMES ("" = slug of title).
     package_name: str = ""
+    # Sunday odd-minute slot (scripts/schedule_slots.py); an existing
+    # defs.yaml keeps the one it has.
+    schedule: str = ""
     # Display title for a minted package, from PACKAGE_TITLES ("" = title).
     package_title: str = ""
     # Set for a folder in GEOMETRY_JOINS: the frame is joined to a key layer
@@ -1076,7 +1079,7 @@ attributes:
     catalog: {cfg["catalog"]}
     title: {json.dumps(entry.title)}
     format: {"csv" if entry.table else "geojson"}
-  schedule: "{cfg["schedule"]}"
+  schedule: "{entry.schedule}"  # {describe_schedule(entry.schedule)}
   partition: weekly
   ingest: snapshot
   ckan:
@@ -1556,6 +1559,7 @@ def sync(
             elif ARCGIS_DCAT[fmt] not in e.formats:
                 continue
             e.mirrors[fmt] = pick_named_resource(resources, res_name, ckan_fmt) or ""
+        e.schedule = schedule_for(publisher, DEPARTMENT, e.folder, "weekly")
         source_fmt = "csv" if e.table else "geojson"
         if e.folder in GEOMETRY_JOINS.get(publisher, {}):
             # The joined frame IS the published CSV, so the publisher's own

@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Pennsylvania Senate District Boundaries"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "21 5 * * 0"  # Sunday 05:21 ET
   partition: weekly
   ingest: snapshot
   ckan:

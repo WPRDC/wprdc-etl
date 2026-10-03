@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Parks Open Space Plan Transition Data"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "46 7 * * 0"  # Sunday 07:46 ET
   partition: weekly
   ingest: snapshot
   ckan:

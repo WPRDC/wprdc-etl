@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Landslide Prone Areas"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "24 7 * * 0"  # Sunday 07:24 ET
   partition: weekly
   ingest: snapshot
   ckan:

@@ -37,6 +37,8 @@ DEFS = REPO / "src" / "wprdc_etl" / "defs"
 sys.path.insert(0, str(REPO / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from schedule_slots import describe as describe_schedule  # noqa: E402
+from schedule_slots import schedule_for  # noqa: E402
 from schema_infer import builder_for  # noqa: E402  (scripts/ is on sys.path)
 
 # "gis", not "pasda": PASDA is the ARCHIVE these are distributed from, not a
@@ -120,7 +122,6 @@ PASDA_DATASETS: list[PasdaDataset] = [
 ]
 
 PUBLISHER = "allegheny_county"
-SCHEDULE = "0 8 1 * *"  # 08:00 America/New_York, 1st of the month
 
 
 @dataclass
@@ -197,6 +198,8 @@ def sample_shapefile(url: str, rows: int) -> list[tuple[str, str]]:
 def render_defs_yaml(r: Resolved) -> str:
     """The defs.yaml for one PASDA dataset."""
     spec = r.spec
+    # The 1st of the month at an odd-minute slot; an existing file keeps its own.
+    schedule = schedule_for(PUBLISHER, DEPARTMENT, spec.folder, "monthly")
     csv_res = r.resources.get("csv", "")
     geojson_res = r.resources.get("geojson", "")
     reps = ""
@@ -253,7 +256,7 @@ attributes:
     type: pasda
     dataset_id: "{spec.dataset_id}"
     format: shapefile
-  schedule: "{SCHEDULE}"
+  schedule: "{schedule}"  # {describe_schedule(schedule)}
   partition: monthly
   ingest: snapshot
   heavy: true

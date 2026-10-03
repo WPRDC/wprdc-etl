@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Pre 2018 DPW Divisions"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "21 8 * * 0"  # Sunday 08:21 ET
   partition: weekly
   ingest: snapshot
   ckan:

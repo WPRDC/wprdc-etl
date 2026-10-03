@@ -450,7 +450,7 @@ class TabularPipeline(Component, Model, Resolvable):
             selection=dg.AssetSelection.assets(landed, validated, *downstream),
             tags=run_tags(cfg, stem),
         )
-        schedules, sensors = schedule_or_sensor(cfg, stem, job)
+        schedules, sensors = schedule_or_sensor(cfg, stem, job, partitions)
 
         return dg.Definitions(
             assets=[landed, validated, *downstream],

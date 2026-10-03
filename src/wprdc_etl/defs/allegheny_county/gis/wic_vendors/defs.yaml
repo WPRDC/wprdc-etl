@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County WIC Vendor Locations"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "39 5 * * 0"  # Sunday 05:39 ET
   partition: weekly
   ingest: snapshot
   ckan:

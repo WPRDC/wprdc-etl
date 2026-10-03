@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Watershed Boundaries"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "36 5 * * 0"  # Sunday 05:36 ET
   partition: weekly
   ingest: snapshot
   ckan:

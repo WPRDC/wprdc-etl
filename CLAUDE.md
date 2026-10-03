@@ -266,6 +266,21 @@ genuinely dataset-specific logic.
 - **Dagster is pinned exactly** (`dagster==1.13.14`, paired libs `==0.29.14`). Bumping
   is a deliberate PR that refreshes `uv.lock` AND runs `dagster instance migrate` (the
   Postgres schema is release-coupled).
+- **A partitioned job's schedule must say which partition.** A plain
+  `ScheduleDefinition` requests none, so every scheduled run of a partitioned
+  job would have failed in production (`bin/run` hid it by choosing the
+  partition itself). `schedule_or_sensor` uses
+  `build_schedule_from_partitioned_job`, which runs the latest COMPLETE
+  partition; `partitioned_schedule_fields` makes `dg check` reject a cron that
+  doesn't fit the cadence (weekly `M H * * DOW`, monthly `M H DOM * *`). Its
+  timezone comes from the PARTITIONS definition — Dagster refuses one on the
+  schedule — so `partitions_for` builds them in America/New_York.
+- **Schedules are slots, not hand-picked crons.** Weekly datasets run on
+  Sunday (a Sunday run lands the week that just ended), monthly on the 1st,
+  at an odd minute between 03:00 and 08:59 ET — clear of the 02:00 DST change
+  and the :00/:15/:30 marks everyone else uses. `scripts/schedule_slots.py`
+  spaced the first layout evenly; the generators give a new dataset a free
+  hashed slot and keep an existing one's. `test_schedules` holds the rules.
 - **Job run tags ↔ prod concurrency limits.** `_common.py:run_tags()` stamps
   `wprdc/{publisher,dataset,source,ingest,heavy}` on every asset job;
   `deploy/prod/dagster.yaml` `tag_concurrency_limits` keys off them — change a key in

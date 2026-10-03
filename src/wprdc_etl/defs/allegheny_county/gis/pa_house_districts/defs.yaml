@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County PA House Districts"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "49 4 * * 0"  # Sunday 04:49 ET
   partition: weekly
   ingest: snapshot
   ckan:

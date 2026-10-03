@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "PGHWebRCO"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "3 8 * * 0"  # Sunday 08:03 ET
   partition: weekly
   ingest: snapshot
   ckan:

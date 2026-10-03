@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Emergency Medical Service Districts"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "49 6 * * 0"  # Sunday 06:49 ET
   partition: weekly
   ingest: snapshot
   ckan:

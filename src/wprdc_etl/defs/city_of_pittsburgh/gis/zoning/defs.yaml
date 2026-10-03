@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Zoning"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "53 8 * * 0"  # Sunday 08:53 ET
   partition: weekly
   ingest: snapshot
   ckan:

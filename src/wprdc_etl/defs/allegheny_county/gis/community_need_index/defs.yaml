@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Community Need Index (used in 2024 report)"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "36 3 * * 0"  # Sunday 03:36 ET
   partition: weekly
   ingest: snapshot
   ckan:

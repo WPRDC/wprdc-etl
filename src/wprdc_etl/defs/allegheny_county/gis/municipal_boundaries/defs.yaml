@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Municipal Boundaries"
     format: geojson
-  schedule: "0 7 * * 1"
+  schedule: "39 4 * * 0"  # Sunday 04:39 ET
   partition: weekly
   ingest: snapshot
   ckan:

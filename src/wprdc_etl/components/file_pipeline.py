@@ -129,7 +129,7 @@ class FilePipeline(Component, Model, Resolvable):
             selection=dg.AssetSelection.assets(landed, published),
             tags=run_tags(cfg, stem),
         )
-        schedules, sensors = schedule_or_sensor(cfg, stem, job)
+        schedules, sensors = schedule_or_sensor(cfg, stem, job, partitions)
 
         return dg.Definitions(
             assets=[landed, published],

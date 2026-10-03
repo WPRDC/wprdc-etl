@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Council Districts 2012"
     format: geojson
-  schedule: "30 7 * * 1"
+  schedule: "32 6 * * 0"  # Sunday 06:32 ET
   partition: weekly
   ingest: snapshot
   ckan:

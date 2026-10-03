@@ -24,7 +24,7 @@ attributes:
     type: pasda
     dataset_id: "1214"
     format: shapefile
-  schedule: "0 8 1 * *"
+  schedule: "24 5 1 * *"  # day 1 of the month, 05:24 ET
   partition: monthly
   ingest: snapshot
   heavy: true
