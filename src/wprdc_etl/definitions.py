@@ -19,6 +19,7 @@ import dagster as dg
 from dagster.components import load_defs
 
 import wprdc_etl.defs
+from wprdc_etl.catalogue_check import catalogue_check_defs
 from wprdc_etl.resources import (
     CkanResource,
     GeocoderResource,
@@ -141,4 +142,5 @@ defs = dg.Definitions.merge(
         },
         sensors=_alert_sensors(),
     ),
+    catalogue_check_defs(),
 )

@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Pittsburgh Council Districts 2022 (Current)"
     format: geojson
-  schedule: "36 6 * * 0"  # Sunday 06:36 ET
+  schedule: "33 6 * * 0"  # Sunday 06:33 ET
   partition: weekly
   ingest: snapshot
   ckan:

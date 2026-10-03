@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "High Injury Network"
     format: geojson
-  schedule: "14 7 * * 0"  # Sunday 07:14 ET
+  schedule: "12 7 * * 0"  # Sunday 07:12 ET
   partition: weekly
   ingest: snapshot
   ckan:

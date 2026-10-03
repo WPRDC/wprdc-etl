@@ -96,19 +96,9 @@ DEPARTMENT = "gis"
 #
 # Add to this table whenever a layer's real source turns out to be somewhere
 # other than the Hub.
-CATALOGUE_EXCLUSIONS: dict[str, dict[str, str]] = {
-    "allegheny_county": {
-        "Allegheny County Parcel Boundaries": "pasda (dataset 1214)",
-        "Allegheny County Addressing Address Points": "pasda (dataset 1219)",
-        "Allegheny County Addressing Street Centerlines": "pasda (dataset 1224)",
-        "Allegheny County Building Footprint Locations": "pasda (dataset 1195)",
-        # On hold. A plain table with no WPRDC package of its own; its
-        # FOLDER_ALIASES and PACKAGE_OVERRIDES entries are kept so removing
-        # this line is all it takes to wire it as addressing_street_aliases.
-        "Allegheny County Addressing Street Aliases": "nobody - on hold",
-    },
-    "city_of_pittsburgh": {},
-}
+# Defined in the package, so the production catalogue check (which can't
+# see scripts/) reads the same table.
+from wprdc_etl.catalogue_check import CATALOGUE_EXCLUSIONS  # noqa: E402
 
 
 @dataclass(frozen=True)

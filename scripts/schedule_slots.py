@@ -1,9 +1,10 @@
-"""When each scheduled dataset runs: a stable, odd-minute slot per dataset.
+"""When each scheduled dataset runs: a stable slot per dataset, outside
+business hours.
 
-Weekly datasets run on SUNDAY, monthly ones on the 1st, all between 03:00 and
-08:59 Eastern on a minute that isn't a multiple of 5 — so nothing lands on the
-:00/:15/:30 marks everyone else's cron uses, and ~100 ArcGIS layers don't
-all ask the Hub for exports in the same minute.
+Weekly datasets run on SUNDAY between 03:00 and 08:59 Eastern; monthly ones
+on the 1st between 03:00 and 07:59 (the 1st falls on weekdays too, so they
+finish before 8am). Slots sit on a 3-minute grid — 03:00, 03:03, … — so the
+~100 ArcGIS layers don't all ask the Hub for exports in the same minute.
 
   * Sunday because a weekly partition runs Sunday-to-Saturday and a schedule
     runs the latest COMPLETE one: a Sunday run lands the week that just ended.
@@ -25,13 +26,9 @@ import yaml
 
 DEFS = pathlib.Path(__file__).resolve().parent.parent / "src" / "wprdc_etl" / "defs"
 
-FIRST_HOUR, LAST_HOUR = 3, 8  # 03:00 through 08:59
-SLOTS = [
-    (hour, minute)
-    for hour in range(FIRST_HOUR, LAST_HOUR + 1)
-    for minute in range(60)
-    if minute % 5
-]
+GRID_MINUTES = 3
+# cadence -> (first hour, last hour), inclusive
+WINDOWS = {"weekly": (3, 8), "monthly": (3, 7)}
 DAY_NAMES = [
     "Sunday",
     "Monday",
@@ -41,6 +38,16 @@ DAY_NAMES = [
     "Friday",
     "Saturday",
 ]
+
+
+def slots(cadence: str) -> list[tuple[int, int]]:
+    """Every (hour, minute) a dataset at this cadence may run at."""
+    first, last = WINDOWS[cadence]
+    return [
+        (hour, minute)
+        for hour in range(first, last + 1)
+        for minute in range(0, 60, GRID_MINUTES)
+    ]
 
 
 def cron_for(cadence: str, slot: tuple[int, int]) -> str:
@@ -82,7 +89,7 @@ def scheduled() -> dict[str, tuple[str, str]]:
     return out
 
 
-def spread(keys: list[str]) -> dict[str, tuple[int, int]]:
+def spread(keys: list[str], cadence: str) -> dict[str, tuple[int, int]]:
     """Evenly spaced slots for `keys`, in key order.
 
     For laying out a whole cadence at once (the first assignment). Hashing
@@ -90,25 +97,29 @@ def spread(keys: list[str]) -> dict[str, tuple[int, int]]:
     spacing puts them ~3.5 minutes apart. Later additions go through
     assign(), which fills a free slot without moving anything.
     """
+    grid = slots(cadence)
     keys = sorted(keys)
-    if len(keys) > len(SLOTS):
+    if len(keys) > len(grid):
         raise RuntimeError("more datasets than schedule slots")
-    step = len(SLOTS) / max(1, len(keys))
-    return {k: SLOTS[int(i * step)] for i, k in enumerate(keys)}
+    step = len(grid) / max(1, len(keys))
+    return {k: grid[int(i * step)] for i, k in enumerate(keys)}
 
 
-def assign(keys: list[str], taken: set[tuple[int, int]]) -> dict[str, tuple[int, int]]:
+def assign(
+    keys: list[str], taken: set[tuple[int, int]], cadence: str
+) -> dict[str, tuple[int, int]]:
     """A free slot for each key: its hash slot, else the next free one."""
+    grid = slots(cadence)
     taken = set(taken)
     out = {}
     for key in sorted(keys):
-        i = int(hashlib.sha256(key.encode()).hexdigest(), 16) % len(SLOTS)
-        while SLOTS[i] in taken:
-            i = (i + 1) % len(SLOTS)
-            if len(taken) >= len(SLOTS):
-                raise RuntimeError("no free schedule slots left")
-        taken.add(SLOTS[i])
-        out[key] = SLOTS[i]
+        if len(taken & set(grid)) >= len(grid):
+            raise RuntimeError("no free schedule slots left")
+        i = int(hashlib.sha256(key.encode()).hexdigest(), 16) % len(grid)
+        while grid[i] in taken:
+            i = (i + 1) % len(grid)
+        taken.add(grid[i])
+        out[key] = grid[i]
     return out
 
 
@@ -130,8 +141,8 @@ def schedule_for(
         for k, (c, cron) in existing.items()
         if c == cadence and k != key and cron in _scheme_crons(cadence)
     }
-    return cron_for(cadence, assign([key], taken)[key])
+    return cron_for(cadence, assign([key], taken, cadence)[key])
 
 
 def _scheme_crons(cadence: str) -> set[str]:
-    return {cron_for(cadence, s) for s in SLOTS}
+    return {cron_for(cadence, s) for s in slots(cadence)}

@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "2018 to 2020 DPW Divisions"
     format: geojson
-  schedule: "53 5 * * 0"  # Sunday 05:53 ET
+  schedule: "51 5 * * 0"  # Sunday 05:51 ET
   partition: weekly
   ingest: snapshot
   ckan:

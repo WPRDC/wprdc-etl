@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Parks Outlines"
     format: geojson
-  schedule: "57 4 * * 0"  # Sunday 04:57 ET
+  schedule: "54 4 * * 0"  # Sunday 04:54 ET
   partition: weekly
   ingest: snapshot
   ckan:

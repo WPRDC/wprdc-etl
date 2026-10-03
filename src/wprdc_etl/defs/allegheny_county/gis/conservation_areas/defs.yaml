@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Conservation Areas"
     format: geojson
-  schedule: "39 3 * * 0"  # Sunday 03:39 ET
+  schedule: "36 3 * * 0"  # Sunday 03:36 ET
   partition: weekly
   ingest: snapshot
   ckan:

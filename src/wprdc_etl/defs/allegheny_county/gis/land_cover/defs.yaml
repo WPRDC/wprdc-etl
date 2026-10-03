@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Land Cover Areas"
     format: geojson
-  schedule: "14 4 * * 0"  # Sunday 04:14 ET
+  schedule: "12 4 * * 0"  # Sunday 04:12 ET
   partition: weekly
   ingest: snapshot
   ckan:

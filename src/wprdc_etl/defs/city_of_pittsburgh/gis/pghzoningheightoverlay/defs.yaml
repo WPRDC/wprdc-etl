@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "PGHZoningHeightOverlay"
     format: geojson
-  schedule: "11 8 * * 0"  # Sunday 08:11 ET
+  schedule: "9 8 * * 0"  # Sunday 08:09 ET
   partition: weekly
   ingest: snapshot
   ckan:

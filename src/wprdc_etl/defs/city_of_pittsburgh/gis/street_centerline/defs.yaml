@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Pittsburgh Street Centerline"
     format: geojson
-  schedule: "39 8 * * 0"  # Sunday 08:39 ET
+  schedule: "36 8 * * 0"  # Sunday 08:36 ET
   partition: weekly
   ingest: snapshot
   ckan:

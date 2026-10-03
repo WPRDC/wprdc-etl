@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Greenways"
     format: geojson
-  schedule: "7 7 * * 0"  # Sunday 07:07 ET
+  schedule: "6 7 * * 0"  # Sunday 07:06 ET
   partition: weekly
   ingest: snapshot
   ckan:

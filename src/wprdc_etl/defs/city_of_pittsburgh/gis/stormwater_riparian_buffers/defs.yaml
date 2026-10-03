@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Stormwater Riparian Buffers"
     format: geojson
-  schedule: "36 8 * * 0"  # Sunday 08:36 ET
+  schedule: "33 8 * * 0"  # Sunday 08:33 ET
   partition: weekly
   ingest: snapshot
   ckan:

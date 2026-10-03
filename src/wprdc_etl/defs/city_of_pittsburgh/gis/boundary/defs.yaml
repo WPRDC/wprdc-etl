@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Pittsburgh Boundary"
     format: geojson
-  schedule: "11 6 * * 0"  # Sunday 06:11 ET
+  schedule: "9 6 * * 0"  # Sunday 06:09 ET
   partition: weekly
   ingest: snapshot
   ckan:

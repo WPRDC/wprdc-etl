@@ -25,7 +25,7 @@ attributes:
   source:
     type: http
     url: https://storage.googleapis.com/pghpa_open_data/cartegraph/water_features.csv
-  schedule: "57 8 * * 0"  # Sunday 08:57 ET
+  schedule: "54 8 * * 0"  # Sunday 08:54 ET
   partition: weekly
   ingest: snapshot
   transforms:

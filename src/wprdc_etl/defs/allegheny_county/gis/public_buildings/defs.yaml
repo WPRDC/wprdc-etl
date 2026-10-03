@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Public Building Locations"
     format: geojson
-  schedule: "7 5 * * 0"  # Sunday 05:07 ET
+  schedule: "6 5 * * 0"  # Sunday 05:06 ET
   partition: weekly
   ingest: snapshot
   ckan:

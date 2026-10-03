@@ -3,9 +3,10 @@
 Two things went wrong before. Every partitioned job had a plain
 ScheduleDefinition, which requests NO partition — so every scheduled run would
 have failed in production (bin/run hid it by choosing the partition itself).
-And ~100 GIS layers all fired Monday at 07:00 / 07:30. Weekly datasets now run
-on Sunday, monthly on the 1st, at odd minutes between 03:00 and 08:59 Eastern
-(scripts/schedule_slots.py), through build_schedule_from_partitioned_job.
+And ~100 GIS layers all fired Monday at 07:00 / 07:30, in business hours.
+Weekly datasets now run on Sunday 03:00-08:59 and monthly ones on the 1st
+03:00-07:59 Eastern, on a 3-minute grid (scripts/schedule_slots.py), through
+build_schedule_from_partitioned_job.
 """
 
 import datetime as dt
@@ -42,15 +43,16 @@ def test_every_schedule_fits_its_partitioning() -> None:
 
 
 @pytest.mark.parametrize("cadence", ["weekly", "monthly"])
-def test_runs_are_spread_over_odd_minutes_in_the_window(cadence: str) -> None:
+def test_runs_are_spread_outside_business_hours(cadence: str) -> None:
     crons = [cron for c, cron in SCHEDULED.values() if c == cadence]
     assert crons, f"no {cadence} datasets found"
     day_field = 4 if cadence == "weekly" else 2
     day = "0" if cadence == "weekly" else "1"  # Sunday / the 1st
     assert {c.split()[day_field] for c in crons} == {day}
+    first, last = slots.WINDOWS[cadence]
     times = [_time(c) for c in crons]
-    assert all(slots.FIRST_HOUR <= h <= slots.LAST_HOUR for h, _ in times)
-    assert all(m % 5 for _, m in times), "a run landed on a :x0/:x5 mark"
+    assert all(first <= h <= last for h, _ in times), "a run is outside its window"
+    assert all(m % slots.GRID_MINUTES == 0 for _, m in times)
     assert len(set(times)) == len(times), "two datasets share a minute"
 
 
@@ -104,3 +106,31 @@ def test_a_scheduled_tick_requests_a_partition(schedule: str) -> None:
         result = sched.evaluate_tick(context)
     keys = [r.partition_key for r in result.run_requests or []]
     assert keys and all(keys), f"{schedule} requested {keys}"
+
+
+@pytest.mark.parametrize("production", [True, False])
+def test_schedules_start_running_only_in_production(
+    monkeypatch: pytest.MonkeyPatch, production: bool
+) -> None:
+    """Dagster creates schedules stopped; production would run nothing."""
+    from types import SimpleNamespace
+
+    from wprdc_etl.components._common import partitions_for, schedule_or_sensor
+
+    monkeypatch.setattr("wprdc_etl.runtime.is_production", lambda: production)
+    want = (
+        dg.DefaultScheduleStatus.RUNNING
+        if production
+        else dg.DefaultScheduleStatus.STOPPED
+    )
+
+    @dg.asset(partitions_def=partitions_for("weekly"))
+    def weekly() -> None: ...
+
+    job = dg.define_asset_job("weekly_job", selection=[weekly])
+    cfg = SimpleNamespace(schedule="0 3 * * 0", partition="weekly")
+    (partitioned,), _ = schedule_or_sensor(cfg, "x", job, partitions_for("weekly"))
+    cfg = SimpleNamespace(schedule="0 3 * * 0", partition="none")
+    (plain,), _ = schedule_or_sensor(cfg, "y", job, None)
+    assert partitioned.default_status == want
+    assert plain.default_status == want

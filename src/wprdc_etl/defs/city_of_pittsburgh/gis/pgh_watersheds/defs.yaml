@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "PGH Watersheds"
     format: geojson
-  schedule: "49 7 * * 0"  # Sunday 07:49 ET
+  schedule: "48 7 * * 0"  # Sunday 07:48 ET
   partition: weekly
   ingest: snapshot
   ckan:

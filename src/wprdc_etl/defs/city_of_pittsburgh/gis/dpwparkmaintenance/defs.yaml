@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "DPWParkMaintenance"
     format: geojson
-  schedule: "46 6 * * 0"  # Sunday 06:46 ET
+  schedule: "45 6 * * 0"  # Sunday 06:45 ET
   partition: weekly
   ingest: snapshot
   ckan:

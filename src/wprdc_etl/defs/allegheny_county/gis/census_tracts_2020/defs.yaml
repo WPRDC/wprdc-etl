@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Census Tracts 2020"
     format: geojson
-  schedule: "32 3 * * 0"  # Sunday 03:32 ET
+  schedule: "30 3 * * 0"  # Sunday 03:30 ET
   partition: weekly
   ingest: snapshot
   ckan:

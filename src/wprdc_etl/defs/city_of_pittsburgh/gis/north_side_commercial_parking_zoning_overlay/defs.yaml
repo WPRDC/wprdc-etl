@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "North Side Commercial Parking Zoning Overlay"
     format: geojson
-  schedule: "32 7 * * 0"  # Sunday 07:32 ET
+  schedule: "30 7 * * 0"  # Sunday 07:30 ET
   partition: weekly
   ingest: snapshot
   ckan:

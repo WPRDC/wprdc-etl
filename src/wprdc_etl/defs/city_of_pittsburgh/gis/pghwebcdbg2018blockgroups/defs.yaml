@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "PGHWebCDBG2018Blockgroups"
     format: geojson
-  schedule: "53 7 * * 0"  # Sunday 07:53 ET
+  schedule: "51 7 * * 0"  # Sunday 07:51 ET
   partition: weekly
   ingest: snapshot
   ckan:

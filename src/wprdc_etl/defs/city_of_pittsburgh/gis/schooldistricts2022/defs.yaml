@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "SchoolDistricts2022"
     format: geojson
-  schedule: "28 8 * * 0"  # Sunday 08:28 ET
+  schedule: "27 8 * * 0"  # Sunday 08:27 ET
   partition: weekly
   ingest: snapshot
   ckan:

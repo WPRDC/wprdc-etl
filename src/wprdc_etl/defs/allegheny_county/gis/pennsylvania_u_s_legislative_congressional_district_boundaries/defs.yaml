@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Pennsylvania U.S. Legislative Congressional District Boundaries"
     format: geojson
-  schedule: "1 5 * * 0"  # Sunday 05:01 ET
+  schedule: "0 5 * * 0"  # Sunday 05:00 ET
   partition: weekly
   ingest: snapshot
   ckan:

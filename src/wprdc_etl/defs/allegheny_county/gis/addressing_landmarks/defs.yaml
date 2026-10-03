@@ -29,7 +29,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Addressing Landmarks"
     format: csv
-  schedule: "1 3 * * 0"  # Sunday 03:01 ET
+  schedule: "0 3 * * 0"  # Sunday 03:00 ET
   partition: weekly
   ingest: snapshot
   ckan:

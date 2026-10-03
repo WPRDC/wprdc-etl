@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Open Spaces"
     format: geojson
-  schedule: "46 4 * * 0"  # Sunday 04:46 ET
+  schedule: "45 4 * * 0"  # Sunday 04:45 ET
   partition: weekly
   ingest: snapshot
   ckan:

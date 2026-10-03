@@ -275,12 +275,18 @@ genuinely dataset-specific logic.
   doesn't fit the cadence (weekly `M H * * DOW`, monthly `M H DOM * *`). Its
   timezone comes from the PARTITIONS definition — Dagster refuses one on the
   schedule — so `partitions_for` builds them in America/New_York.
-- **Schedules are slots, not hand-picked crons.** Weekly datasets run on
-  Sunday (a Sunday run lands the week that just ended), monthly on the 1st,
-  at an odd minute between 03:00 and 08:59 ET — clear of the 02:00 DST change
-  and the :00/:15/:30 marks everyone else uses. `scripts/schedule_slots.py`
-  spaced the first layout evenly; the generators give a new dataset a free
-  hashed slot and keep an existing one's. `test_schedules` holds the rules.
+- **Schedules start RUNNING in production, STOPPED elsewhere.** Dagster
+  creates every schedule stopped, so a deploy would run nothing until ~110
+  were switched on by hand. `default_schedule_status()` keys off
+  `is_production()`, like the Slack sensor; dev stays stopped so `dg dev` with
+  a daemon never starts pulling and publishing on its own.
+- **Schedules are slots, not hand-picked crons — outside business hours.**
+  Weekly datasets run on Sunday 03:00-08:59 ET (a Sunday run lands the week
+  that just ended), monthly ones on the 1st 03:00-07:59 (the 1st can be a
+  weekday), on a 3-minute grid, starting after the 02:00 DST change.
+  `scripts/schedule_slots.py` spaced the first layout evenly (weekly runs
+  3-6 minutes apart); the generators give a new dataset a free hashed slot and
+  keep an existing one's. `test_schedules` holds the rules.
 - **Job run tags ↔ prod concurrency limits.** `_common.py:run_tags()` stamps
   `wprdc/{publisher,dataset,source,ingest,heavy}` on every asset job;
   `deploy/prod/dagster.yaml` `tag_concurrency_limits` keys off them — change a key in
@@ -508,10 +514,21 @@ API" distribution whose URL is actually a PASDA landing page, and with no
 downloadable file at all — so there is nothing for the Hub generator to
 mirror.
 
-`CATALOGUE_EXCLUSIONS` in `scripts/sync_arcgis.py` is the table that keeps
-them out of the Hub sync. It is keyed by publisher and catalogue title and
-carries a reason, which `bin/arcgis --list` prints as `ELSEWHERE`. Add to it
-rather than special-casing a title inline — that is what makes it extensible.
+`CATALOGUE_EXCLUSIONS` in `src/wprdc_etl/catalogue_check.py` is the table
+that keeps them out of the Hub sync. It is keyed by publisher and catalogue
+title and carries a reason, which `bin/arcgis --list` prints as `ELSEWHERE`.
+Add to it rather than special-casing a title inline — that is what makes it
+extensible. It lives in the package, not `scripts/`, because the weekly
+catalogue check reads it in production.
+
+**The weekly catalogue check** (`maintenance__catalogue_check__job`,
+Saturday 06:00 ET) does `bin/arcgis --list`'s job unattended: it reports a
+catalogue layer no pipeline uses and the exclusions don't explain (NEW), a
+wired title gone from its catalogue (DRIFT — that run will fail Sunday), and a
+PASDA dataset id that no longer resolves. It only reports — run metadata in
+the UI, and a Slack message in production when there is something to act on.
+Silence is the normal week, so a layer that will never be wired (a web page
+with no file) belongs in the exclusions, or it is reported every Saturday.
 
 `bin/pasda` generates these the way `bin/arcgis` generates the others (dry-run
 by default, `--write` to apply, `--force` to regenerate). The layers are a

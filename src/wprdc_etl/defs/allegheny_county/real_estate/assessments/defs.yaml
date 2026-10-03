@@ -23,7 +23,7 @@ attributes:
     port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
     path: /WPRDC/Property_Assessments/ALLEGHENY_COUNTY_MASTER_FILE.csv
     secret_ref: ALLEGHENY_SFTP
-  schedule: "48 7 1 * *"  # day 1 of the month, 07:48 ET
+  schedule: "0 7 1 * *"  # day 1 of the month, 07:00 ET
   partition: monthly
   ingest: snapshot                       # full-state file -> DataPusher+ replace
   transforms:                            # shared primitives, run in order

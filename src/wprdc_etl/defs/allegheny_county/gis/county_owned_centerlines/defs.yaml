@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County-Owned Roads Centerlines"
     format: geojson
-  schedule: "49 3 * * 0"  # Sunday 03:49 ET
+  schedule: "48 3 * * 0"  # Sunday 03:48 ET
   partition: weekly
   ingest: snapshot
   ckan:

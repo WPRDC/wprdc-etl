@@ -57,7 +57,8 @@ Four county layers are not sourced from the Hub at all. The county's
 `data.json` lists them with an "ArcGIS GeoServices REST API" distribution
 whose URL is in fact a PASDA landing page, and offers no downloadable file —
 so the Hub generator excludes them (`CATALOGUE_EXCLUSIONS` in
-`scripts/sync_arcgis.py`, which `bin/arcgis --list` reports as `ELSEWHERE`) and
+`src/wprdc_etl/catalogue_check.py`, which `bin/arcgis --list` reports as
+`ELSEWHERE`) and
 `bin/pasda` writes them instead:
 
 ```bash

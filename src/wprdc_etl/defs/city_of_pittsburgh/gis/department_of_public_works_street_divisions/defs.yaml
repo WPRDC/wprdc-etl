@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Department of Public Works Street Divisions"
     format: geojson
-  schedule: "39 6 * * 0"  # Sunday 06:39 ET
+  schedule: "36 6 * * 0"  # Sunday 06:36 ET
   partition: weekly
   ingest: snapshot
   ckan:

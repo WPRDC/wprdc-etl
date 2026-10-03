@@ -129,6 +129,23 @@ def run_tags(cfg: PipelineConfig, stem: str) -> dict[str, str]:
     return tags
 
 
+def default_schedule_status() -> dg.DefaultScheduleStatus:
+    """RUNNING in production, STOPPED everywhere else.
+
+    Dagster creates every schedule stopped, so a production deploy would run
+    nothing until someone switched ~110 schedules on by hand. In dev they stay
+    stopped: `dg dev` with a daemon must not start pulling sources and
+    publishing on its own. Same gate as the Slack failure sensor.
+    """
+    from wprdc_etl.runtime import is_production
+
+    return (
+        dg.DefaultScheduleStatus.RUNNING
+        if is_production()
+        else dg.DefaultScheduleStatus.STOPPED
+    )
+
+
 def partitioned_schedule_fields(cadence: str, cron: str) -> dict[str, int]:
     """The minute/hour/day of `cron`, checked against a partition cadence.
 
@@ -179,7 +196,10 @@ def schedule_or_sensor(
         return (
             [
                 dg.build_schedule_from_partitioned_job(
-                    job, name=f"{stem}__schedule", **fields
+                    job,
+                    name=f"{stem}__schedule",
+                    default_status=default_schedule_status(),
+                    **fields,
                 )
             ],
             [],
@@ -192,6 +212,7 @@ def schedule_or_sensor(
                     job=job,
                     cron_schedule=cfg.schedule,
                     execution_timezone=SCHEDULE_TZ,
+                    default_status=default_schedule_status(),
                 )
             ],
             [],

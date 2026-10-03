@@ -28,7 +28,7 @@ attributes:
     catalog: https://pghgishub-pittsburghpa.opendata.arcgis.com/data.json
     title: "Census Block Group 2020"
     format: geojson
-  schedule: "18 6 * * 0"  # Sunday 06:18 ET
+  schedule: "15 6 * * 0"  # Sunday 06:15 ET
   partition: weekly
   ingest: snapshot
   ckan:

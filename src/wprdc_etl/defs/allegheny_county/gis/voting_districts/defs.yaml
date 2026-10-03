@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Voting District Boundaries"
     format: geojson
-  schedule: "32 5 * * 0"  # Sunday 05:32 ET
+  schedule: "30 5 * * 0"  # Sunday 05:30 ET
   partition: weekly
   ingest: snapshot
   ckan:

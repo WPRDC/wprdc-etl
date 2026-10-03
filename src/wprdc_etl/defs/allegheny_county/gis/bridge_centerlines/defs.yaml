@@ -28,7 +28,7 @@ attributes:
     catalog: https://openac-alcogis.opendata.arcgis.com/data.json
     title: "Allegheny County Owned Bridge Centerlines"
     format: geojson
-  schedule: "14 3 * * 0"  # Sunday 03:14 ET
+  schedule: "12 3 * * 0"  # Sunday 03:12 ET
   partition: weekly
   ingest: snapshot
   ckan:
