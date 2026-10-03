@@ -219,7 +219,7 @@ def build() -> dict:
 
     from wprdc_etl.strategies.emit import GEO_FORMATS
     from wprdc_etl.strategies.extract import ARCGIS_FORMATS, EXTRACTORS, PASDA_FORMATS
-    from wprdc_etl.strategies.load import LOADERS
+    from wprdc_etl.strategies.load import BOOL_FORMATS, LOADERS
     from wprdc_etl.strategies.mirror import MIRROR_KINDS
 
     schema = list_all_components_schema(
@@ -248,6 +248,7 @@ def build() -> dict:
     _set_string(source["type"], list(EXTRACTORS))
     _set_string(source["format"], sorted(set(ARCGIS_FORMATS) | set(PASDA_FORMATS)))
     _set_string(defs["MirrorModelModel"]["properties"]["format"], list(MIRROR_KINDS))
+    _set_string(defs["CkanModelModel"]["properties"]["bool_format"], list(BOOL_FORMATS))
     _set_string(
         defs["RepresentationModelModel"]["properties"]["format"], list(GEO_FORMATS)
     )

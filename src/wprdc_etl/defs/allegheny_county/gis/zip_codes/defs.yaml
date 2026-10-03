@@ -37,10 +37,11 @@ attributes:
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
-    # Replaces the publisher's description. Sourced from this
-    # dataset's curated text on data.wprdc.org.
+    # STUB from the publisher's catalogue description (harvest
+    # boilerplate removed). REVIEW before publishing: it replaces
+    # the package notes on every run.
     description: |-
-      <div>This dataset demarcates the zip code boundaries that lie within Allegheny County.</div><div><br /></div><div>If viewing this description on the Western Pennsylvania Regional Data Center’s open data portal <a href='http://www.wprdc.org' target='_blank'>(http://www.wprdc.org)</a>, this dataset is harvested on a weekly basis from Allegheny County’s GIS data portal (<a href='http://openac.alcogis.opendata.arcgis.com/' target='_blank'>http://openac.alcogis.opendata.arcgis.com/</a>). The full metadata record for this dataset can also be found on Allegheny County’s GIS portal. You can access the metadata record and other resources on the GIS portal by clicking on the “Explore” button (and choosing the “Go to resource” option) to the right of the “ArcGIS Open Dataset” text below.</div><div><br /></div><div><b>Category</b>:  Civic Vitality and Governance</div><div><b><br /></b></div><div><b>Organization</b>:  Allegheny County</div><div><br /></div><div><b>Department:</b>  Geographic Information Systems Group; Department of Administrative Services</div><div><br /></div><div><b>Temporal Coverage:</b>  current</div><div><br /></div><div><b>Data Notes: </b></div><div><br /></div><div><b>Coordinate System:</b>  Pennsylvania State Plane South Zone 3702; U.S. Survey Foot</div><div><br /></div><div><b>Development Notes:</b>  none</div><div><br /></div><div><b>Other:</b> none</div><div><br /></div><div><b>Related Document(s):</b>  Data Dictionary (none)</div><div><br /></div><div><b>Frequency - Data Change:</b>  As needed</div><div><br /></div><div><b>Frequency - Publishing:</b>  As needed</div><div><b><br /></b></div><div><b>Data Steward Name:</b>  Eli Thomas</div><div><br /></div><div><b>Data Steward Email:</b> gishelp@alleghenycounty.us</div>
+      This dataset demarcates the zip code boundaries that lie within Allegheny County.
     mirror:
       - format: geojson
         resource_id: "14e5de97-0a5f-4521-84f6-ba74413db598"

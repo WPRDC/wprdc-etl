@@ -55,6 +55,7 @@ from wprdc_etl.dataset_modules import load_dataset_module
 from wprdc_etl.strategies import get_extractor, get_loader
 from wprdc_etl.strategies.accumulate import merge as merge_into_table
 from wprdc_etl.strategies.emit import publish_representation
+from wprdc_etl.strategies.load import BOOL_FORMATS
 from wprdc_etl.strategies.mirror import (
     publish_mirror,
     sync_package_metadata,
@@ -166,6 +167,11 @@ class TabularPipeline(Component, Model, Resolvable):
                     "publish 'replace' to publish the accumulated table as a file, "
                     "or drop accumulate."
                 )
+        if cfg.ckan and cfg.ckan.bool_format not in BOOL_FORMATS:
+            raise ValueError(
+                f"{stem}: ckan.bool_format must be one of {BOOL_FORMATS}, "
+                f"got {cfg.ckan.bool_format!r}"
+            )
         if cfg.ckan:
             validate_mirrors(
                 cfg.ckan.mirror, has_datastore_target=bool(cfg.ckan.resource_id)

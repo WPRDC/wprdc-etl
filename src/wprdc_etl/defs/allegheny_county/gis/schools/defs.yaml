@@ -43,15 +43,7 @@ attributes:
       ## Overview
 
       These geocoded locations for Allegheny County schools (public, private, charter, and career and technical centers) are based on the Allegheny County extract of Public and Private school names, addresses and enrollment data via [Education Demographics and Geographic Estimates from the National Center for Education Statistics](https://nces.ed.gov/programs/edge/geographic/schoollocations) and [Enrollment Reports as of October 1 submitted to the Pennsylvania Department of Education](https://www.pa.gov/agencies/education/data-and-reporting/enrollment#accordion-cb5f3bee47-item-9b3fcf9ab9). The address data for public schools are based on data reported in the NCES Common Core of Data, which is an annual collection of enrollment, staffing and program participation for schools as reported to the Unites States Department of Education. 
-
-      **Department:** Allegheny County Department of Children Initiatives
-
-      **Data Notes:** Coordinate System: WGS 1984 Web Mercator (auxiliary sphere)
-
-      **Data Steward Name:** See [PA Enrollment | Department of Education](https://www.pa.gov/agencies/education/data-and-reporting/enrollment#accordion-cb5f3bee47-item-9b3fcf9ab9) and [NCES- EDGE School Geocodes and Geoassignments](https://nces.ed.gov/programs/edge/geographic/schoollocations) for more information.
-
-      **Data Steward Email:** Ra-DDQDataCollection@pa.gov and EDGE@ed.gov (Data Collection Team)
-
+     
       ---
 
       ## Further Documentation and Resources

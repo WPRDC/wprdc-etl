@@ -142,25 +142,40 @@ genuinely dataset-specific logic.
 - **`postgis/postgis` is amd64-only** — the compose service pins
   `platform: linux/amd64`, so it runs emulated on Apple Silicon. Fine for
   boundary layers (hundreds of rows); don't use it for bulk data.
-- **A `replace` publish TRUNCATES the DataStore table, it does not drop it.**
-  `datastore_delete` with no `filters` drops the table and takes
-  `ckanext-spatialdata`'s `dataspatial_wkb` column and its GiST index with it —
-  they aren't part of the resource's publicly viewable columns, so nothing else
-  would notice. `replace()` passes `filters: {}` instead. The cost: a truncated
-  table keeps its existing column types, so the loader BLOCKS any added /
-  removed / retyped column until `ckan.rebuild: true` opts into the drop. Don't
-  "fix" a blocked run by reaching for `rebuild` without checking whether the
-  column change is real.
-- **We create a resource's DataStore table, not DataPusher+.** Left to
-  itself on a resource with no table, DataPusher+ types columns by qsv
-  inference (ids, wards, tracts -> numeric) while the frame publishes them as
-  text — so the first run succeeded and every later one was blocked as a "type
-  change". `CkanResource.replace` now runs `datastore_create` from the frame's
-  dtypes on a first load (before the upload) and after a `rebuild` drop;
-  DataPusher+ loads into an existing table without retyping it. A table that
-  was qsv-created before this fix stays blocked until one `ckan.rebuild: true`
-  run (or, locally, a drop). Production's long-lived tables were curated with
-  text codes, so they were never affected — every NEW resource was.
+- **Production's DataPusher+ re-creates the DataStore table on EVERY load.**
+  Verified on data.wprdc.org (2026-10-02): a reload re-typed an established
+  table from qsv inference (text ids/wards -> numeric, a bool -> text,
+  float8 -> numeric), and an explicit `float8` override still came back
+  `numeric` — a column only changes type when the table is re-created. So:
+  - **The data dictionary pins the types.** DataPusher+ honours
+    `info.type_override` when it re-creates, so `CkanResource.replace` writes
+    one per text/numeric/timestamp column before every load — into the new
+    table on a first load or rebuild, in place (merged into curator
+    labels/notes, live types kept) on an existing one. Without it text ids
+    came back numeric every time; with it they stayed text. It also throws
+    the dictionary away when it re-creates (seen locally), which is why the
+    overrides are rewritten whenever a load finds them missing.
+  - **`bool` can't be pinned**, so the replace loader converts booleans first
+    (`ckan.bool_format`: `text` -> True/False, the default, or `int` -> 1/0
+    for older datasets). Title case because most of production's text
+    booleans already use it. A dataset whose live table has a real `bool` column is
+    blocked once by the column guard (`bool->text`); clear it with one
+    `ckan.rebuild: true` run.
+  - **Anything else added to the table is lost on every load** —
+    ckanext-spatialdata's `dataspatial_wkb` included. `replace()` still
+    truncates (`filters: {}`) rather than drops on a normal load, but that no
+    longer protects the geometry column. No dataset sets `ckan.spatial` yet;
+    the first one must restore it after every load, not only after a rebuild.
+  - **We create the table, before the upload,** on a first load and on a
+    rebuild (drop, then create): the upload sets off a DataPusher+ job of its
+    own, which must find the new table, not none and not the old one.
+  - **Local oddity (DataPusher+ v3.0.0a0), now moot:** one long-lived local
+    resource stored `False`/`True` while its file said `false`/`true`; fresh
+    resources store exactly what is sent. Publishing `True`/`False` keeps the
+    file and the DataStore in agreement either way.
+  The column guard still blocks an added/removed/retyped column until
+  `ckan.rebuild: true` — not to protect the table any more, but so a schema
+  change reaches consumers on purpose rather than silently.
 - **A publish that wouldn't change CKAN writes nothing.** Each CKAN write
   first compares what it would send with what CKAN holds: `replace` and
   `publish_file` against the `etl_sha256` field they record on the resource

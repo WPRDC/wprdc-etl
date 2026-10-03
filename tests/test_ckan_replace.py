@@ -44,8 +44,13 @@ def _ckan(
     resource: dict[str, Any] | None = None,
     package: dict[str, Any] | None = None,
 ) -> CkanResource:
+    # `live` maps column -> type, or -> full {"type", "info"} field.
+    state = {
+        c: v if isinstance(v, dict) else {"type": v, "info": {}}
+        for c, v in live.items()
+    }
     monkeypatch.setattr(
-        CkanResource, "_datastore_state", lambda self, rid: (live, rows)
+        CkanResource, "_datastore_state", lambda self, rid: (state, rows)
     )
     monkeypatch.setattr(CkanResource, "resource", lambda self, rid: resource or {})
     monkeypatch.setattr(CkanResource, "package", lambda self, pid: package or {})
@@ -72,40 +77,84 @@ def _names(calls: list[tuple[str, dict[str, Any]]]) -> list[str]:
 
 
 # -- who creates the table ---------------------------------------------------
-def test_first_load_creates_the_table_from_the_frame_before_uploading(
+def test_first_load_creates_the_table_with_type_overrides_before_uploading(
     monkeypatch: pytest.MonkeyPatch, calls: list
 ) -> None:
     assert _ckan(monkeypatch, live={}).replace(RID, _frame()) is True
     assert _names(calls) == ["datastore_create", "resource_patch", "datapusher_submit"]
+    # type_override pins what DataPusher+ re-creates; bool has none.
     assert calls[0][1]["fields"] == [
-        {"id": "id", "type": "text"},
-        {"id": "ward", "type": "text"},
+        {"id": "id", "type": "text", "info": {"type_override": "text"}},
+        {"id": "ward", "type": "text", "info": {"type_override": "text"}},
         {"id": "inactive", "type": "bool"},
-        {"id": "latitude", "type": "numeric"},
+        {"id": "latitude", "type": "numeric", "info": {"type_override": "numeric"}},
     ]
     assert calls[1][1][FINGERPRINT_FIELD] == _sha(_frame())  # recorded with it
 
 
-def test_an_existing_table_is_truncated_not_recreated(
+def test_an_existing_table_gets_overrides_merged_into_curator_info(
     monkeypatch: pytest.MonkeyPatch, calls: list
 ) -> None:
-    _ckan(monkeypatch, live={"id": "text"}, rows=7).replace(RID, _frame())
-    assert _names(calls) == ["resource_patch", "datastore_delete", "datapusher_submit"]
-    assert calls[1][1]["filters"] == {}  # rows only — the table stays
-
-
-def test_a_rebuild_drops_then_recreates_with_the_frames_types(
-    monkeypatch: pytest.MonkeyPatch, calls: list
-) -> None:
-    _ckan(monkeypatch, live={"id": "numeric"}).replace(RID, _frame(), rebuild=True)
+    live = {
+        "id": {"type": "text", "info": {"label": "Feature ID"}},
+        "ward": "text",
+        "inactive": "bool",
+        "latitude": "float8",
+        "retired_col": {"type": "text", "info": {"notes": "kept as is"}},
+    }
+    _ckan(monkeypatch, live=live, rows=7).replace(RID, _frame())
     assert _names(calls) == [
+        "datastore_create",
         "resource_patch",
         "datastore_delete",
-        "datastore_create",
         "datapusher_submit",
     ]
-    assert "filters" not in calls[1][1]  # a real drop
-    assert {"id": "id", "type": "text"} in calls[2][1]["fields"]
+    sent = {f["id"]: f for f in calls[0][1]["fields"]}
+    # The curator's label survives; the override is added beside it.
+    assert sent["id"]["info"] == {"label": "Feature ID", "type_override": "text"}
+    # Each column keeps its LIVE type: the override shapes the next re-create.
+    assert sent["latitude"] == {
+        "id": "latitude",
+        "type": "float8",
+        "info": {"type_override": "numeric"},
+    }
+    # A column the frame doesn't have is sent untouched, not dropped.
+    assert sent["retired_col"]["info"] == {"notes": "kept as is"}
+    assert calls[2][1]["filters"] == {}  # rows only — the table stays
+
+
+def test_overrides_already_in_place_are_not_rewritten(
+    monkeypatch: pytest.MonkeyPatch, calls: list
+) -> None:
+    live = {
+        "id": {"type": "text", "info": {"type_override": "text"}},
+        "ward": {"type": "text", "info": {"type_override": "text"}},
+        "inactive": "bool",
+        "latitude": {"type": "numeric", "info": {"type_override": "numeric"}},
+    }
+    _ckan(monkeypatch, live=live, rows=7).replace(RID, _frame())
+    assert _names(calls) == ["resource_patch", "datastore_delete", "datapusher_submit"]
+
+
+def test_a_rebuild_recreates_with_overrides_and_keeps_curator_info(
+    monkeypatch: pytest.MonkeyPatch, calls: list
+) -> None:
+    live = {"id": {"type": "numeric", "info": {"label": "Feature ID"}}}
+    _ckan(monkeypatch, live=live).replace(RID, _frame(), rebuild=True)
+    # Drop and re-create BEFORE the upload: a DataPusher+ job the upload sets
+    # off must not find the old table still standing.
+    assert _names(calls) == [
+        "datastore_delete",
+        "datastore_create",
+        "resource_patch",
+        "datapusher_submit",
+    ]
+    assert "filters" not in calls[0][1]  # a real drop
+    assert {
+        "id": "id",
+        "type": "text",
+        "info": {"label": "Feature ID", "type_override": "text"},
+    } in calls[1][1]["fields"]
 
 
 # -- nothing to publish ------------------------------------------------------

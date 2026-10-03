@@ -43,8 +43,6 @@ attributes:
       This dataset shows the greenways in Allegheny County.
 
       This dataset is harvested on a weekly basis from [Allegheny County's GIS data portal](https://openac.alcogis.opendata.arcgis.com/).
-
-      **Department:** Geographic Information Systems Group; Department of Information Technology
     mirror:
       - format: geojson
         resource_id: "02932c3d-d48a-4ea9-a142-5c77d68a88c7"

@@ -41,8 +41,6 @@ attributes:
     # dataset's curated text on data.wprdc.org.
     description: |-
       This is an Allegheny County extract of the 2020 US Census Tracts downloaded from the following website: https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-geodatabase-file.html
-
-      **Department:**  Geographic Information Systems Group; Department of Information Technology
     mirror:
       - format: geojson
         resource_id: "83b2018d-70e5-4bad-b99d-89781f7425ed"

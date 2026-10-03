@@ -1005,6 +1005,7 @@ _HARVEST_BOILERPLATE = re.compile(
 )
 # Word nests bold spans, which converts to `**A:****  **B` — an empty bold
 # run, then a closing `**` after whitespace, which CommonMark won't close.
+_BLANK_BOLD = re.compile(r"(\*\*\s*\*\*\s*)+")
 _EMPTY_BOLD = re.compile(r"\*\*\*\*")
 _SPACE_BEFORE_CLOSE = re.compile(r"\*\*(\S[^*\n]*?)([ \t]+)\*\*")
 
@@ -1019,13 +1020,22 @@ def stub_description(entry: dict[str, Any] | None) -> str:
     from wprdc_etl.strategies.metadata import html_to_markdown
 
     text = html_to_markdown((entry or {}).get("description"))
-    paragraphs = [
-        p for p in text.split("\n\n") if not _HARVEST_BOILERPLATE.match(p.strip())
-    ]
     # Word's non-breaking spaces would keep `**A:\xa0**` from closing.
-    text = "\n\n".join(paragraphs).replace("\xa0", " ")
+    text = text.replace("\xa0", " ")
     text = _EMPTY_BOLD.sub("", text)
-    return _SPACE_BEFORE_CLOSE.sub(r"**\1**\2", text).strip()
+    text = _SPACE_BEFORE_CLOSE.sub(r"**\1**\2", text)
+    paragraphs = [
+        p
+        for p in text.split("\n\n")
+        # Whitespace collapsed before matching: older text wraps the
+        # boilerplate mid-sentence ("Western Pennsylvania\nRegional Data
+        # Center"), which an unbroken pattern misses.
+        if not _HARVEST_BOILERPLATE.match(" ".join(p.split()))
+        # A bold run around nothing but a <br> (`<b><br /></b>`) converts to
+        # `** **`, which CKAN shows as literal asterisks.
+        and not _BLANK_BOLD.fullmatch(p.strip())
+    ]
+    return "\n\n".join(paragraphs).strip()
 
 
 # --------------------------------------------------------------------------

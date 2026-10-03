@@ -43,14 +43,6 @@ attributes:
     description: |-
       Shows the location of all blazed and unblazed trails in all Allegheny County parks. This is
       the same data used in the Allegheny County Parks Trails Mobile App, available for Apple and Android devices.
-
-      **Category:**  Recreation
-
-      **Organization:**  Allegheny County
-
-      **Department:**  Parks Department
-
-      **Temporal Coverage:**  present
     mirror:
       - format: geojson
         resource_id: "5990b107-06b2-4ea7-95cc-0e7fb1b6a27b"

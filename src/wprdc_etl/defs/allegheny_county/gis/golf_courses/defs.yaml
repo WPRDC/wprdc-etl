@@ -43,8 +43,6 @@ attributes:
       This dataset shows the golf courses in Allegheny County.
 
       This dataset is harvested on a weekly basis from [Allegheny County's GIS data portal](https://openac.alcogis.opendata.arcgis.com/).
-
-      **Department:** Geographic Information Systems Group; Department of Information Technology
     mirror:
       - format: geojson
         resource_id: "a11d9adc-f17e-4fb5-b135-8807f4e1bc36"

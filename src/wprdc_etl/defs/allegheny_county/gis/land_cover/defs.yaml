@@ -37,75 +37,12 @@ attributes:
     # the package. Anything of ours goes in `description_suffix`, which is
     # appended and so survives an upstream edit.
     sync_metadata: true
-    # Replaces the publisher's description. Sourced from this
-    # dataset's curated text on data.wprdc.org.
+    # STUB from the publisher's catalogue description (harvest
+    # boilerplate removed). REVIEW before publishing: it replaces
+    # the package notes on every run.
     description: |-
-      <p><span style='font-size:10.0pt;
-      line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:
-      yes'>The Land Cover dataset demarcates 14 land cover types by area; such as
-      Residential, Commercial, Industrial, Forest, Agriculture, etc.</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif;
-      mso-no-proof:yes'></span></p>
-
-      <p><span style='font-size:10.0pt;line-height:107%;font-family:
-      &quot;Tahoma&quot;,sans-serif'>If viewing this description on the Western Pennsylvania
-      Regional Data Center’s open data portal (</span><a href='http://www.wprdc.org'><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>http://www.wprdc.org</span></a><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>), this
-      dataset is harvested on a weekly basis from Allegheny County’s GIS data portal
-      (</span><a href='http://openac.alcogis.opendata.arcgis.com/'><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>http://openac.alcogis.opendata.arcgis.com/</span></a><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>). The
-      full metadata record for this dataset can also be found on Allegheny County’s
-      GIS portal. You can access the metadata record and other resources on the GIS
-      portal by clicking on the “Explore” button (and choosing the “Go to resource”
-      option) to the right of the “ArcGIS Open Dataset” text below.</span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Category:</span></b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'> <span style='mso-spacerun:yes'> </span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>Geography</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Organization:</span></b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'> <span style='mso-spacerun:yes'> </span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>Allegheny County</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Department:</span></b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-spacerun:yes'>  </span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>Geographic Information Systems Group; Department of
-      Administrative Services</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Temporal
-      Coverage:<span style='mso-spacerun:yes'>  </span></span></b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>1994</span></span><b><span style='font-size:10.0pt;line-height:
-      107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></b></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Data
-      Notes:<span style='mso-spacerun:yes'>  </span></span></b></p>
-
-      <p><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>Coordinate System:<span style='mso-spacerun:yes'> 
-      </span>Pennsylvania State Plane South Zone 3702; U.S. Survey Foot</span></span></p>
-
-      <p><span style='font-size:10.0pt;line-height:107%;font-family:
-      &quot;Tahoma&quot;,sans-serif;mso-no-proof:yes'>Development Notes:<span style='mso-spacerun:yes'>  </span>The dataset was created by Chester
-      Environmental through combined image processing and GIS analysis of Landsat TM
-      imagery of October 2, 1992, existing aerial photography, hardcopy and digital
-      mapping sources and Census Bureau demographic data. The original dataset was
-      created in 1993, then updated by Chester in 1994.</span></p>
-
-      <p><span style='font-size:10.0pt;line-height:107%;font-family:
-      &quot;Tahoma&quot;,sans-serif;mso-no-proof:yes'>Other: none</span><b><span style='font-size:10.0pt;line-height:
-      107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></b></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Related
-      Document(s):</span></b><span style='font-size:10.0pt;line-height:107%;
-      font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-spacerun:yes'>  </span>Data
-      Dictionary (</span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>https://docs.google.com/spreadsheets/d/1VfUflfki42mpLSkr1R-up_OXGD3mHnv8tqeXf6XS9O0/edit?usp=sharing</span></span><span style='font-size:
-      10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>)</span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Frequency
-      - Data Change:</span></b><span style='font-size:10.0pt;line-height:107%;
-      font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-spacerun:yes'>  </span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>As needed</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Frequency
-      - Publishing:</span></b><span style='font-size:10.0pt;line-height:107%;
-      font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-spacerun:yes'>  </span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>As needed</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Data
-      Steward Name:</span></b><span style='font-size:10.0pt;line-height:107%;
-      font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-spacerun:yes'>  </span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>Eli Thomas</span></span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
-
-      <p><b><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'>Data
-      Steward Email:</span></b><span style='font-size:10.0pt;line-height:107%;
-      font-family:&quot;Tahoma&quot;,sans-serif'> </span><span style='font-size:10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'><span style='mso-no-proof:yes'>gishelp@alleghenycounty.us</span></span><span style='font-size:
-      10.0pt;line-height:107%;font-family:&quot;Tahoma&quot;,sans-serif'></span></p>
+      The Land Cover dataset demarcates 14 land cover types by area; such as
+      Residential, Commercial, Industrial, Forest, Agriculture, etc.
     mirror:
       - format: geojson
         resource_id: "238ad72f-a822-42b4-82d4-34b02f1d3a9c"

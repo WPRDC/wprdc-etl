@@ -49,6 +49,26 @@ RegionHits = dict[tuple[float, float], dict[str, tuple[str, str | None]]]
 FINGERPRINT_FIELD = "etl_sha256"
 
 
+# Our field types -> the data-dictionary type_override DataPusher+ honours.
+# No `bool`: production's DataPusher+ turns it into text regardless, so the
+# replace loader converts booleans first (ckan.bool_format).
+_OVERRIDE_TYPES = {"text": "text", "numeric": "numeric", "timestamp": "timestamp"}
+
+
+def _with_overrides(
+    fields: list[dict[str, str]], live: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """`fields` with a type_override in each one's info, merged into the
+    curator info `live` holds for that column (used across a rebuild's drop)."""
+    out = []
+    for f in fields:
+        info = dict((live.get(f["id"]) or {}).get("info") or {})
+        if f["type"] in _OVERRIDE_TYPES:
+            info["type_override"] = _OVERRIDE_TYPES[f["type"]]
+        out.append({**f, **({"info": info} if info else {})})
+    return out
+
+
 def force_publish() -> bool:
     """WPRDC_FORCE_PUBLISH=1 publishes even when CKAN already holds the same
     content — for a resource someone changed by hand behind the fingerprint."""
@@ -667,16 +687,17 @@ class CkanResource(dg.ConfigurableResource):
         auto-trigger on resource change — that hook has a long history of not
         firing when only the file changes (ckan/datapusher#151, ckan/ckan#5727).
 
-        WE CREATE THE TABLE, not DataPusher+. Left to itself on a resource with
-        no table, DataPusher+ creates one from qsv's type inference — ids,
-        wards and tracts become numeric — while the frame publishes them as
-        text. Every later run then meets a "type change" and the guard blocks
-        it, so a new resource could be published exactly once. DataPusher+
-        loads into an existing table without retyping it (verified on 2.12:
-        a table pre-created with text codes kept them through a push), so the
-        first load and a rebuild create the table from the frame's dtypes
-        first. On a first load that happens BEFORE the upload, so a push the
-        upload itself triggers can't get there ahead of us.
+        THE DATA DICTIONARY PINS THE TYPES. Production's DataPusher+ drops and
+        re-creates the table on every load, typing columns by qsv inference —
+        ids, wards and tracts become numeric while the frame publishes them as
+        text, so the next run meets a "type change" and the guard blocks it.
+        It honours `info.type_override` when it re-creates the table, so every
+        load first writes one per column into the data dictionary (merged into
+        any curator labels/notes): when creating the table on a first load or
+        after a rebuild, and in place on an existing table. Verified on
+        data.wprdc.org: without overrides, text ids came back numeric every
+        time; with them, they stayed text. `bool` has no override there — the
+        replace loader publishes booleans as text or 0/1 (`ckan.bool_format`).
         """
         import tempfile
 
@@ -700,8 +721,8 @@ class CkanResource(dg.ConfigurableResource):
         # chunks instead of holding the encoded CSV in memory (same reason
         # publish_file takes a path).
         fields = self._infer_fields(dataframe)
-        live_fields, live_rows = self._datastore_state(resource_id)
-        first_load = not live_fields
+        live, live_rows = self._datastore_state(resource_id)
+        first_load = not live
 
         fd, path = tempfile.mkstemp(suffix=".csv")
         os.close(fd)
@@ -717,7 +738,19 @@ class CkanResource(dg.ConfigurableResource):
                 return False
 
             if first_load:
-                self._create_table(resource_id, fields)
+                self._create_table(resource_id, _with_overrides(fields, {}))
+            elif rebuild:
+                # Drop and re-create BEFORE the upload, as a first load does:
+                # the upload sets off a DataPusher+ job of its own, and one that
+                # starts while the old table still stands loads into it — a
+                # water_features rebuild came out with its old bool column's
+                # True/False instead of the new file's text.
+                self._action(
+                    "datastore_delete", json={"resource_id": resource_id, "force": True}
+                )
+                self._create_table(resource_id, _with_overrides(fields, live))
+            else:
+                self._set_type_overrides(resource_id, fields, live)
 
             # 1. Attach the new file (patch preserves the resource's other
             #    metadata) and record what it was.
@@ -730,20 +763,16 @@ class CkanResource(dg.ConfigurableResource):
         finally:
             os.unlink(path)
 
-        # 2. Clear the existing rows. Skipped on a first load: the table was
-        #    created above and is already empty.
-        payload: dict[str, Any] = {"resource_id": resource_id, "force": True}
-        if not rebuild:
-            payload["filters"] = {}  # delete all rows, keep the table
-        if not first_load:
+        # 2. Clear the existing rows. Skipped when the table was just created
+        #    (a first load or a rebuild): it is already empty.
+        if not first_load and not rebuild:
             try:
-                self._action("datastore_delete", json=payload)
+                self._action(
+                    "datastore_delete",
+                    json={"resource_id": resource_id, "force": True, "filters": {}},
+                )
             except Exception:
                 pass
-        # A rebuild just dropped the table; recreate it with the frame's types
-        # rather than leave DataPusher+ to guess them.
-        if rebuild and not first_load:
-            self._create_table(resource_id, fields)
         # 3. Kick off the DataPusher+ job. This is async — it returns once the
         #    job is queued, not once the rows have landed in the DataStore.
         self._action("datapusher_submit", json={"resource_id": resource_id})
@@ -798,11 +827,14 @@ class CkanResource(dg.ConfigurableResource):
         """Return {field_id: ckan_type} for the resource's current DataStore
         table, or {} if it has no DataStore table yet (fresh resource). Drops
         CKAN's internal _id / _full_text fields."""
-        return self._datastore_state(resource_id)[0]
+        return {k: f["type"] for k, f in self._datastore_state(resource_id)[0].items()}
 
-    def _datastore_state(self, resource_id: str) -> tuple[dict[str, str], int]:
-        """({field_id: ckan_type}, row count) for the resource's DataStore
-        table, or ({}, 0) if it has none yet."""
+    def _datastore_state(
+        self, resource_id: str
+    ) -> tuple[dict[str, dict[str, Any]], int]:
+        """({field_id: {"type", "info"}}, row count) for the resource's
+        DataStore table, or ({}, 0) if it has none yet. `info` is the field's
+        data dictionary (labels, notes, type_override)."""
         try:
             result = self._action(
                 "datastore_search", json={"resource_id": resource_id, "limit": 0}
@@ -810,7 +842,7 @@ class CkanResource(dg.ConfigurableResource):
         except Exception:
             return {}, 0  # no datastore table / not datastore-active
         fields = {
-            f["id"]: f["type"]
+            f["id"]: {"type": f["type"], "info": f.get("info") or {}}
             for f in result.get("fields", [])
             if not f["id"].startswith("_")
         }
@@ -829,6 +861,44 @@ class CkanResource(dg.ConfigurableResource):
             return self.resource(resource_id).get(FINGERPRINT_FIELD) == sha
         except Exception:
             return False
+
+    def _set_type_overrides(
+        self,
+        resource_id: str,
+        fields: list[dict[str, str]],
+        live: dict[str, dict[str, Any]],
+    ) -> None:
+        """Write a type_override for each of `fields` into an existing table's
+        data dictionary, merged into whatever info a curator left there.
+
+        Every live column is sent with its LIVE type — the override changes
+        what DataPusher+ will create next, not the table now — and columns the
+        frame doesn't have keep their info untouched. Skipped when every
+        override is already in place.
+        """
+        wanted = {
+            f["id"]: _OVERRIDE_TYPES[f["type"]]
+            for f in fields
+            if f["type"] in _OVERRIDE_TYPES and f["id"] in live
+        }
+        if all(live[c]["info"].get("type_override") == t for c, t in wanted.items()):
+            return
+        payload = [
+            {
+                "id": c,
+                "type": f["type"],
+                "info": (
+                    {**f["info"], "type_override": wanted[c]}
+                    if c in wanted
+                    else f["info"]
+                ),
+            }
+            for c, f in live.items()
+        ]
+        self._action(
+            "datastore_create",
+            json={"resource_id": resource_id, "fields": payload, "force": True},
+        )
 
     def _create_table(self, resource_id: str, fields: list[dict[str, str]]) -> None:
         """Create the resource's DataStore table with exactly `fields`.

@@ -73,29 +73,6 @@ attributes:
       portal by clicking on the “Explore” button (and choosing the “Go to resource”
       option) to the right of the “ArcGIS Open Dataset” text below.
 
-      **Category:**  Human & Social Services
-
-      **Organization:**  Allegheny County
-
-      **Department:**  Department of Human Services
-
-      **Temporal Coverage:**  2022
-
-      **Data Notes:**  
-
-      Coordinate System:  GCS_North_American_1983
-
-      Development Notes:  see https://www.alleghenycountyanalytics.us/2024/05/31/allegheny-county-community-need-index/
-
-      **Related Document(s):**  2024 report: https://www.alleghenycountyanalytics.us/wp-content/uploads/2021/05/24-ACDHS-05-CNI-Report_v2.pdf
-
-      **Frequency - Data Change:**  as needed
-
-      **Frequency - Publishing:**  as needed
-
-      **Data Steward Name:**  Nicholas Cotter
-
-      **Data Steward Email:**  [DHS-Research@alleghenycounty.us](mailto:DHS-Research@alleghenycounty.us)
     # Appended to the description on every sync. Hand-added: the generator
     # doesn't emit suffixes, so an --overwrite-defs regeneration drops it.
     description_suffix: |-

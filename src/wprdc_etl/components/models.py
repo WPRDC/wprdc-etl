@@ -126,6 +126,11 @@ class CkanModel(Model, Resolvable):
     primary_key: list[str] | None = None  # merge/upsert key
     # drop and rebuild the table -- only necessary when changing schema
     rebuild: bool = False
+    # How boolean columns are published by a replace: "text" (True/False, the
+    # default) or "int" (1/0, what some older WPRDC datasets use).
+    # Production's DataPusher+ can't keep a bool column — it re-creates every
+    # table and has no bool type_override — so they are converted first.
+    bool_format: str = "text"
     # make the DataStore table spatial-ready via ckanext-spatialdata; reads the
     # dataset's `geometry:` block, which it therefore requires
     spatial: bool = False

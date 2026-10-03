@@ -41,8 +41,6 @@ attributes:
     # dataset's curated text on data.wprdc.org.
     description: |-
       This dataset shows the municipal parks in Allegheny County.
-
-      **Department:**  Geographic Information Systems Group; Department of Information Technology
     mirror:
       - format: geojson
         resource_id: "b3c0756e-321d-43b7-bc53-0a230ffe78c5"

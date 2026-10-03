@@ -37,6 +37,42 @@ if TYPE_CHECKING:
     from wprdc_etl.resources import CkanResource
 
 
+BOOL_FORMATS = ("text", "int")
+
+
+def publishable_booleans(dataframe: pd.DataFrame, bool_format: str) -> pd.DataFrame:
+    """Convert boolean columns to what a replace can publish and keep.
+
+    Production's DataPusher+ re-creates the table on every load and has no
+    bool type_override, so a bool column always comes back as text. Converting
+    first makes the frame say what the table will hold — so the column-change
+    guard compares like with like — and lets a dataset choose the form:
+    "text" -> "True"/"False", "int" -> 1/0. Missing values stay missing.
+    Title case on purpose: it is what most of WPRDC's text booleans already
+    use (Python's spelling), and what DataPusher+ was seen storing even when
+    sent "false"/"true" — so the file and the DataStore agree.
+    """
+    import pandas as pd
+
+    if bool_format not in BOOL_FORMATS:
+        raise dg.Failure(
+            f"ckan.bool_format must be one of {BOOL_FORMATS}, got {bool_format!r}",
+            allow_retries=False,
+        )
+    out = dataframe
+    for col in dataframe.columns:
+        if not pd.api.types.is_bool_dtype(dataframe[col].dtype):
+            continue
+        if out is dataframe:
+            out = dataframe.copy()
+        values = dataframe[col].astype("boolean")
+        if bool_format == "int":
+            out[col] = values.astype("Int64")
+        else:
+            out[col] = values.map({True: "True", False: "False"}).astype("string")
+    return out
+
+
 def _stem(cfg: PipelineConfig) -> str:
     return "__".join(x for x in [cfg.publisher, cfg.department, cfg.dataset] if x)
 
@@ -174,13 +210,13 @@ def _guard_replace(
         # allow_retries=False: the column change is still there a minute later.
         raise dg.Failure(
             allow_retries=False,
-            description="replace aborted: the output's shape differs from the live CKAN "
-            f"table — {'; '.join(problems)}. The reload truncates rather than "
-            "drops, so the table keeps its current columns and types and can't "
-            "take this. If the change is intended, set `ckan.rebuild: true` to "
-            "drop and recreate the table — but note that discards anything else "
-            "added to it, including ckanext-spatialdata's geometry column and "
-            "indexes, which then need regenerating.",
+            description="replace aborted: the output's columns differ from the live CKAN "
+            f"table — {'; '.join(problems)}. Consumers of the table would see "
+            "the change, so it isn't made silently. If it is intended, set "
+            "`ckan.rebuild: true` for one run: the table is dropped and "
+            "re-created with the new columns and types (and their data "
+            "dictionary overrides). That also discards anything else added to "
+            "the table, such as ckanext-spatialdata's geometry column.",
         )
 
 
@@ -227,6 +263,7 @@ class ReplaceLoader(Loader):
         ckan: CkanResource,
         context: dg.AssetExecutionContext | None = None,
     ) -> None:
+        dataframe = publishable_booleans(dataframe, cfg.ckan.bool_format)
         if dump_local(cfg, dataframe, context):
             return
         rebuild = bool(cfg.ckan.rebuild)
