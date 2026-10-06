@@ -1,10 +1,11 @@
-# TEMPLATE. Replace the domain and the basic-auth hash (or drop this in favour
-# of oauth2-proxy for SSO). Generate a hash with:  caddy hash-password
-dagster.example.org {
+# Everything host-specific comes from the proxy container's environment
+# (deploy/compose.prod.yaml): DAGSTER_DOMAIN from deploy.env, the credentials
+# from /opt/wprdc-etl/proxy.env. Generate the hash with `caddy hash-password`
+# and single-quote it in proxy.env — it is full of `$`.
+{$DAGSTER_DOMAIN} {
 	encode gzip
 	basic_auth {
-		# username  <bcrypt hash>
-		wprdc $2a$14$REPLACE_WITH_caddy_hash-password_OUTPUT
+		{$DAGSTER_UI_USER} {$DAGSTER_UI_PASSWORD_HASH}
 	}
 	reverse_proxy webserver:3000
 }

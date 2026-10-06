@@ -134,3 +134,16 @@ def test_schedules_start_running_only_in_production(
     (plain,), _ = schedule_or_sensor(cfg, "y", job, None)
     assert partitioned.default_status == want
     assert plain.default_status == want
+
+
+def test_paused_holds_production_schedules_stopped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first-boot brake: production, but nothing starts until switched on."""
+    from wprdc_etl.components._common import default_schedule_status
+
+    monkeypatch.setattr("wprdc_etl.runtime.is_production", lambda: True)
+    monkeypatch.setenv("WPRDC_SCHEDULES_PAUSED", "1")
+    assert default_schedule_status() == dg.DefaultScheduleStatus.STOPPED
+    monkeypatch.setenv("WPRDC_SCHEDULES_PAUSED", "")
+    assert default_schedule_status() == dg.DefaultScheduleStatus.RUNNING

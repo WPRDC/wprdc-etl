@@ -476,6 +476,22 @@ def _read_parquet(raw: Any) -> pd.DataFrame:
 # --------------------------------------------------------------------------
 # SFTP (paramiko) — thin, only what a landing pull needs
 # --------------------------------------------------------------------------
+def _reject_unknown_host_policy():
+    """paramiko's RejectPolicy, but raising a non-retryable dg.Failure: an
+    unknown host key is a config gap, and retrying it only delays the alert."""
+    import paramiko
+
+    class _Policy(paramiko.MissingHostKeyPolicy):
+        def missing_host_key(self, client, hostname, key):
+            raise dg.Failure(
+                f"SFTP host {hostname!r} ({key.get_name()}) is not in known_hosts "
+                f"— add its verified key to the file SFTP_KNOWN_HOSTS points at",
+                allow_retries=False,
+            )
+
+    return _Policy()
+
+
 class SFTPResource(dg.ConfigurableResource):
     """Minimal SFTP client for landing pulls.
 
@@ -483,8 +499,10 @@ class SFTPResource(dg.ConfigurableResource):
     `secret_ref`, so nothing sensitive lives in a config field here.
 
     Host-key verification: in production the server key MUST already be known
-    (RejectPolicy) — point `known_hosts` at a file baked into the image / a
-    mounted secret, or rely on the container user's ~/.ssh/known_hosts. Outside
+    — point `known_hosts` at the file the deploy step mounts
+    (`SFTP_KNOWN_HOSTS`, see deploy/compose.prod.yaml), or rely on the
+    container user's ~/.ssh/known_hosts. An unknown or changed key is a
+    permanent failure (no retry can fix it), so it alerts at once. Outside
     production the key is auto-added (AutoAddPolicy) so local dev against the
     compose `sftp` service works with no setup.
     """
@@ -499,6 +517,11 @@ class SFTPResource(dg.ConfigurableResource):
 
         ssh = paramiko.SSHClient()
         if self.known_hosts:
+            if not os.path.isfile(self.known_hosts):
+                raise dg.Failure(
+                    f"SFTP known_hosts file {self.known_hosts!r} does not exist",
+                    allow_retries=False,
+                )
             ssh.load_host_keys(self.known_hosts)  # explicit file (dev or prod)
         elif is_production():
             ssh.load_system_host_keys()  # container user's ~/.ssh/known_hosts
@@ -507,9 +530,19 @@ class SFTPResource(dg.ConfigurableResource):
 
         # Fail closed in production; auto-learn an unknown key in dev.
         ssh.set_missing_host_key_policy(
-            paramiko.RejectPolicy() if is_production() else paramiko.AutoAddPolicy()
+            _reject_unknown_host_policy()
+            if is_production()
+            else paramiko.AutoAddPolicy()
         )
-        ssh.connect(hostname=host, port=port, username=username, password=password)
+        try:
+            ssh.connect(hostname=host, port=port, username=username, password=password)
+        except paramiko.BadHostKeyException as e:
+            raise dg.Failure(
+                f"SFTP host {host!r} presented a key that does not match "
+                f"known_hosts — verify it with the publisher before updating "
+                f"the file ({e})",
+                allow_retries=False,
+            ) from e
         return ssh
 
     def list_matching(

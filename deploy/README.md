@@ -4,8 +4,9 @@ Production runs on a **single VM** with `docker compose`: three Dagster
 processes from one image, plus a Caddy reverse proxy. State lives in **managed
 Postgres** and **AWS S3**; secrets come from **Secrets Manager / SSM**.
 
-The step-by-step rollout (infra provisioning, sequencing, cutover) lives in the
-deploy plan; this README is the architecture reference.
+The step-by-step rollout (infra provisioning, sequencing, cutover) and
+day-two operations live in [`ROLLOUT.md`](ROLLOUT.md); this README is the
+architecture reference.
 
 ## Architecture
 
@@ -112,8 +113,9 @@ operator → Caddy (auth) → webserver → GraphQL → queued run in Postgres.
 | `entrypoint.sh` | Runs `dagster instance migrate`, then execs the service command |
 | `prod/dagster.yaml` | Production Dagster instance config — coordinator, S3 compute logs, run monitoring, retention. Copied to `$DAGSTER_HOME`; **not** the repo-root dev `dagster.yaml` |
 | `prod/workspace.yaml` | Points webserver + daemon at the gRPC code server |
-| `compose.prod.yaml` | The stack. **Template** — set `WPRDC_ETL_IMAGE`, the domain, the secrets path |
-| `Caddyfile` | Proxy TLS + basic-auth. **Template** — set the domain and password hash, or swap for oauth2-proxy |
+| `compose.prod.yaml` | The stack. Host-specific values come from `/opt/wprdc-etl/{deploy,prod,proxy}.env` + `known_hosts` |
+| `Caddyfile` | Proxy TLS + basic-auth; domain and credentials from the proxy's environment |
+| `ROLLOUT.md` | First-deploy checklist and day-two operations |
 | `s3-lifecycle.json` | Landing-bucket lifecycle (IA at 90d, Glacier at 365d) — `aws s3api put-bucket-lifecycle-configuration` |
 
 ## First boot
@@ -134,16 +136,17 @@ CREATE EXTENSION postgis;
 
 Set `SPATIAL_DSN` to it. The tables are created on first write by
 `SpatialResource.ensure_schema()`, and populated by materializing the
-`*/boundaries/*` jobs once — nothing to seed by hand. Until those run,
+datasets with a `region_layer:` block once — nothing to seed by hand. Until those run,
 `reverse_geocode` fails loud naming the layers it can't find, so bring the
 boundary layers up before any dataset that depends on them.
 
 ```bash
-export WPRDC_ETL_IMAGE=ghcr.io/<org>/wprdc-etl@sha256:...
-docker compose -f deploy/compose.prod.yaml pull
-docker compose -f deploy/compose.prod.yaml up -d
+docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml pull
+docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml up -d
 ```
 
-The entrypoint runs `dagster instance migrate` on every start (idempotent) —
-re-run a deploy after any `dagster` version bump. Verify with a **dry run**
-(`ENVIRONMENT` unset in `prod.env`) before flipping `ENVIRONMENT=production`.
+`deploy.env` carries the image digest, the domain, `ENVIRONMENT` and
+`WPRDC_SCHEDULES_PAUSED`; ROLLOUT.md §2 lists every file the VM needs. The
+entrypoint runs `dagster instance migrate` on every start (idempotent) —
+re-run a deploy after any `dagster` version bump. Boot as a **dry run**
+(`ENVIRONMENT=` empty) before flipping `ENVIRONMENT=production`.

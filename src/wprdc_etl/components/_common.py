@@ -6,6 +6,7 @@ dataset / partition / schedule fields works.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator  # runtime import — see arrival_sensor
 from typing import TYPE_CHECKING
 
@@ -136,12 +137,23 @@ def default_schedule_status() -> dg.DefaultScheduleStatus:
     nothing until someone switched ~110 schedules on by hand. In dev they stay
     stopped: `dg dev` with a daemon must not start pulling sources and
     publishing on its own. Same gate as the Slack failure sensor.
+
+    `WPRDC_SCHEDULES_PAUSED=1` holds them STOPPED in production too — the
+    brake for a first production boot (deploy/ROLLOUT.md), so schedules are
+    switched on in batches rather than all at once. A schedule started or
+    stopped in the UI keeps that state whatever this returns; the default only
+    applies to a schedule nobody has touched.
     """
     from wprdc_etl.runtime import is_production
 
+    paused = os.getenv("WPRDC_SCHEDULES_PAUSED", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     return (
         dg.DefaultScheduleStatus.RUNNING
-        if is_production()
+        if is_production() and not paused
         else dg.DefaultScheduleStatus.STOPPED
     )
 

@@ -1,12 +1,16 @@
-# Production stack for a single VM. TEMPLATE — fill in the image ref, the
-# domain, and the secrets path before use.
+# Production stack for a single VM. Nothing host-specific is committed; the
+# deploy step writes three files under /opt/wprdc-etl/ (see deploy/ROLLOUT.md):
 #
-#   docker compose -f deploy/compose.prod.yaml up -d
+#   deploy.env   compose interpolation: WPRDC_ETL_IMAGE, DAGSTER_DOMAIN,
+#                ENVIRONMENT (empty = dry run, `production` = publish),
+#                WPRDC_SCHEDULES_PAUSED (1 = schedules default to stopped)
+#   prod.env     app secrets, 0600: DAGSTER_PG_URL, SPATIAL_DSN, CKAN_API_TOKEN,
+#                per-source SFTP creds, DAGSTER_SLACK_BOT_TOKEN
+#   proxy.env    Caddy basic-auth, 0600: DAGSTER_UI_USER, DAGSTER_UI_PASSWORD_HASH
+#   known_hosts  verified SFTP host keys (OpenSSH format)
 #
-# Secrets (DAGSTER_PG_URL, CKAN_API_TOKEN, per-source SFTP creds,
-# DAGSTER_SLACK_BOT_TOKEN, ...) come from AWS Secrets Manager / SSM, written by
-# the deploy step to a root-owned 0600 file at the path below. Non-secret env is
-# inline here.
+#   docker compose --env-file /opt/wprdc-etl/deploy.env \
+#     -f deploy/compose.prod.yaml up -d
 #
 # The VM needs an IAM instance profile granting: s3 R/W on the landing +
 # runtime buckets, and secretsmanager:GetSecretValue on the secret(s).
@@ -17,17 +21,22 @@ x-app: &app
   env_file:
     - /opt/wprdc-etl/prod.env          # secrets, deploy-time from Secrets Manager
   environment:
-    ENVIRONMENT: ${ENVIRONMENT}
+    # `?` not `:?`: empty is a valid value (dry run); only unset is an error,
+    # so a deploy that forgot deploy.env can't silently pick a mode.
+    ENVIRONMENT: ${ENVIRONMENT?set ENVIRONMENT in deploy.env (empty = dry run)}
     AWS_REGION: us-east-1
     LANDING_BUCKET: wprdc-etl-landing
     DAGSTER_RUNTIME_BUCKET: wprdc-dagster-runtime
     DAGSTER_MAX_CONCURRENT_RUNS: "4"
     CKAN_URL: https://data.wprdc.org
-    DAGSTER_WEBSERVER_URL: https://dagster.example.org
+    DAGSTER_WEBSERVER_URL: https://${DAGSTER_DOMAIN:?set DAGSTER_DOMAIN in deploy.env}
     WPRDC_ALERT_SLACK_CHANNEL: "#wprdc-etl-alerts"
     DAGSTER_HOME: /opt/dagster/home
+    SFTP_KNOWN_HOSTS: /opt/dagster/known_hosts
+    WPRDC_SCHEDULES_PAUSED: ${WPRDC_SCHEDULES_PAUSED:-}
   volumes:
     - dagster-local:/opt/dagster/home/local   # compute-log staging + artifacts
+    - /opt/wprdc-etl/known_hosts:/opt/dagster/known_hosts:ro
 
 services:
   # Long-lived gRPC code server. DefaultRunLauncher launches each run as a
@@ -89,6 +98,10 @@ services:
     image: caddy:2
     restart: unless-stopped
     depends_on: [webserver]
+    env_file:
+      - /opt/wprdc-etl/proxy.env   # DAGSTER_UI_USER, DAGSTER_UI_PASSWORD_HASH
+    environment:
+      DAGSTER_DOMAIN: ${DAGSTER_DOMAIN:?set DAGSTER_DOMAIN in deploy.env}
     ports:
       - "443:443"
       - "80:80"

@@ -75,3 +75,47 @@ def test_the_replace_column_guard_is_permanent() -> None:
     with pytest.raises(dg.Failure, match="replace aborted") as exc:
         _guard_replace(report, rebuild=False, context=None)
     assert exc.value.allow_retries is False
+
+
+def test_missing_known_hosts_file_is_permanent(tmp_path) -> None:
+    """A known_hosts path the deploy step forgot to mount can't be retried away."""
+    from wprdc_etl.resources import SFTPResource
+
+    sftp = SFTPResource(known_hosts=str(tmp_path / "absent"))
+    with pytest.raises(dg.Failure) as exc:
+        sftp._connect("sftp.example.org", "u", "p", 22)
+    assert exc.value.allow_retries is False
+
+
+def test_unknown_host_key_is_permanent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Production rejects an unknown key without burning the retry backoff."""
+    import paramiko
+
+    from wprdc_etl.resources import _reject_unknown_host_policy
+
+    key = paramiko.RSAKey.generate(1024)
+    with pytest.raises(dg.Failure) as exc:
+        _reject_unknown_host_policy().missing_host_key(None, "sftp.example.org", key)
+    assert exc.value.allow_retries is False
+    assert "SFTP_KNOWN_HOSTS" in str(exc.value)
+
+
+def test_changed_host_key_is_permanent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    import paramiko
+
+    from wprdc_etl.resources import SFTPResource
+
+    known = tmp_path / "known_hosts"
+    known.write_text("")
+    key = paramiko.RSAKey.generate(1024)
+
+    def bad_key(self, **_):
+        raise paramiko.BadHostKeyException("sftp.example.org", key, key)
+
+    monkeypatch.setattr("wprdc_etl.resources.is_production", lambda: True)
+    monkeypatch.setattr(paramiko.SSHClient, "connect", bad_key)
+    with pytest.raises(dg.Failure) as exc:
+        SFTPResource(known_hosts=str(known))._connect("sftp.example.org", "u", "p", 22)
+    assert exc.value.allow_retries is False

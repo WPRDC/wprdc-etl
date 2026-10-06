@@ -81,13 +81,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      # Image names must be lower case; the repository is `WPRDC/wprdc-etl`.
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }},ghcr.io/${{ github.repository }}:latest
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }},${{ steps.name.outputs.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      # Deploy to the VM is a separate step — e.g. SSH + `docker compose -f
-      # deploy/compose.prod.yaml pull && up -d` with WPRDC_ETL_IMAGE set to the
-      # digest just pushed.
+      # Deploy by DIGEST, not tag (deploy/ROLLOUT.md): this is the value for
+      # WPRDC_ETL_IMAGE in /opt/wprdc-etl/deploy.env.
+      - run: |
+          echo "WPRDC_ETL_IMAGE=${{ steps.name.outputs.image }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"

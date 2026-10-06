@@ -65,15 +65,17 @@ AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
 - **Shared config models**: `src/wprdc_etl/components/models.py`.
 - **Dataset instances** (the jobs): `src/wprdc_etl/defs/<publisher>/[department/]<dataset>/defs.yaml`
   plus optional co-located `schema.py`, `transform.py`, `fetch.py`.
-- **Boundary layers** (feed the admin-region store): `defs/*/boundaries/<layer>/` —
-  ordinary pipelines with a `region_layer:` block.
+- **Boundary layers** (feed the admin-region store): ordinary `gis/` pipelines
+  with a `region_layer:` block (15 of them; `grep -rl region_layer: defs/`).
+  There is no `boundaries/` folder any more.
 - **Resources** (S3/SFTP/CKAN/PostGIS clients): `src/wprdc_etl/resources.py`.
 - **Env gate + safety guards**: `src/wprdc_etl/runtime.py`.
 - **Top-level Definitions** (resources, IO manager, alert sensor wired once):
   `src/wprdc_etl/definitions.py`.
 - **Tests**: top-level `tests/` — NEVER under `defs/` (see gotchas).
 - **Production deploy** (Dockerfile at repo root; prod instance config, compose
-  stack, entrypoint): `deploy/` — start at `deploy/README.md`.
+  stack, entrypoint): `deploy/` — architecture in `deploy/README.md`, the
+  step-by-step rollout and day-two ops in `deploy/ROLLOUT.md`.
 
 Design pattern: shared vocabulary + per-dataset composition. Add reusable ops to the
 strategy libraries; use a co-located `transform.py`/`schema.py`/`fetch.py` only for
@@ -280,6 +282,9 @@ genuinely dataset-specific logic.
   were switched on by hand. `default_schedule_status()` keys off
   `is_production()`, like the Slack sensor; dev stays stopped so `dg dev` with
   a daemon never starts pulling and publishing on its own.
+  `WPRDC_SCHEDULES_PAUSED=1` holds them stopped in production too — the
+  first-boot brake (deploy/ROLLOUT.md §4-5). It only sets the DEFAULT: a
+  schedule switched on or off in the UI keeps that state in Postgres.
 - **Schedules are slots, not hand-picked crons — outside business hours.**
   Weekly datasets run on Sunday 03:00-08:59 ET (a Sunday run lands the week
   that just ended), monthly ones on the 1st 03:00-07:59 (the 1st can be a
@@ -327,7 +332,9 @@ The system fails safe: **dry-run is the default; real writes require
   production; don't set `WPRDC_ALLOW_REMOTE_SPATIAL` to get around it. Reads are
   deliberately unguarded so `reverse_geocode` works in dry-run.
 - **SFTP host keys** are auto-added in dev, rejected-if-unknown in production
-  (`SFTPResource._connect`). Don't make dev use `RejectPolicy`.
+  (`SFTPResource._connect`). Don't make dev use `RejectPolicy`. Production
+  reads them from `SFTP_KNOWN_HOSTS` (the file the deploy mounts); an unknown
+  or changed key is `allow_retries=False`, so it alerts at once.
 - **Never commit secrets or `.env`.** Credentials are referenced by env-var name
   (`secret_ref`), never inlined in `defs.yaml`.
 - Don't weaken the guards in `runtime.py`, the schema superset check, or the CKAN
@@ -582,7 +589,7 @@ the prod coordinator serialises heavy decodes.
   `source.path`); optional HTTP Basic auth via `secret_ref` ("user:password").
 - `GeocoderResource` (address -> lat/lon) is still a stub. The REVERSE direction is
   implemented: `reverse_geocode` resolves coordinates to admin regions against the
-  PostGIS store (`SpatialResource`), with layers loaded by the `*/boundaries/*`
+  PostGIS store (`SpatialResource`), with layers loaded by the `region_layer`
   pipelines. Data that references geometry by identifier uses `join_geometry`
   against a `key_layer` instead (landmarks -> address points); parcels by PIN
   would be the same pattern, not address geocoding.
@@ -592,15 +599,13 @@ the prod coordinator serialises heavy decodes.
   `dataspatial_wkb`. `::` casts are blocked too and CKAN denies `CAST`. Boundary
   layers are read from their GeoJSON *file* resources instead (the DataStore's
   non-spatial `geometry` column is unprojected WKT with no SRID).
-- **Landmarks <- address points is DEV-ONLY — not in production yet.** The
-  `key_layer` on `gis/address_points`, the `join_geometry` step and the new
-  `addressing_landmarks` package (`5a07d365…`, CSV resource `3b2cf234…`) are
-  verified against the LOCAL CKAN and PostGIS only. In production the package
-  and resource don't exist (`bin/seed-ckan` refuses a non-local portal, so
-  nothing creates new packages there yet), `keyed_geometry` is empty until
-  `address_points` runs, and the old faulty `cd24b8f3` is still live until the
-  user deletes it. Leave this note until the user says the production rollout
-  has started.
+- **Landmarks <- address points: CKAN is ready, the ETL isn't live yet.**
+  As of 2026-10-06 production CKAN is at parity with dev, so the new
+  `addressing_landmarks` package (`5a07d365…`, CSV resource `3b2cf234…`)
+  exists there. What remains (deploy/ROLLOUT.md §6): production
+  `keyed_geometry` is empty until `gis/address_points` runs, so it must run
+  before `addressing_landmarks`; and the old faulty `cd24b8f3` is still live
+  until the user deletes it. Remove this note once both are done.
 - **Street Aliases is on hold** — excluded in `CATALOGUE_EXCLUSIONS`, not
   wired. When it's picked back up: the local CKAN still holds a stale
   `cd24b8f3` shell NAMED `allegheny-county-addressing-street-aliases` (from the
@@ -613,6 +618,7 @@ the prod coordinator serialises heavy decodes.
   `publish: replace`, which accumulates and ships a file.
 - The assessments example's column names / date formats are drawn from the WPRDC data
   dictionary and unverified against a real extract — confirm before trusting.
-- Deploy: code + `deploy/` templates are done; the infra isn't — managed Postgres,
-  the two S3 buckets + IAM role, Secrets Manager wiring, and the reverse-proxy auth
-  still need provisioning. See `deploy/README.md`.
+- Deploy: code, image build (CI -> `ghcr.io/wprdc/wprdc-etl`) and `deploy/`
+  are done; the infra isn't — managed Postgres, the two S3 buckets + IAM role,
+  Secrets Manager wiring, the VM and DNS still need provisioning. Track it in
+  `deploy/ROLLOUT.md`, which is the checklist.

@@ -128,7 +128,9 @@ defs = dg.Definitions.merge(
         resources={
             "io_manager": _io_manager(),
             "landing": LandingZoneResource(**landing_kwargs),
-            "sftp": SFTPResource(),
+            # Production mounts the verified host keys and sets this; dev
+            # leaves it unset and auto-learns the compose sftp container's key.
+            "sftp": SFTPResource(known_hosts=os.getenv("SFTP_KNOWN_HOSTS") or None),
             "ckan": CkanResource(
                 base_url=os.getenv("CKAN_URL", "https://data.wprdc.org"),
                 api_key=dg.EnvVar("CKAN_API_TOKEN"),
