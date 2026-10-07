@@ -277,8 +277,9 @@ Behaviour worth knowing:
 - **Missing coordinate columns degrade.** The requested columns are added as
   all-null (dtype `string`) with a warning; the database is never touched.
 - Output columns are always pandas `string` dtype.
-- The matching `*/boundaries/*` pipeline must have been materialised at least
-  once, or the lookup fails loud naming the layers that *are* loaded.
+- The dataset carrying the matching `region_layer:` must have been
+  materialised at least once, or the lookup fails loud naming the layers that
+  *are* loaded.
 
 Layer loading, dissolving and the `ST_MakeValid` normalisation live in
 `SpatialResource.replace_layer` — see [pipelines.md](pipelines.md#tabularpipeline)

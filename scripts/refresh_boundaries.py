@@ -6,8 +6,8 @@
     uv run python scripts/refresh_boundaries.py -l neighborhood fire_zone
 
 Why you need this: `reverse_geocode` resolves coordinates against layers held in
-PostGIS, and those layers only get there when their `*/boundaries/*` pipeline
-runs. A dataset that reverse-geocodes (city_of_pittsburgh/water_features, say)
+PostGIS, and those layers only get there when the dataset carrying their
+`region_layer:` block runs. A dataset that reverse-geocodes (city_of_pittsburgh/water_features, say)
 fails on a fresh database until the layers it names have been materialized at
 least once. Rather than hunting down which pipelines those are, run this.
 

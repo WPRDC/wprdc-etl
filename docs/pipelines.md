@@ -324,8 +324,9 @@ Builds: `city_of_pittsburgh/water_features/{landed,validated,loaded,published/ge
 the `schema_ok` check, job `city_of_pittsburgh__water_features__job`, and schedule
 `city_of_pittsburgh__water_features__schedule`.
 
-A boundary layer is the same component with `region_layer:` and (here) no
-`ckan:` at all — see `defs/city_of_pittsburgh/boundaries/neighborhood/defs.yaml`:
+A boundary layer is the same component with a `region_layer:` block — see
+`defs/city_of_pittsburgh/gis/neighborhoods/defs.yaml`, which also mirrors the
+city's distributions to CKAN:
 
 ```yaml
   region_layer:
@@ -334,8 +335,10 @@ A boundary layer is the same component with `region_layer:` and (here) no
     label_field: hood            # the human label
 ```
 
-That instance builds `landed`, `validated`, `region_layer` and `schema_ok` —
-no `loaded`, because there is no CKAN target.
+That adds a `region_layer` asset beside the others. A layer we consume but
+don't republish may omit `ckan:` entirely; it then builds `landed`,
+`validated`, `region_layer` and `schema_ok` — no `loaded`, because there is no
+CKAN target.
 
 ## FilePipeline
 

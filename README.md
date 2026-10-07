@@ -222,9 +222,11 @@ republishing it; every pipeline needs at least one of `ckan` / `region_layer`.
 Features are dissolved by `value_field` on the way in (boundary files routinely
 split one region across several polygons) and run through `ST_MakeValid`.
 
-Shipped layers live in `defs/city_of_pittsburgh/boundaries/` and
-`defs/allegheny_county/boundaries/`. Note `municipality` is county-scoped — it
-adds nothing to a City of Pittsburgh dataset, which is a single municipality.
+Shipped layers are ordinary GIS datasets under `defs/allegheny_county/gis/` and
+`defs/city_of_pittsburgh/gis/` that also carry a `region_layer:` block —
+`grep -rl region_layer: src/wprdc_etl/defs` lists them. Note `municipality` is
+county-scoped — it adds nothing to a City of Pittsburgh dataset, which is a
+single municipality.
 
 Data that references geometry **by identifier** rather than carrying it — the
 county's Addressing Landmarks hold an `ADDRESS_ID` and nothing else spatial —
