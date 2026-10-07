@@ -1228,7 +1228,7 @@ ALTER TABLE keyed_geometry_layer ADD COLUMN IF NOT EXISTS content_sha256 text;
 class SpatialResource(dg.ConfigurableResource):
     """PostGIS store of administrative boundary layers.
 
-    Lives on the ETL server's Postgres, in its own `spatial` database next to
+    Lives on the ETL server's Postgres, in its own `etl_spatial` database next to
     Dagster's run storage (see compose.yaml). psycopg is imported lazily so a
     checkout without it still loads.
     """

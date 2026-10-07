@@ -19,8 +19,8 @@ Each phase ends in a state that is safe to leave overnight.
 - [ ] **Postgres** (managed, 17 to match dev), two databases:
       ```sql
       CREATE DATABASE dagster;
-      CREATE DATABASE spatial;
-      \connect spatial
+      CREATE DATABASE etl_spatial;
+      \connect etl_spatial
       CREATE EXTENSION postgis;
       ```
       Turn on automated backups. Dagster's run/event tables grow without
@@ -61,7 +61,7 @@ next to them — compose mounts `deploy/Caddyfile` by relative path.
 - [ ] `prod.env` (0600) — from Secrets Manager:
       ```sh
       DAGSTER_PG_URL=postgresql://dagster:...@host:5432/dagster
-      SPATIAL_DSN=postgresql://dagster:...@host:5432/spatial
+      SPATIAL_DSN=postgresql://dagster:...@host:5432/etl_spatial
       CKAN_API_TOKEN=...            # data.wprdc.org token with write access
       ALLEGHENY_SFTP=user:password
       ALLEGHENY_SFTP_HOST=...

@@ -16,13 +16,13 @@ This starts:
 |-------------|----------------------------|---------------------------|
 | localstack  | S3 landing zone            | http://localhost:4566     |
 | postgres    | Dagster run/event storage  | localhost:5432            |
-| postgis     | the admin-region store     | localhost:`$POSTGIS_PORT` (default 5434, db `spatial`) |
+| postgis     | the admin-region store     | localhost:`$POSTGIS_PORT` (default 5434, db `etl_spatial`) |
 | sftp        | an SFTP source             | localhost:2222 (wprdc/wprdc) |
 
 `postgis` is a second server, not a second database on the first — the official
 `postgres:17` image is Debian trixie while `postgis/postgis:17-3.5` is bullseye,
 and pointing the latter at the existing `dagster` volume trips a collation
-version mismatch. In production `spatial` is just another database on the
+version mismatch. In production `etl_spatial` is just another database on the
 managed instance with the extension enabled; the split is dev-only.
 
 To use reverse geocoding locally, point the app at it and materialize the

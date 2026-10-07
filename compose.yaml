@@ -26,7 +26,7 @@
 # a data directory holding real run history. A second volume initialized by the
 # PostGIS image sidesteps that entirely.
 #
-# PRODUCTION IS DIFFERENT: there, `spatial` is just another database on the
+# PRODUCTION IS DIFFERENT: there, `etl_spatial` is just another database on the
 # managed Postgres instance with the postgis extension enabled — one server, no
 # image involved. See deploy/README.md.
 
@@ -71,7 +71,7 @@ services:
     environment:
       POSTGRES_USER: dagster
       POSTGRES_PASSWORD: dagster
-      POSTGRES_DB: spatial
+      POSTGRES_DB: etl_spatial
     ports:
       # Host port is configurable (see the note at the top); container side is
       # always 5432. SPATIAL_DSN must use the same host port.
@@ -100,9 +100,9 @@ volumes:
 # First-run setup (once, after `docker compose up -d`):
 #   aws --endpoint-url http://localhost:4566 s3 mb s3://wprdc-etl-landing
 #
-# The `spatial` database and its postgis extension are created by the postgis
+# The `etl_spatial` database and its postgis extension are created by the postgis
 # image on first start — nothing to run by hand. Verify with:
-#   docker compose exec postgis psql -U dagster -d spatial -c "SELECT PostGIS_Version();"
+#   docker compose exec postgis psql -U dagster -d etl_spatial -c "SELECT PostGIS_Version();"
 #
 # .env for LOCAL DEV:
 #   S3_ENDPOINT_URL=http://localhost:4566

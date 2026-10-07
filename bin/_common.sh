@@ -57,7 +57,7 @@ env_defaults() {
   : "${AWS_DEFAULT_REGION:=$AWS_REGION}"
   : "${LANDING_BUCKET:=wprdc-etl-landing}"
   : "${POSTGIS_PORT:=5434}"
-  : "${SPATIAL_DSN:=postgresql://dagster:dagster@localhost:${POSTGIS_PORT}/spatial}"
+  : "${SPATIAL_DSN:=postgresql://dagster:dagster@localhost:${POSTGIS_PORT}/etl_spatial}"
   : "${DAGSTER_PG_URL:=postgresql://dagster:dagster@localhost:5432/dagster}"
   : "${CKAN_URL:=http://localhost:5001}"
   export S3_ENDPOINT_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION \

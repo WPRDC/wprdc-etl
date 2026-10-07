@@ -68,7 +68,7 @@ Everything left of the `aws` box is one `docker compose` stack. `code-location`,
 | **daemon** | `dagster-daemon run` | The clock and dispatcher: evaluates schedules/sensors, drains the run queue (`QueuedRunCoordinator` + `tag_concurrency_limits`), monitors for dead runs, fires the Slack run-failure sensor. Stateless — all working state is in Postgres. **Without it, nothing fires.** |
 | **webserver** | `dagster-webserver -w workspace.yaml` | UI + GraphQL. Read-mostly (run history, logs, asset status from Postgres); can launch runs on demand. Auth-less itself — never exposed directly. |
 | **proxy** | `caddy:2` | TLS termination + authentication. The only publicly reachable container; reverse-proxies to `webserver:3000`. |
-| **Postgres** *(managed)* | — | Two databases on one instance. `dagster`: run storage, event logs, schedule/sensor ticks, the run queue — the coordination backbone for all three Dagster services (`DAGSTER_PG_URL`). `spatial`: the PostGIS admin-region store backing `reverse_geocode` (`SPATIAL_DSN`), needs `CREATE EXTENSION postgis`. |
+| **Postgres** *(managed)* | — | Two databases on one instance. `dagster`: run storage, event logs, schedule/sensor ticks, the run queue — the coordination backbone for all three Dagster services (`DAGSTER_PG_URL`). `etl_spatial`: the PostGIS admin-region store backing `reverse_geocode` (`SPATIAL_DSN`), needs `CREATE EXTENSION postgis`. |
 | **S3** *(AWS)* | — | `landing` bucket: immutable raw source + watermarks. `runtime` bucket: the `validated → loaded` IO-manager pickles and step compute logs. |
 
 `webserver` and `daemon` reach `code-location` via `prod/workspace.yaml`
@@ -129,8 +129,8 @@ Plus the spatial store, on the same managed instance — one extra database and
 one extension (RDS and Cloud SQL both ship PostGIS):
 
 ```sql
-CREATE DATABASE spatial;
-\connect spatial
+CREATE DATABASE etl_spatial;
+\connect etl_spatial
 CREATE EXTENSION postgis;
 ```
 

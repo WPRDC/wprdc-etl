@@ -133,12 +133,12 @@ genuinely dataset-specific logic.
   param names via `inspect.signature`, so a typo'd key fails at `dg check`.
 - **Two Postgres servers in dev, one in prod.** `compose.yaml` runs `postgres`
   (5432, Dagster storage) and `postgis` (`$POSTGIS_PORT`, default 5434, db
-  `spatial`, the admin-region store — the host port is an env var because 5433
+  `etl_spatial`, the admin-region store — the host port is an env var because 5433
   collides with other local Postgres containers; it drives both the compose port
   mapping and `SPATIAL_DSN`, which expands `${POSTGIS_PORT}` from `.env`).
   They're separate only because `postgres:17` is Debian trixie and
   `postgis/postgis:17-3.5` is bullseye — pointing the PostGIS image at the
-  `dagster` volume trips a collation version mismatch. In prod `spatial` is just
+  `dagster` volume trips a collation version mismatch. In prod `etl_spatial` is just
   another database on the managed instance. Don't "simplify" dev back to one
   service without checking glibc.
 - **`postgis/postgis` is amd64-only** — the compose service pins
