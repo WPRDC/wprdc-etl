@@ -29,9 +29,12 @@ Each phase ends in a state that is safe to leave overnight.
       - `wprdc-etl-landing` — then
         `aws s3api put-bucket-lifecycle-configuration --bucket wprdc-etl-landing --lifecycle-configuration file://deploy/s3-lifecycle.json`
       - `wprdc-dagster-runtime`
-- [ ] **VM** — amd64 (CI builds amd64 only), ~16 GB RAM (code-location is
-      capped at 6 GB, plus webserver, daemon, OS), Docker + compose plugin,
-      the DB reachable from it. Ports 80/443 open; nothing else public.
+- [ ] **VM** — EC2, amd64 (CI builds amd64 only), ~16 GB RAM
+      (`m6i.xlarge`/`t3.xlarge`: code-location is capped at 6 GB, plus
+      webserver, daemon, OS), **50 GB gp3** root volume (peak ~25 GB: OS,
+      2.2 GB images kept for rollback, run scratch; data lives in S3/RDS, so
+      it doesn't grow with the data). Docker + compose plugin, the DB
+      reachable from it. Ports 80/443 open; nothing else public.
 - [ ] **IAM instance role** on the VM:
       - `s3:GetObject`, `s3:PutObject`, `s3:ListBucket`, `s3:DeleteObject` on
         both buckets
@@ -155,7 +158,15 @@ decides the default for one nobody has touched.
 
 **Deploy a new version** — put the digest from the CI summary into
 `deploy.env`, then `pull` + `up -d` as in §3. The entrypoint migrates on every
-start. **Roll back** the same way, with the previous digest; keep a note of it.
+start. Then reclaim disk — each image is 2.2 GB:
+
+```sh
+docker image prune -af --filter "until=720h"
+```
+
+It removes only images no container uses and older than 30 days, so recent
+rollback targets stay. **Roll back** the same way, with the previous digest;
+keep a note of it.
 
 **Dagster version bump** — a deliberate PR (CLAUDE.md); the migration runs on
 the next deploy, and rolling back past it is not supported, so take a DB

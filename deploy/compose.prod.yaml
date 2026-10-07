@@ -15,9 +15,18 @@
 # The VM needs an IAM instance profile granting: s3 R/W on the landing +
 # runtime buckets, and secretsmanager:GetSecretValue on the secret(s).
 
+# Docker's json-file logs never rotate by default and would fill the disk;
+# 5 x 50 MB per container is days of history (the run logs proper are in S3).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 50m
+    max-file: "5"
+
 x-app: &app
   image: ${WPRDC_ETL_IMAGE:?set WPRDC_ETL_IMAGE to the pushed image ref}
   restart: unless-stopped
+  logging: *logging
   env_file:
     - /opt/wprdc-etl/prod.env          # secrets, deploy-time from Secrets Manager
   environment:
@@ -97,6 +106,7 @@ services:
   proxy:
     image: caddy:2
     restart: unless-stopped
+    logging: *logging
     depends_on: [webserver]
     env_file:
       - /opt/wprdc-etl/proxy.env   # DAGSTER_UI_USER, DAGSTER_UI_PASSWORD_HASH
