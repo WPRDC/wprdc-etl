@@ -77,7 +77,7 @@ def test_alert_sensors_configured_in_production_with_slack_creds(
 ) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("DAGSTER_SLACK_BOT_TOKEN", "xoxb-test")
-    monkeypatch.setenv("WPRDC_ALERT_SLACK_CHANNEL", "#wprdc-etl-alerts")
+    monkeypatch.setenv("WPRDC_ALERT_SLACK_CHANNEL", "#etl-alerts")
     sensors = d._alert_sensors()
     assert len(sensors) == 1
     assert isinstance(sensors[0], dg.SensorDefinition)

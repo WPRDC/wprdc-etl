@@ -1,6 +1,6 @@
 # Deployment
 
-Production runs on a **single VM** with `docker compose`: three Dagster
+Production runs on a **single VM** with `docker compose`: four Dagster
 processes from one image, plus a Caddy reverse proxy. State lives in **managed
 Postgres** and **AWS S3**; secrets come from **Secrets Manager / SSM**.
 
@@ -17,6 +17,7 @@ flowchart TB
     subgraph vm["Single VM — docker compose"]
         proxy["<b>proxy</b><br/>Caddy · TLS + auth"]
         web["<b>webserver</b><br/>dagster-webserver :3000"]
+        webro["<b>webserver-ro</b><br/>dagster-webserver --read-only"]
         daemon["<b>daemon</b><br/>dagster-daemon"]
         code["<b>code-location</b><br/>dagster code-server :4000<br/>+ run subprocesses execute here"]
         vol[("dagster-local volume<br/>compute-log staging · artifacts")]
@@ -32,15 +33,18 @@ flowchart TB
     subgraph ext["External"]
         sftp["SFTP sources"]
         ckan["CKAN · data.wprdc.org"]
-        slack["Slack · #wprdc-etl-alerts"]
+        slack["Slack · #etl-alerts"]
     end
 
-    user -->|https| proxy --> web
+    user -->|https| proxy -->|admin user| web
+    proxy -->|everyone else| webro
 
     web -->|gRPC| code
+    webro -->|gRPC| code
     daemon -->|gRPC| code
 
     web --> pg
+    webro --> pg
     daemon --> pg
     code --> pg
 
@@ -67,7 +71,8 @@ Everything left of the `aws` box is one `docker compose` stack. `code-location`,
 | **code-location** | `dagster code-server start -m wprdc_etl.definitions` | The only process that imports the pipeline code. Serves the definitions over gRPC **and** hosts the run subprocesses (`DefaultRunLauncher` forks them here). Sized for `DAGSTER_MAX_CONCURRENT_RUNS` concurrent jobs + one `heavy` outlier. |
 | **daemon** | `dagster-daemon run` | The clock and dispatcher: evaluates schedules/sensors, drains the run queue (`QueuedRunCoordinator` + `tag_concurrency_limits`), monitors for dead runs, fires the Slack run-failure sensor. Stateless — all working state is in Postgres. **Without it, nothing fires.** |
 | **webserver** | `dagster-webserver -w workspace.yaml` | UI + GraphQL. Read-mostly (run history, logs, asset status from Postgres); can launch runs on demand. Auth-less itself — never exposed directly. |
-| **proxy** | `caddy:2` | TLS termination + authentication. The only publicly reachable container; reverse-proxies to `webserver:3000`. |
+| **webserver-ro** | `dagster-webserver -w workspace.yaml --read-only` | The same UI with every mutation disabled (no launching, terminating, re-executing, toggling schedules). OSS Dagster has no roles; this is the two-tier substitute. Skips the migrate (`DAGSTER_SKIP_MIGRATE=1`) and starts after `webserver` is healthy. |
+| **proxy** | `caddy:2` | TLS termination + authentication. The only publicly reachable container. One login prompt: `DAGSTER_UI_USER` goes to `webserver:3000`, every other user to `webserver-ro:3000` (the default route, so an unclassified user can't change anything). |
 | **Postgres** *(managed)* | — | Two databases on one instance. `dagster`: run storage, event logs, schedule/sensor ticks, the run queue — the coordination backbone for all three Dagster services (`DAGSTER_PG_URL`). `etl_spatial`: the PostGIS admin-region store backing `reverse_geocode` (`SPATIAL_DSN`), needs `CREATE EXTENSION postgis`. |
 | **S3** *(AWS)* | — | `landing` bucket: immutable raw source + watermarks. `runtime` bucket: the `validated → loaded` IO-manager pickles and step compute logs. |
 

@@ -7,6 +7,7 @@
 #   prod.env     app secrets, 0600: DAGSTER_PG_URL, SPATIAL_DSN, CKAN_API_TOKEN,
 #                per-source SFTP creds, DAGSTER_SLACK_BOT_TOKEN
 #   proxy.env    Caddy basic-auth, 0600: DAGSTER_UI_USER, DAGSTER_UI_PASSWORD_HASH
+#                (full UI), DAGSTER_RO_USER, DAGSTER_RO_PASSWORD_HASH (read-only)
 #   known_hosts  verified SFTP host keys (OpenSSH format)
 #
 #   docker compose --env-file /opt/wprdc-etl/deploy.env \
@@ -29,7 +30,7 @@ x-app: &app
   logging: *logging
   env_file:
     - /opt/wprdc-etl/prod.env          # secrets, deploy-time from Secrets Manager
-  environment:
+  environment: &app-env
     # `?` not `:?`: empty is a valid value (dry run); only unset is an error,
     # so a deploy that forgot deploy.env can't silently pick a mode.
     ENVIRONMENT: ${ENVIRONMENT?set ENVIRONMENT in deploy.env (empty = dry run)}
@@ -39,7 +40,7 @@ x-app: &app
     DAGSTER_MAX_CONCURRENT_RUNS: "4"
     CKAN_URL: https://data.wprdc.org
     DAGSTER_WEBSERVER_URL: https://${DAGSTER_DOMAIN:?set DAGSTER_DOMAIN in deploy.env}
-    WPRDC_ALERT_SLACK_CHANNEL: "#wprdc-etl-alerts"
+    WPRDC_ALERT_SLACK_CHANNEL: "#etl-alerts"
     DAGSTER_HOME: /opt/dagster/home
     SFTP_KNOWN_HOSTS: /opt/dagster/known_hosts
     WPRDC_SCHEDULES_PAUSED: ${WPRDC_SCHEDULES_PAUSED:-}
@@ -95,21 +96,48 @@ services:
       - /opt/dagster/home/workspace.yaml
     depends_on: [code-location]
     expose: ["3000"]
-    healthcheck:
+    healthcheck: &webserver-health
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:3000/server_info').status==200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 5
 
-  # Authenticating reverse proxy in front of the (auth-less) webserver.
+  # The same UI with `--read-only`: browse runs, logs, assets and schedules,
+  # but no launching, terminating, re-executing or toggling. Caddy sends every
+  # user except DAGSTER_UI_USER here. OSS Dagster has no roles; this is the
+  # two-tier substitute.
+  webserver-ro:
+    <<: *app
+    command:
+      - dagster-webserver
+      - -h
+      - 0.0.0.0
+      - -p
+      - "3000"
+      - -w
+      - /opt/dagster/home/workspace.yaml
+      - --read-only
+    environment:
+      # `<<` is a shallow merge, so a bare `environment:` here would REPLACE
+      # the shared one; merge it explicitly. `webserver` migrates, and waiting
+      # for it to be healthy means two containers never race on a version bump.
+      <<: *app-env
+      DAGSTER_SKIP_MIGRATE: "1"
+    depends_on:
+      webserver:
+        condition: service_healthy
+    expose: ["3000"]
+    healthcheck: *webserver-health
+
+  # Authenticating reverse proxy in front of the (auth-less) webservers.
   # Swap Caddy basic-auth for oauth2-proxy if you need SSO.
   proxy:
     image: caddy:2
     restart: unless-stopped
     logging: *logging
-    depends_on: [webserver]
+    depends_on: [webserver, webserver-ro]
     env_file:
-      - /opt/wprdc-etl/proxy.env   # DAGSTER_UI_USER, DAGSTER_UI_PASSWORD_HASH
+      - /opt/wprdc-etl/proxy.env   # DAGSTER_UI_USER/_PASSWORD_HASH, DAGSTER_RO_USER/_PASSWORD_HASH
     environment:
       DAGSTER_DOMAIN: ${DAGSTER_DOMAIN:?set DAGSTER_DOMAIN in deploy.env}
     ports:

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# docker compose for the production stack, from anywhere:
+#   deploy/dc ps | logs -f proxy | pull | up -d | restart daemon | ...
+# Config files live in $WPRDC_ETL_HOME (default /opt/wprdc-etl) — see ROLLOUT.md §2.
+set -euo pipefail
+
+home="${WPRDC_ETL_HOME:-/opt/wprdc-etl}"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+exec docker compose \
+  --env-file "$home/deploy.env" \
+  -f "$here/compose.prod.yaml" \
+  "$@"

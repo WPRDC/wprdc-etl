@@ -1,11 +1,23 @@
 # Everything host-specific comes from the proxy container's environment
 # (deploy/compose.prod.yaml): DAGSTER_DOMAIN from deploy.env, the credentials
-# from /opt/wprdc-etl/proxy.env. Generate the hash with `caddy hash-password`
-# and single-quote it in proxy.env — it is full of `$`.
+# from /opt/wprdc-etl/proxy.env. Generate each hash with
+# `docker run --rm -it caddy:2 caddy hash-password` and single-quote it in
+# proxy.env — it is full of `$`.
+#
+# Two tiers, one login prompt: DAGSTER_UI_USER gets the full UI; every other
+# user gets the `--read-only` webserver. The read-only route is the default,
+# so a user added here without a matching route can't change anything.
 {$DAGSTER_DOMAIN} {
 	encode gzip
 	basic_auth {
 		{$DAGSTER_UI_USER} {$DAGSTER_UI_PASSWORD_HASH}
+		{$DAGSTER_RO_USER} {$DAGSTER_RO_PASSWORD_HASH}
 	}
-	reverse_proxy webserver:3000
+	@admin vars {http.auth.user.id} {$DAGSTER_UI_USER}
+	handle @admin {
+		reverse_proxy webserver:3000
+	}
+	handle {
+		reverse_proxy webserver-ro:3000
+	}
 }

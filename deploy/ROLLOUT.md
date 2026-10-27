@@ -16,7 +16,7 @@ Each phase ends in a state that is safe to leave overnight.
 
 ## 1. Provision
 
-- [ ] **Postgres** (managed, 17 to match dev), two databases:
+- [x] **Postgres** (managed, 17 to match dev), two databases:
       ```sql
       CREATE DATABASE dagster;
       CREATE DATABASE etl_spatial;
@@ -25,62 +25,103 @@ Each phase ends in a state that is safe to leave overnight.
       ```
       Turn on automated backups. Dagster's run/event tables grow without
       bound; plan a retention job (deploy/prod/dagster.yaml only purges ticks).
-- [ ] **S3**, us-east-1, Block Public Access on:
+- [x] **S3**, us-east-1, Block Public Access on:
       - `wprdc-etl-landing` — then
         `aws s3api put-bucket-lifecycle-configuration --bucket wprdc-etl-landing --lifecycle-configuration file://deploy/s3-lifecycle.json`
       - `wprdc-dagster-runtime`
-- [ ] **VM** — EC2, amd64 (CI builds amd64 only), ~16 GB RAM
+- [x] **VM** — EC2, Ubuntu, amd64 (CI builds amd64 only), ~16 GB RAM
       (`m6i.xlarge`/`t3.xlarge`: code-location is capped at 6 GB, plus
       webserver, daemon, OS), **50 GB gp3** root volume (peak ~25 GB: OS,
       2.2 GB images kept for rollback, run scratch; data lives in S3/RDS, so
-      it doesn't grow with the data). Docker + compose plugin, the DB
+      it doesn't grow with the data). Docker + compose plugin, `jq`, the DB
       reachable from it. Ports 80/443 open; nothing else public.
-- [ ] **IAM instance role** on the VM:
+- [x] **IAM instance role** on the VM:
       - `s3:GetObject`, `s3:PutObject`, `s3:ListBucket`, `s3:DeleteObject` on
         both buckets
-      - `secretsmanager:GetSecretValue` on the secret(s) below
-- [ ] **DNS** — an A record for the UI hostname (`DAGSTER_DOMAIN`) at the VM.
+      - `secretsmanager:GetSecretValue` on the `wprdc/etl/prod` secret (§2)
+- [x] **DNS** — an A record for the UI hostname (`DAGSTER_DOMAIN`) at the VM.
       Caddy fetches the certificate itself once the name resolves.
-- [ ] **GHCR pull access** — the package is private by default. Either make
-      `wprdc-etl` public in the org's package settings (the image holds code,
-      no secrets), or `docker login ghcr.io` on the VM with a `read:packages`
-      token.
+- [x] **GHCR pull access** — the package is private by default. **Make it
+      public** (recommended): the repo is already public and the image holds
+      only that code, no secrets, so it reveals nothing new — and the VM then
+      needs no credential that can expire or leave with the person who made it.
+- 
+1. If the org restricts it: github.com/organizations/WPRDC/settings →
+   **Packages** → allow **Public** under package creation/visibility
+   (needs an org owner).
+2. github.com/orgs/WPRDC/packages → `wprdc-etl` → **Package settings** →
+   **Danger Zone** → **Change visibility** → Public, type the name to
+   confirm. Needs admin on the package (an org owner has it).
+3. On the VM, logged out of GHCR, as `ubuntu`:
+   ```sh
+   docker logout ghcr.io
+   docker pull ghcr.io/wprdc/wprdc-etl@sha256:...   # digest from the CI summary
+
 
 ## 2. Files on the VM
 
-All under `/opt/wprdc-etl/`, root-owned. Check out the repo (or copy `deploy/`)
-next to them — compose mounts `deploy/Caddyfile` by relative path.
+All under `/opt/wprdc-etl/`, owned by the instance's default `ubuntu` user,
+which runs `docker compose` without `sudo`. Root ownership would buy nothing:
+`ubuntu` has passwordless sudo, and `docker` group membership is
+root-equivalent anyway. The modes are what matter — the secret files stay
+0600. Check out the repo (or copy `deploy/`) next to them — compose mounts
+`deploy/Caddyfile` by relative path.
 
-- [ ] `deploy.env` — compose interpolation, not secret:
-      ```sh
-      WPRDC_ETL_IMAGE=ghcr.io/wprdc/wprdc-etl@sha256:...   # from the CI summary
-      DAGSTER_DOMAIN=etl.example.org
-      ENVIRONMENT=                                          # empty = dry run
-      WPRDC_SCHEDULES_PAUSED=1
-      ```
-- [ ] `prod.env` (0600) — from Secrets Manager:
-      ```sh
-      DAGSTER_PG_URL=postgresql://dagster:...@host:5432/dagster
-      SPATIAL_DSN=postgresql://dagster:...@host:5432/etl_spatial
-      CKAN_API_TOKEN=...            # data.wprdc.org token with write access
-      ALLEGHENY_SFTP=user:password
-      ALLEGHENY_SFTP_HOST=...
-      ALLEGHENY_SFTP_PORT=22
-      DAGSTER_SLACK_BOT_TOKEN=xoxb-...
-      ```
-      e.g. `aws secretsmanager get-secret-value --secret-id wprdc-etl/prod --query SecretString --output text > prod.env`
-      with the secret stored in env-file form.
-- [ ] `proxy.env` (0600) — UI basic auth. Hash with
-      `docker run --rm caddy:2 caddy hash-password`, and **single-quote** it:
-      the hash is full of `$`, which compose would otherwise interpolate.
-      ```sh
-      DAGSTER_UI_USER=wprdc
-      DAGSTER_UI_PASSWORD_HASH='$2a$14$...'
-      ```
-- [ ] `known_hosts` — SFTP host keys. `ssh-keyscan -p <port> <host> > known_hosts`,
-      then **confirm the fingerprint** (`ssh-keygen -lf known_hosts`) with the
-      publisher out of band. A key that isn't in this file fails the run at
-      once, with no retries; a changed key does the same.
+```sh
+sudo usermod -aG docker ubuntu        # then log out and back in
+sudo install -d -o ubuntu -g ubuntu -m 0700 /opt/wprdc-etl
+git clone https://github.com/WPRDC/wprdc-etl.git /opt/wprdc-etl/repo
+# ...write the files below, then:
+chmod 600 /opt/wprdc-etl/{prod.env,proxy.env}
+chmod 644 /opt/wprdc-etl/{deploy.env,known_hosts}
+```
+
+- [x] `deploy.env` — compose interpolation, not secret:
+```sh
+WPRDC_ETL_IMAGE=ghcr.io/wprdc/wprdc-etl@sha256:...   # from the CI summary
+DAGSTER_DOMAIN=etl.example.org
+ENVIRONMENT=                                          # empty = dry run
+WPRDC_SCHEDULES_PAUSED=1
+```
+- [x] `prod.env` (0600) — from Secrets Manager. Store **one** secret,
+`wprdc/etl/prod`, as key/value JSON (the console's default editor),
+not a secret per value — one fetch, one ARN in the IAM policy:
+```json
+{
+  "DAGSTER_PG_URL": "postgresql://dagster:...@host:5432/dagster?sslmode=require",
+  "SPATIAL_DSN": "postgresql://dagster:...@host:5432/etl_spatial?sslmode=require",
+  "CKAN_API_TOKEN": "...",
+  "ALLEGHENY_SFTP": "user:password",
+  "ALLEGHENY_SFTP_HOST": "...",
+  "ALLEGHENY_SFTP_PORT": "22",
+  "DAGSTER_SLACK_BOT_TOKEN": "xoxb-..."
+}
+```
+`CKAN_API_TOKEN` is a data.wprdc.org token with write access. Render it
+to env-file form on the VM (needs `jq`):
+
+```sh
+aws secretsmanager get-secret-value --secret-id wprdc/etl/prod \
+  --query SecretString --output text \
+  | jq -r "to_entries[] | \"\(.key)='\(.value)'\"" > /opt/wprdc-etl/prod.env
+chmod 600 /opt/wprdc-etl/prod.env
+```
+Values are single-quoted because compose expands an unquoted `$` in an
+`env_file`, and passwords/DSNs often contain one — so a value must not
+itself contain `'`. Re-run this after rotating a value, then `up -d`.
+- [x] `proxy.env` (0600) — UI basic auth. Hash with
+`docker run --rm -it caddy:2 caddy hash-password` and **single-quote** it:
+the hash is full of `$`, which compose would otherwise interpolate.
+```sh
+DAGSTER_UI_USER=wprdc                       # full UI: launch, terminate, toggle
+DAGSTER_UI_PASSWORD_HASH='$2a$14$...'
+DAGSTER_RO_USER=viewer                      # read-only UI (--read-only webserver)
+DAGSTER_RO_PASSWORD_HASH='$2a$14$...'
+```
+- [x] `known_hosts` — SFTP host keys. `ssh-keyscan -p <port> <host> > known_hosts`,
+then **confirm the fingerprint** (`ssh-keygen -lf known_hosts`) with the
+publisher out of band. A key that isn't in this file fails the run at
+once, with no retries; a changed key does the same.
 
 ## 3. Boot, dry run
 
@@ -96,11 +137,11 @@ docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml 
 docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml ps
 ```
 
-- [ ] All four services healthy; `dagster instance migrate` ran in each log.
-- [ ] `https://$DAGSTER_DOMAIN` gives a certificate and asks for the password.
-- [ ] Code location loaded, 109 jobs and 108 schedules; Deployment → Daemons
+- [ ] All five services healthy ; `dagster instance migrate` ran in each Dagster log except `webserver-ro`, which skips it.
+- [x] `https://$DAGSTER_DOMAIN` gives a certificate and asks for the password.
+- [x] Code location loaded, 109 jobs and 108 schedules; Deployment → Daemons
       all green.
-- [ ] Every schedule shows **Stopped**.
+- [x] Every schedule shows **Stopped**.
 
 ## 4. Production, schedules held
 
@@ -125,7 +166,7 @@ in this phase is launched by hand from the UI.
 - [ ] **Slack** — the failure sensor is on by default in production. Force a
       failure (e.g. launch an SFTP dataset for a partition old enough that its
       file is gone; it fails after the ~7 min of retries) and see it reach
-      `#wprdc-etl-alerts` with a working link back to the UI.
+      `#etl-alerts` with a working link back to the UI.
 - [ ] **Column-guard blocks** — expect some on datasets whose live table
       DataPusher+ retyped (`bool->text` and the like). Collect them, set
       `ckan.rebuild: true` on all of them in one commit, deploy, run each

@@ -289,7 +289,7 @@ DAGSTER_MAX_CONCURRENT_RUNS=4     # run-queue cap; tune without a redeploy
 
 # Run-failure alerting (Slack):
 DAGSTER_SLACK_BOT_TOKEN=xoxb-...
-WPRDC_ALERT_SLACK_CHANNEL=#wprdc-etl-alerts
+WPRDC_ALERT_SLACK_CHANNEL=#etl-alerts
 DAGSTER_WEBSERVER_URL=https://dagster.example.org
 ```
 
