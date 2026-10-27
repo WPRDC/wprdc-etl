@@ -162,7 +162,8 @@ genuinely dataset-specific logic.
     for older datasets). Title case because most of production's text
     booleans already use it. A dataset whose live table has a real `bool` column is
     blocked once by the column guard (`bool->text`); clear it with one
-    `ckan.rebuild: true` run.
+    run launched with the tag `wprdc/rebuild=true` (same as
+    `ckan.rebuild: true`, for that run only — no commit, no redeploy).
   - **Anything else added to the table is lost on every load** —
     ckanext-spatialdata's `dataspatial_wkb` included. `replace()` still
     truncates (`filters: {}`) rather than drops on a normal load, but that no
@@ -175,9 +176,10 @@ genuinely dataset-specific logic.
     resource stored `False`/`True` while its file said `false`/`true`; fresh
     resources store exactly what is sent. Publishing `True`/`False` keeps the
     file and the DataStore in agreement either way.
-  The column guard still blocks an added/removed/retyped column until
-  `ckan.rebuild: true` — not to protect the table any more, but so a schema
-  change reaches consumers on purpose rather than silently.
+  The column guard still blocks an added/removed/retyped column until a
+  rebuild (`ckan.rebuild: true`, or one run tagged `wprdc/rebuild=true`) —
+  not to protect the table any more, but so a schema change reaches
+  consumers on purpose rather than silently.
 - **A publish that wouldn't change CKAN writes nothing.** Each CKAN write
   first compares what it would send with what CKAN holds: `replace` and
   `publish_file` against the `etl_sha256` field they record on the resource

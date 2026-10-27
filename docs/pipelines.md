@@ -209,7 +209,7 @@ derived — an ArcGIS CSV export of a polygon layer carries no geometry, so a
 |-------|------|-------|
 | `resource_id` | str | The CKAN resource (UUID) that receives the tabular data. |
 | `primary_key` | list[str] \| null | Required for `publish: upsert` (the upsert key) and for `accumulate` (the merge key). |
-| `rebuild` | bool | `false` | Make a `replace` DROP the DataStore table instead of truncating it. Needed for a genuine schema change; discards anything else added to the table, including `ckanext-spatialdata`'s geometry column and indexes. |
+| `rebuild` | bool | `false` | Make a `replace` DROP the DataStore table instead of truncating it. Needed for a genuine schema change; discards anything else added to the table, including `ckanext-spatialdata`'s geometry column and indexes. For a one-off, prefer launching the run with the tag `wprdc/rebuild=true` — same effect, that run only, no commit to revert. |
 
 #### GeometryModel
 

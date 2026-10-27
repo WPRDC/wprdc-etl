@@ -38,6 +38,7 @@ from wprdc_etl.components._common import (
     partitions_for,
     resolve_modes,
     network_retry_policy,
+    asset_tags,
     run_tags,
     schedule_or_sensor,
     taxonomy,
@@ -223,6 +224,7 @@ class TabularPipeline(Component, Model, Resolvable):
             retry_policy=network_retry_policy(),
             partitions_def=partitions,
             group_name=group,
+            tags=asset_tags(cfg),
         )
         def landed(
             context: dg.AssetExecutionContext,
@@ -240,6 +242,7 @@ class TabularPipeline(Component, Model, Resolvable):
             partitions_def=partitions,
             deps=[landed],
             group_name=group,
+            tags=asset_tags(cfg),
         )
         def validated(
             context: dg.AssetExecutionContext,
@@ -268,6 +271,7 @@ class TabularPipeline(Component, Model, Resolvable):
                 partitions_def=partitions,
                 ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
                 group_name=group,
+                tags=asset_tags(cfg),
             )
             def accumulated(
                 context: dg.AssetExecutionContext,
@@ -319,6 +323,7 @@ class TabularPipeline(Component, Model, Resolvable):
                 partitions_def=partitions,
                 ins={"to_publish": dg.AssetIn(key=[*key_prefix, upstream])},
                 group_name=group,
+                tags=asset_tags(cfg),
             )
             def loaded(
                 context: dg.AssetExecutionContext,
@@ -520,6 +525,7 @@ def _make_representation_asset(
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,
+        tags=asset_tags(cfg),
     )
     def _representation(
         context: dg.AssetExecutionContext,
@@ -585,6 +591,7 @@ def _make_mirror_asset(
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
         group_name=group,
+        tags=asset_tags(cfg),
     )
     def _mirror(
         context: dg.AssetExecutionContext,
@@ -623,6 +630,7 @@ def _make_metadata_asset(
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
         group_name=group,
+        tags=asset_tags(cfg),
     )
     def _metadata(
         context: dg.AssetExecutionContext,
@@ -651,6 +659,8 @@ def _make_region_layer_asset(
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,
+        tags=asset_tags(cfg),
+        kinds={"postgis"},
     )
     def _region_layer(
         context: dg.AssetExecutionContext,
@@ -694,6 +704,8 @@ def _make_key_layer_asset(
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,
+        tags=asset_tags(cfg),
+        kinds={"postgis"},
     )
     def _key_layer(
         context: dg.AssetExecutionContext,

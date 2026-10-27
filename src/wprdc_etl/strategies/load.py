@@ -169,6 +169,30 @@ def _fmt_changes(type_changes: dict[str, tuple[str, str]]) -> str:
     return ", ".join(f"{c}: {a}->{b}" for c, (a, b) in type_changes.items())
 
 
+# A run launched with this tag rebuilds as if `ckan.rebuild: true` were set,
+# for that run only: Launchpad -> Edit tags. Schedules never carry it, so
+# there is no flag to revert afterwards (and no image to build twice).
+REBUILD_TAG = "wprdc/rebuild"
+
+
+def wants_rebuild(
+    cfg: TabularPipeline, context: dg.AssetExecutionContext | None
+) -> bool:
+    """`ckan.rebuild` in the YAML, or the run's `wprdc/rebuild=true` tag."""
+    if cfg.ckan.rebuild:
+        return True
+    if context is None:
+        return False
+    tag = context.run.tags.get(REBUILD_TAG, "")
+    if tag.strip().lower() in ("1", "true", "yes"):
+        context.log.warning(
+            f"{REBUILD_TAG}={tag} on this run: dropping and re-creating the "
+            "DataStore table"
+        )
+        return True
+    return False
+
+
 def _guard_replace(
     report: dict[str, Any],
     rebuild: bool,
@@ -178,8 +202,9 @@ def _guard_replace(
 
     A truncating reload keeps the table's existing columns and types, so a new,
     dropped, or retyped column has nowhere to land — DataPusher+ either fails or
-    silently coerces. That's a hard stop unless `ckan.rebuild` says to drop and
-    recreate, in which case it's back to being informational.
+    silently coerces. That's a hard stop unless `ckan.rebuild` (or the run's
+    `wprdc/rebuild` tag) says to drop and recreate, in which case it's back to
+    being informational.
     """
     if not report["live_exists"]:
         return  # first load — replace() creates the table from the frame
@@ -212,9 +237,10 @@ def _guard_replace(
             allow_retries=False,
             description="replace aborted: the output's columns differ from the live CKAN "
             f"table — {'; '.join(problems)}. Consumers of the table would see "
-            "the change, so it isn't made silently. If it is intended, set "
-            "`ckan.rebuild: true` for one run: the table is dropped and "
-            "re-created with the new columns and types (and their data "
+            "the change, so it isn't made silently. If it is intended, "
+            f"re-launch this job with the run tag `{REBUILD_TAG}=true` "
+            "(Launchpad -> Edit tags): that one run drops the table and "
+            "re-creates it with the new columns and types (and their data "
             "dictionary overrides). That also discards anything else added to "
             "the table, such as ckanext-spatialdata's geometry column.",
         )
@@ -266,7 +292,7 @@ class ReplaceLoader(Loader):
         dataframe = publishable_booleans(dataframe, cfg.ckan.bool_format)
         if dump_local(cfg, dataframe, context):
             return
-        rebuild = bool(cfg.ckan.rebuild)
+        rebuild = wants_rebuild(cfg, context)
         if not dataframe.empty:
             _guard_replace(compat_report(cfg, dataframe, ckan), rebuild, context)
         changed = ckan.replace(

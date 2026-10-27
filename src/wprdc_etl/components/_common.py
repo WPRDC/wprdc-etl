@@ -139,6 +139,17 @@ def run_tags(cfg: PipelineConfig, stem: str) -> dict[str, str]:
     return tags
 
 
+def asset_tags(cfg: PipelineConfig) -> dict[str, str]:
+    """The run tags, for every asset of the dataset, so the asset catalog can
+    filter on them (`tag:wprdc/source=sftp`) — the Jobs list can't filter on
+    tags at all. Minus `wprdc/dataset`: asset tag values are capped at 63
+    characters and some stems are longer; the asset key names the dataset
+    anyway."""
+    tags = run_tags(cfg, "")
+    del tags["wprdc/dataset"]
+    return tags
+
+
 def default_schedule_status() -> dg.DefaultScheduleStatus:
     """RUNNING in production, STOPPED everywhere else.
 

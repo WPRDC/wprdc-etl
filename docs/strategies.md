@@ -371,7 +371,7 @@ The policy differs by mode, deliberately:
 
 | | `added` columns | `removed` columns | `type_changes` |
 |---|---|---|---|
-| **replace** | **BLOCKS** | **BLOCKS** | **BLOCKS** — the reload truncates rather than drops, so the table keeps its current columns and types and has nowhere to put the change. Set `ckan.rebuild: true` to drop and recreate |
+| **replace** | **BLOCKS** | **BLOCKS** | **BLOCKS** — the reload truncates rather than drops, so the table keeps its current columns and types and has nowhere to put the change. Set `ckan.rebuild: true`, or launch one run with the tag `wprdc/rebuild=true`, to drop and recreate |
 | **replace** + `rebuild` | WARN | WARN — consumer-breaking changes should still be visible | WARN |
 | **upsert** | — | WARN — those columns exist in CKAN but won't be updated | **BLOCKS** — upserting into an existing typed table can fail or corrupt. Reset the table and re-run if the change is intended |
 

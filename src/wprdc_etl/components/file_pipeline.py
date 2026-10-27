@@ -30,6 +30,7 @@ from dagster.components import Component, Model, Resolvable
 from wprdc_etl.components._common import (
     network_retry_policy,
     partitions_for,
+    asset_tags,
     run_tags,
     schedule_or_sensor,
     taxonomy,
@@ -61,6 +62,7 @@ class FilePipeline(Component, Model, Resolvable):
             key=[*key_prefix, "landed"],
             partitions_def=partitions,
             group_name=group,
+            tags=asset_tags(cfg),
             retry_policy=network_retry_policy(),
         )
         def landed(
@@ -79,6 +81,7 @@ class FilePipeline(Component, Model, Resolvable):
             retry_policy=network_retry_policy(),
             deps=[landed],
             group_name=group,
+            tags=asset_tags(cfg),
         )
         def published(
             context: dg.AssetExecutionContext,

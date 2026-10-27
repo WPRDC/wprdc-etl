@@ -176,10 +176,11 @@ in this phase is launched by hand from the UI.
       file is gone; it fails after the ~7 min of retries) and see it reach
       `#etl-alerts` with a working link back to the UI.
 - [ ] **Column-guard blocks** — expect some on datasets whose live table
-      DataPusher+ retyped (`bool->text` and the like). Collect them, set
-      `ckan.rebuild: true` on all of them in one commit, deploy, run each
-      once, then revert the flag in the next commit. Batch these: every
-      round is a commit, an image and a deploy.
+      DataPusher+ retyped (`bool->text` and the like). For each, once you've
+      checked the change is the expected one: open the job's Launchpad,
+      **Edit tags**, add `wprdc/rebuild=true`, launch. Only that run drops and
+      re-creates the table (keeping the dictionary's labels and notes); no
+      commit, no deploy, nothing to revert.
 
 ## 5. Switch schedules on
 

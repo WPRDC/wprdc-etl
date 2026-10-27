@@ -5,7 +5,12 @@ from typing import Any
 
 import dagster as dg
 
-from wprdc_etl.components._common import SCHEDULE_TZ, run_tags, schedule_or_sensor
+from wprdc_etl.components._common import (
+    SCHEDULE_TZ,
+    asset_tags,
+    run_tags,
+    schedule_or_sensor,
+)
 
 
 def _tabular_cfg(**over: Any) -> SimpleNamespace:
@@ -47,6 +52,16 @@ def test_run_tags_name_the_postgis_layer() -> None:
     plain = run_tags(_tabular_cfg(), "p__d")
     assert "wprdc/region_layer" not in plain
     assert "wprdc/postgis_layer" not in plain
+
+
+def test_asset_tags_are_the_run_tags_minus_dataset() -> None:
+    """Asset tag values are capped at 63 chars; some dataset stems are longer."""
+    cfg = _tabular_cfg(heavy=True, region_layer=SimpleNamespace(name="ward"))
+    tags = asset_tags(cfg)
+    assert "wprdc/dataset" not in tags
+    assert {
+        k: v for k, v in run_tags(cfg, "p__d").items() if k != "wprdc/dataset"
+    } == tags
 
 
 def test_run_tags_file_pipeline_has_no_ingest() -> None:
