@@ -9,7 +9,8 @@ Each phase ends in a state that is safe to leave overnight.
 ## 0. Repo (done)
 
 - [x] CI builds and pushes `ghcr.io/wprdc/wprdc-etl` on every green `main`,
-      and prints `WPRDC_ETL_IMAGE=…@sha256:…` in the job summary.
+      tagged with the full commit sha (and `latest`); `deploy/release`
+      deploys by that tag.
 - [x] Nothing host-specific is committed: domain, UI credentials, SFTP host
       keys and secrets all come from files on the VM (§2).
 - [x] `WPRDC_SCHEDULES_PAUSED=1` holds production schedules stopped (§4).
@@ -55,7 +56,7 @@ Each phase ends in a state that is safe to leave overnight.
 3. On the VM, logged out of GHCR, as `ubuntu`:
    ```sh
    docker logout ghcr.io
-   docker pull ghcr.io/wprdc/wprdc-etl@sha256:...   # digest from the CI summary
+   docker pull ghcr.io/wprdc/wprdc-etl:latest
 
 
 ## 2. Files on the VM
@@ -78,7 +79,7 @@ chmod 644 /opt/wprdc-etl/{deploy.env,known_hosts}
 
 - [x] `deploy.env` — compose interpolation, not secret:
 ```sh
-WPRDC_ETL_IMAGE=ghcr.io/wprdc/wprdc-etl@sha256:...   # from the CI summary
+WPRDC_ETL_IMAGE=ghcr.io/wprdc/wprdc-etl:<sha>         # written by deploy/release
 DAGSTER_DOMAIN=etl.example.org
 ENVIRONMENT=                                          # empty = dry run
 WPRDC_SCHEDULES_PAUSED=1
@@ -108,7 +109,7 @@ chmod 600 /opt/wprdc-etl/prod.env
 ```
 Values are single-quoted because compose expands an unquoted `$` in an
 `env_file`, and passwords/DSNs often contain one — so a value must not
-itself contain `'`. Re-run this after rotating a value, then `up -d`.
+itself contain `'`. Re-run this after rotating a value, then `deploy/dc up -d`.
 - [x] `proxy.env` (0600) — UI basic auth. Hash with
 `docker run --rm -it caddy:2 caddy hash-password` and **single-quote** it:
 the hash is full of `$`, which compose would otherwise interpolate.
@@ -130,14 +131,21 @@ guard refuses real-AWS writes outside production. **Don't set
 `WPRDC_ALLOW_REAL_S3` to get past it** — this phase proves the stack, not the
 pipelines.
 
+Every compose command goes through `deploy/dc`, which supplies
+`--env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml` and passes
+the rest through, from any directory (`deploy/dc logs -f proxy`,
+`deploy/dc restart daemon`, …). Optionally
+`sudo ln -s /opt/wprdc-etl/repo/deploy/dc /usr/local/bin/dc` to type `dc`.
+
+Bring it up with `deploy/release`: it checks out the latest `main`, pins
+`WPRDC_ETL_IMAGE` in `deploy.env` to the image CI built from that commit
+(adding the line if it's missing), pulls, runs `up -d` and prints `ps`:
+
 ```sh
-cd /opt/wprdc-etl/repo
-docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml pull
-docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml up -d
-docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml ps
+/opt/wprdc-etl/repo/deploy/release
 ```
 
-- [ ] All five services healthy ; `dagster instance migrate` ran in each Dagster log except `webserver-ro`, which skips it.
+- [ ] All five services healthy; `dagster instance migrate` ran in each Dagster log except `webserver-ro`, which skips it.
 - [x] `https://$DAGSTER_DOMAIN` gives a certificate and asks for the password.
 - [x] Code location loaded, 109 jobs and 108 schedules; Deployment → Daemons
       all green.
@@ -146,7 +154,7 @@ docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml 
 ## 4. Production, schedules held
 
 Set `ENVIRONMENT=production` in `deploy.env`, keep `WPRDC_SCHEDULES_PAUSED=1`,
-re-run `up -d`. Writes are now real; schedules still don't fire. Everything
+re-run `deploy/dc up -d`. Writes are now real; schedules still don't fire. Everything
 in this phase is launched by hand from the UI.
 
 - [ ] **Schedules still Stopped** after the restart — check before anything else.
@@ -197,21 +205,28 @@ decides the default for one nobody has touched.
 
 ## Day-two operations
 
-**Deploy a new version** — put the digest from the CI summary into
-`deploy.env`, then `pull` + `up -d` as in §3. The entrypoint migrates on every
-start. Then reclaim disk — each image is 2.2 GB:
+**Deploy a new version** — once CI is green for the commit:
 
 ```sh
-docker image prune -af --filter "until=720h"
+/opt/wprdc-etl/repo/deploy/release          # latest main
+/opt/wprdc-etl/repo/deploy/release <sha>    # a specific commit
 ```
 
-It removes only images no container uses and older than 30 days, so recent
-rollback targets stay. **Roll back** the same way, with the previous digest;
-keep a note of it.
+It checks out the commit, pins `WPRDC_ETL_IMAGE` to `:<sha>`, pulls, `up -d`,
+and prunes images unused and older than 30 days (each is 2.2 GB; recent
+rollback targets stay). The entrypoint migrates on every start. If CI hasn't
+built that commit, the pull fails, the checkout is put back and the running
+stack is untouched. A change to `deploy/` alone deploys the same way — it
+just re-pulls the image it already has. It refuses a dirty checkout and a
+commit older than the script itself.
+
+**Roll back** — `deploy/release <previous sha>`. Every release is a line in
+`/opt/wprdc-etl/releases.log`, with the image it replaced; the next plain
+`deploy/release` returns to `main`.
 
 **Dagster version bump** — a deliberate PR (CLAUDE.md); the migration runs on
 the next deploy, and rolling back past it is not supported, so take a DB
 snapshot first.
 
 **SFTP host key rotated** — verify the new fingerprint with the publisher,
-update `known_hosts`, `up -d` (no rebuild).
+update `known_hosts`, `deploy/dc up -d` (no rebuild).

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Deploy a commit: check it out, pin the image CI built from it, restart.
+#
+#   deploy/release          # latest main
+#   deploy/release <sha>    # a specific commit — rollback, or a hotfix
+#
+# CI tags every image it pushes from a green `main` with the full commit sha,
+# so the checked-out deploy/ files and the running image always come from the
+# same commit. If that image doesn't exist (CI still running, or failed), the
+# pull fails, the checkout is put back and the running stack is untouched.
+#
+# Records every release in $WPRDC_ETL_HOME/releases.log. Config files live in
+# $WPRDC_ETL_HOME (default /opt/wprdc-etl) — see ROLLOUT.md §2.
+
+# Everything is in main(): bash reads a script as it runs, and the checkout
+# below can rewrite this very file. A function is parsed whole before it runs.
+main() {
+  set -euo pipefail
+
+  local home="${WPRDC_ETL_HOME:-/opt/wprdc-etl}"
+  local repo
+  repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local image_repo="ghcr.io/wprdc/wprdc-etl"
+  local env_file="$home/deploy.env"
+
+  cd "$repo"
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "release: $repo has local changes; commit or discard them first" >&2
+    git status --short --untracked-files=no >&2
+    exit 1
+  fi
+
+  # Where to put the checkout back if the image isn't there: the commit, and
+  # the branch if on one (the fast-forward below moves the branch too).
+  local before_sha before_branch
+  before_sha="$(git rev-parse HEAD)"
+  before_branch="$(git symbolic-ref --quiet --short HEAD || true)"
+
+  git fetch --quiet origin
+  local target
+  target="$(git rev-parse --verify "${1:-origin/main}^{commit}")"
+  # A commit from before this script existed would check it out of existence,
+  # leaving nothing to release forward with.
+  if ! git cat-file -e "$target:deploy/release" 2>/dev/null; then
+    echo "release: $target predates deploy/release; pick a later commit" >&2
+    exit 1
+  fi
+  if [ $# -eq 0 ]; then
+    git checkout --quiet main
+    git merge --quiet --ff-only origin/main
+  else
+    git checkout --quiet --detach "$target"
+  fi
+  local sha
+  sha="$(git rev-parse HEAD)"
+  local image="$image_repo:$sha"
+
+  echo "==> $(git log -1 --format='%h %s (%an, %ar)')"
+  if ! docker pull --quiet "$image"; then
+    echo "release: no image $image — has CI finished (and passed) for this commit?" >&2
+    if [ -n "$before_branch" ]; then
+      git checkout --quiet "$before_branch"
+      git reset --quiet --hard "$before_sha"
+    else
+      git checkout --quiet --detach "$before_sha"
+    fi
+    exit 1
+  fi
+
+  local previous
+  previous="$(sed -n 's/^WPRDC_ETL_IMAGE=//p' "$env_file")"
+  if grep -q '^WPRDC_ETL_IMAGE=' "$env_file"; then
+    # Rewrite in place (not sed -i / mv) so the file keeps its owner and mode.
+    local updated
+    updated="$(sed "s|^WPRDC_ETL_IMAGE=.*|WPRDC_ETL_IMAGE=$image|" "$env_file")"
+    printf '%s\n' "$updated" >"$env_file"
+  else
+    printf 'WPRDC_ETL_IMAGE=%s\n' "$image" >>"$env_file"
+  fi
+
+  local compose=(docker compose --env-file "$env_file" -f "$repo/deploy/compose.prod.yaml")
+  "${compose[@]}" pull --quiet
+  "${compose[@]}" up -d --remove-orphans
+
+  printf '%s\t%s\tprevious=%s\n' "$(date -u +%FT%TZ)" "$image" "${previous:-none}" \
+    >>"$home/releases.log"
+
+  # Each image is ~2.2 GB. Keeps anything a container uses and anything newer
+  # than 30 days, so recent rollback targets stay on disk.
+  docker image prune -af --filter "until=720h" >/dev/null
+
+  "${compose[@]}" ps
+  echo "==> released $sha (previous: ${previous:-none})"
+}
+
+main "$@"
+exit

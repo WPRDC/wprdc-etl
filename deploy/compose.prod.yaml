@@ -10,8 +10,8 @@
 #                (full UI), DAGSTER_RO_USER, DAGSTER_RO_PASSWORD_HASH (read-only)
 #   known_hosts  verified SFTP host keys (OpenSSH format)
 #
-#   docker compose --env-file /opt/wprdc-etl/deploy.env \
-#     -f deploy/compose.prod.yaml up -d
+#   deploy/dc up -d    # = docker compose --env-file /opt/wprdc-etl/deploy.env \
+#                      #     -f deploy/compose.prod.yaml up -d
 #
 # The VM needs an IAM instance profile granting: s3 R/W on the landing +
 # runtime buckets, and secretsmanager:GetSecretValue on the secret(s).

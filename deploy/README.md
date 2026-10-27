@@ -146,11 +146,11 @@ datasets with a `region_layer:` block once — nothing to seed by hand. Until th
 boundary layers up before any dataset that depends on them.
 
 ```bash
-docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml pull
-docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml up -d
+deploy/release     # check out main, pin the image CI built from it, pull, up -d
+deploy/dc ps       # = docker compose --env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml ps
 ```
 
-`deploy.env` carries the image digest, the domain, `ENVIRONMENT` and
+`deploy.env` carries the image (`:<commit sha>`, written by `deploy/release`), the domain, `ENVIRONMENT` and
 `WPRDC_SCHEDULES_PAUSED`; ROLLOUT.md §2 lists every file the VM needs. The
 entrypoint runs `dagster instance migrate` on every start (idempotent) —
 re-run a deploy after any `dagster` version bump. Boot as a **dry run**
