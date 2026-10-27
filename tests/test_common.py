@@ -35,6 +35,20 @@ def test_run_tags_heavy_flag() -> None:
     assert tags["wprdc/heavy"] == "true"
 
 
+def test_run_tags_name_the_postgis_layer() -> None:
+    cfg = _tabular_cfg(
+        region_layer=SimpleNamespace(name="ward"),
+        key_layer=SimpleNamespace(name="address_point"),
+    )
+    tags = run_tags(cfg, "p__d")
+    assert tags["wprdc/region_layer"] == "ward"
+    assert tags["wprdc/key_layer"] == "address_point"
+    assert tags["wprdc/postgis_layer"] == "true"
+    plain = run_tags(_tabular_cfg(), "p__d")
+    assert "wprdc/region_layer" not in plain
+    assert "wprdc/postgis_layer" not in plain
+
+
 def test_run_tags_file_pipeline_has_no_ingest() -> None:
     """FilePipeline cfg has no `ingest` attribute at all."""
     cfg = SimpleNamespace(publisher="x", source=SimpleNamespace(type="http"))

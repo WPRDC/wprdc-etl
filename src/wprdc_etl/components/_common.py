@@ -127,6 +127,15 @@ def run_tags(cfg: PipelineConfig, stem: str) -> dict[str, str]:
         tags["wprdc/ingest"] = cfg.ingest
     if getattr(cfg, "heavy", False):
         tags["wprdc/heavy"] = "true"
+    # Which PostGIS layer the job feeds, so the runs that must go first on a
+    # fresh database (deploy/ROLLOUT.md §4) can be filtered in the UI. The UI
+    # filters on key AND value, hence one constant tag to select them all.
+    if getattr(cfg, "region_layer", None):
+        tags["wprdc/region_layer"] = cfg.region_layer.name
+    if getattr(cfg, "key_layer", None):
+        tags["wprdc/key_layer"] = cfg.key_layer.name
+    if "wprdc/region_layer" in tags or "wprdc/key_layer" in tags:
+        tags["wprdc/postgis_layer"] = "true"
     return tags
 
 
