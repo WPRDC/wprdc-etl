@@ -69,6 +69,41 @@ def _with_overrides(
     return out
 
 
+def check_ckan_response(resp: Any, action: str) -> None:
+    """Raise for a failed CKAN Action API response, saying WHO refused it.
+
+    data.wprdc.org sits behind a CDN whose WAF rejects some requests by their
+    contents (CLAUDE.md: any SQL containing `wkb`). Its 403 and CKAN's own
+    Authorization Error look identical to raise_for_status, so the message
+    carries the start of the body and the server header: CKAN answers with a
+    JSON envelope, the WAF with an HTML page.
+
+    401/403 are permanent — no retry gets a different answer — so they're
+    `allow_retries=False` and alert at once instead of after ~7 minutes of
+    backoff. Other errors keep raising `requests.HTTPError` and retry.
+    """
+    import requests
+
+    if resp.ok:
+        return
+    try:
+        envelope = resp.json()
+    except ValueError:
+        envelope = None
+    if isinstance(envelope, dict) and "success" in envelope:
+        who = f"CKAN refused it: {envelope.get('error')}"
+    else:
+        body = " ".join((resp.text or "").split())[:300]
+        who = (
+            "not CKAN's JSON - likely the CDN/WAF in front of it "
+            f"(server={resp.headers.get('server')!r}): {body!r}"
+        )
+    message = f"CKAN {action}: HTTP {resp.status_code}; {who}"
+    if resp.status_code in (401, 403):
+        raise dg.Failure(message, allow_retries=False)
+    raise requests.HTTPError(message, response=resp)
+
+
 def force_publish() -> bool:
     """WPRDC_FORCE_PUBLISH=1 publishes even when CKAN already holds the same
     content — for a resource someone changed by hand behind the fingerprint."""
@@ -648,7 +683,7 @@ class CkanResource(dg.ConfigurableResource):
             files=files,
             timeout=300,
         )
-        resp.raise_for_status()
+        check_ckan_response(resp, name)
         payload = resp.json()
         if not payload.get("success"):
             raise RuntimeError(f"CKAN {name} failed: {payload.get('error')}")
@@ -868,12 +903,19 @@ class CkanResource(dg.ConfigurableResource):
         """({field_id: {"type", "info"}}, row count) for the resource's
         DataStore table, or ({}, 0) if it has none yet. `info` is the field's
         data dictionary (labels, notes, type_override)."""
+        import requests
+
         try:
             result = self._action(
                 "datastore_search", json={"resource_id": resource_id, "limit": 0}
             )
-        except Exception:
-            return {}, 0  # no datastore table / not datastore-active
+        except requests.HTTPError as e:
+            # CKAN answers 404 when the resource has no DataStore table. Only
+            # that means "first load": a refusal, an outage or a timeout must
+            # NOT, or `replace` would create a table over a live one.
+            if e.response is not None and e.response.status_code == 404:
+                return {}, 0
+            raise
         fields = {
             f["id"]: {"type": f["type"], "info": f.get("info") or {}}
             for f in result.get("fields", [])
@@ -984,7 +1026,7 @@ class CkanResource(dg.ConfigurableResource):
             params=params,
             timeout=120,
         )
-        resp.raise_for_status()
+        check_ckan_response(resp, name)
         payload = resp.json()
         if not payload.get("success"):
             raise RuntimeError(f"CKAN {name} failed: {payload.get('error')}")
