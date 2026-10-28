@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator  # runtime import — see arrival_sensor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import dagster as dg
 
@@ -137,6 +137,24 @@ def run_tags(cfg: PipelineConfig, stem: str) -> dict[str, str]:
     if "wprdc/region_layer" in tags or "wprdc/key_layer" in tags:
         tags["wprdc/postgis_layer"] = "true"
     return tags
+
+
+def landed_resources(cfg: PipelineConfig) -> set[str]:
+    """Resource keys the `landed` asset requests: landing, plus whatever the
+    source's extractor declares (only SFTP sources need `sftp`)."""
+    from wprdc_etl.strategies import get_extractor
+
+    return {"landing", *get_extractor(cfg.source.type).resources}
+
+
+def land(context: dg.AssetExecutionContext, cfg: PipelineConfig) -> dict[str, Any]:
+    """The `landed` asset's body, shared by both pipeline types: run the
+    source's extractor with the resources `landed_resources` requested."""
+    from wprdc_etl.strategies import get_extractor
+
+    extractor = get_extractor(cfg.source.type)
+    sftp = context.resources.sftp if "sftp" in extractor.resources else None
+    return extractor.extract(context, cfg, landing=context.resources.landing, sftp=sftp)
 
 
 def asset_tags(cfg: PipelineConfig) -> dict[str, str]:

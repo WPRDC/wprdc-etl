@@ -162,9 +162,12 @@ in this phase is launched by hand from the UI.
       (`grep -rl region_layer: src/wprdc_etl/defs`): the county's zip codes,
       school/voting/council/senate/magisterial/DPW districts, municipal
       boundaries and census tracts; the city's police and fire zones, wards,
-      neighborhoods, council districts and DPW street divisions. Until they've
-      run, the 17 datasets with a `reverse_geocode` step fail, naming the
-      missing layers. `gis/address_points` (the `key_layer`) belongs here too.
+      neighborhoods, council districts and DPW street divisions — plus
+      `gis/address_points` (the `key_layer`). Until they've run, the datasets
+      that read them fail, naming the missing layers: `water_features`
+      (`reverse_geocode`) and `addressing_landmarks` (`join_geometry`). Their
+      `validated` asset lists `spatial` under required resources; no other
+      dataset's does.
 - [ ] **One dataset per source type** — an SFTP, an HTTP, an ArcGIS (mirror),
       a PASDA (`heavy`) and an `api_incremental` one. For each, on
       data.wprdc.org:

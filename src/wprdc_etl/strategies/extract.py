@@ -32,7 +32,11 @@ class Extractor:
 
     Resources are passed by keyword so each extractor takes only what it needs
     (SFTP needs `sftp`; future HTTP/API extractors will take an http client).
+    `resources` names the ones beyond `landing`, so the `landed` asset requests
+    exactly those and the UI's "required resources" is accurate.
     """
+
+    resources: tuple[str, ...] = ()
 
     def extract(
         self,
@@ -47,6 +51,8 @@ class Extractor:
 
 class SftpFileExtractor(Extractor):
     """Pull the newest file matching a glob from an SFTP server and land it."""
+
+    resources = ("sftp",)
 
     def extract(
         self,

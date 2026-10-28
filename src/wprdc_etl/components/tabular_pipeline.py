@@ -29,9 +29,7 @@ from dagster.components import Component, Model, Resolvable
 
 from wprdc_etl.resources import (
     CkanResource,
-    GeocoderResource,
     LandingZoneResource,
-    SFTPResource,
     SpatialResource,
 )
 from wprdc_etl.components._common import (
@@ -39,6 +37,8 @@ from wprdc_etl.components._common import (
     resolve_modes,
     network_retry_policy,
     asset_tags,
+    land,
+    landed_resources,
     run_tags,
     schedule_or_sensor,
     taxonomy,
@@ -53,7 +53,7 @@ from wprdc_etl.components.models import (
     SourceModel,
 )
 from wprdc_etl.dataset_modules import load_dataset_module
-from wprdc_etl.strategies import get_extractor, get_loader
+from wprdc_etl.strategies import get_loader
 from wprdc_etl.strategies.accumulate import merge as merge_into_table
 from wprdc_etl.strategies.emit import publish_representation
 from wprdc_etl.strategies.load import BOOL_FORMATS
@@ -63,7 +63,11 @@ from wprdc_etl.strategies.mirror import (
     validate_mirrors,
 )
 from wprdc_etl.strategies.read import read_landed
-from wprdc_etl.strategies.transform import apply_declarative, validate_steps
+from wprdc_etl.strategies.transform import (
+    apply_declarative,
+    steps_need,
+    validate_steps,
+)
 
 if TYPE_CHECKING:
     import pandera.pandas as pa
@@ -225,38 +229,41 @@ class TabularPipeline(Component, Model, Resolvable):
             partitions_def=partitions,
             group_name=group,
             tags=asset_tags(cfg),
+            required_resource_keys=landed_resources(cfg),
         )
-        def landed(
-            context: dg.AssetExecutionContext,
-            landing: LandingZoneResource,
-            sftp: SFTPResource,
-        ) -> dict[str, Any]:
+        def landed(context: dg.AssetExecutionContext) -> dict[str, Any]:
             # Extractor is chosen by source.type. It lands the raw artifact +
             # manifest and returns the manifest.
-            extractor = get_extractor(cfg.source.type)
-            return extractor.extract(context, cfg, landing=landing, sftp=sftp)
+            return land(context, cfg)
 
         # -- validated ----------------------------------------------------
+        # Only the resources this dataset uses, so the UI's "required
+        # resources" is accurate and a missing one fails at load, not mid-run.
+        validated_resources = {"landing"}
+        if cfg.geocode:
+            validated_resources.add("geocoder")
+        if "spatial" in steps_need(cfg.transforms):
+            validated_resources.add("spatial")
+
         @dg.asset(
             key=[*key_prefix, "validated"],
             partitions_def=partitions,
             deps=[landed],
             group_name=group,
             tags=asset_tags(cfg),
+            required_resource_keys=validated_resources,
         )
-        def validated(
-            context: dg.AssetExecutionContext,
-            landing: LandingZoneResource,
-            geocoder: GeocoderResource,
-            spatial: SpatialResource,
-        ) -> pd.DataFrame:
+        def validated(context: dg.AssetExecutionContext) -> pd.DataFrame:
             partition = (
                 context.partition_key if context.has_partition_key else "current"
             )
-            df = read_landed(landing, cfg, partition)
+            df = read_landed(context.resources.landing, cfg, partition)
             if cfg.geocode:
-                df = geocoder.geocode_frame(df, address_col="address")
-            return _transform(df, cfg, deps={"spatial": spatial, "context": context})
+                df = context.resources.geocoder.geocode_frame(df, address_col="address")
+            deps: dict[str, Any] = {"context": context}
+            if "spatial" in validated_resources:
+                deps["spatial"] = context.resources.spatial
+            return _transform(df, cfg, deps=deps)
 
         # -- accumulated --------------------------------------------------
         # The dataset's full current state, when this run only produced part of
@@ -339,7 +346,10 @@ class TabularPipeline(Component, Model, Resolvable):
             loaded_assets.append(loaded)
 
         # -- schema / drift check on the validated asset ------------------
-        @dg.asset_check(asset=validated)
+        # blocking: a failure at ERROR severity (declared columns missing)
+        # stops everything downstream of `validated` in the same run, the
+        # mirrors included. WARN results (value checks) block nothing.
+        @dg.asset_check(asset=validated, blocking=True)
         def schema_ok(
             context: dg.AssetCheckExecutionContext,
             landing: LandingZoneResource,
@@ -578,10 +588,10 @@ def _make_mirror_asset(
 ) -> dg.AssetsDefinition:
     """Build the publish asset for one mirrored distribution.
 
-    It depends on `landed` rather than `validated`: a mirror is a copy of the
-    upstream file, so it neither reads nor needs the parsed frame. The
-    dependency is there to keep the mirrors inside the dataset's job and
-    ordered after the extract that proved the layer resolves.
+    It reads `landed` (the manifest), not the parsed frame: a mirror is a copy
+    of the upstream file. It still waits for `validated`, so the blocking
+    `schema_ok` check gates it — a layer that lost a declared column isn't
+    copied onto CKAN until someone has looked.
     """
     fmt = mirror.format.lower()
 
@@ -590,6 +600,7 @@ def _make_mirror_asset(
         retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
+        deps=[dg.AssetKey([*key_prefix, "validated"])],
         group_name=group,
         tags=asset_tags(cfg),
     )

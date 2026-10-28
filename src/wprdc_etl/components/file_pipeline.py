@@ -31,14 +31,15 @@ from wprdc_etl.components._common import (
     network_retry_policy,
     partitions_for,
     asset_tags,
+    land,
+    landed_resources,
     run_tags,
     schedule_or_sensor,
     taxonomy,
 )
 from wprdc_etl.components.models import CkanModel, SourceModel
-from wprdc_etl.resources import CkanResource, LandingZoneResource, SFTPResource
+from wprdc_etl.resources import CkanResource, LandingZoneResource
 from wprdc_etl.runtime import sink_dir
-from wprdc_etl.strategies import get_extractor
 
 
 class FilePipeline(Component, Model, Resolvable):
@@ -64,15 +65,10 @@ class FilePipeline(Component, Model, Resolvable):
             group_name=group,
             tags=asset_tags(cfg),
             retry_policy=network_retry_policy(),
+            required_resource_keys=landed_resources(cfg),
         )
-        def landed(
-            context: dg.AssetExecutionContext,
-            landing: LandingZoneResource,
-            sftp: SFTPResource,
-        ) -> dict[str, Any]:
-            return get_extractor(cfg.source.type).extract(
-                context, cfg, landing=landing, sftp=sftp
-            )
+        def landed(context: dg.AssetExecutionContext) -> dict[str, Any]:
+            return land(context, cfg)
 
         # -- published: upload the landed object to the single CKAN resource -
         @dg.asset(

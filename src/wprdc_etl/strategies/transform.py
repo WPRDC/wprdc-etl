@@ -421,6 +421,16 @@ def validate_steps(steps: list[dict[str, Any]] | None) -> None:
                 raise ValueError(f"transform step {i}: {e}") from None
 
 
+def steps_need(steps: list[dict[str, Any]] | None) -> set[str]:
+    """The runtime objects a step list asks for via @needs, e.g. {"spatial"}.
+    The `validated` asset requests a resource only when its steps need it."""
+    return {
+        name
+        for step in steps or []
+        for name in getattr(PRIMITIVES[step["op"]], "_needs", ())
+    }
+
+
 def apply_declarative(
     df: pd.DataFrame,
     steps: list[dict[str, Any]],

@@ -73,9 +73,10 @@ admin-region store.
 ```
 landed ──► validated ──┬──► loaded                 (only when `ckan:` is set)
               │        ├──► published/<format>     (one per `representations:`)
-              │        └──► region_layer           (only when `region_layer:` is set)
+              │        ├──► region_layer           (only when `region_layer:` is set)
+              │        └──► mirrored/<format>      (one per `ckan.mirror:`; also reads `landed`)
               │
-              └──► schema_ok                       (asset check — re-reads the LANDED file)
+              └──► schema_ok                       (BLOCKING asset check — re-reads the LANDED file)
 ```
 
 | Asset key suffix | Returns | What it does |
@@ -106,6 +107,13 @@ in `schema.py` — it isn't in the raw file, so it would be reported missing.
 | a declared column is missing from the file | **ERROR** (`missing_columns`) |
 | columns all present, pandera value/type checks fail | **WARN** |
 | columns all present, everything passes | pass |
+
+The check is **blocking**: an ERROR stops everything downstream of
+`validated` in that run — `loaded`, representations, the PostGIS layers and
+the mirrors — so a file that lost a declared column never reaches CKAN or the
+spatial store. A WARN blocks nothing, and neither does an *added* column (the
+file is still a superset). Mirrors copy the landed bytes rather than the
+frame, but they wait for `validated` precisely so this gate covers them.
 
 It also emits a **drift signal** — informational, never a failure. The check
 fingerprints the file's column set (order-insensitive), compares it to the last

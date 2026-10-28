@@ -447,7 +447,10 @@ DataStore resource as CSV" (`CkanResource.replace` always uploads
 `data.csv`), so pointing it at the GeoJSON resource would push a CSV body
 into a GeoJSON resource. It is optional now; a mirror dataset leaves it
 unset, which also means no `loaded` asset — so `schema_ok` is the only
-pre-publish check on those datasets.
+pre-publish check on those datasets. It is a BLOCKING check and each mirror
+depends on `validated` as well as `landed` for that reason: without the
+dependency the mirrors ran beside `validated`, uploaded before the check
+finished, and a file missing a declared column reached CKAN anyway.
 
 **`mirror[].datastore` makes an uploaded file queryable**, by the route its
 format needs. An uploaded file and a DataStore table coexist fine (the
