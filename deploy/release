@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
 # Deploy a commit: check it out, pin the image CI built from it, restart.
 #
-#   deploy/release          # latest main
-#   deploy/release <sha>    # a specific commit — rollback, or a hotfix
+#   deploy/release                  # latest main
+#   deploy/release <sha>            # a specific commit — rollback, or a hotfix
+#   deploy/release --drain [<sha>]  # hold new runs, let running ones finish,
+#                                   # then release (and reopen the queue)
 #
 # CI tags every image it pushes from a green `main` with the full commit sha,
 # so the checked-out deploy/ files and the running image always come from the
 # same commit. If that image doesn't exist (CI still running, or failed), the
 # pull fails, the checkout is put back and the running stack is untouched.
+#
+# A release restarts `code-location`, and runs execute INSIDE it, so it kills
+# any run in progress. --drain avoids that: it restarts only the daemon with
+# DAGSTER_MAX_CONCURRENT_RUNS=0 (Dagster: "set to 0 to stop any runs from
+# launching"), so schedules and manual launches still queue but nothing
+# starts; waits until no run is in progress; then releases, which brings the
+# daemon back at the normal limit and the held runs start. If the wait times
+# out (RELEASE_DRAIN_TIMEOUT seconds, default 7200) or is interrupted, the
+# queue is reopened and the checkout put back.
 #
 # Records every release in $WPRDC_ETL_HOME/releases.log. Config files live in
 # $WPRDC_ETL_HOME (default /opt/wprdc-etl) — see ROLLOUT.md §2.
@@ -17,11 +28,24 @@
 main() {
   set -euo pipefail
 
+  local drain=0
+  local args=()
+  local a
+  for a in "$@"; do
+    case "$a" in
+      --drain) drain=1 ;;
+      -*) echo "release: unknown option $a" >&2; exit 2 ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  set -- "${args[@]+"${args[@]}"}"
+
   local home="${WPRDC_ETL_HOME:-/opt/wprdc-etl}"
   local repo
   repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   local image_repo="ghcr.io/wprdc/wprdc-etl"
   local env_file="$home/deploy.env"
+  local compose=(docker compose --env-file "$env_file" -f "$repo/deploy/compose.prod.yaml")
 
   cd "$repo"
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
@@ -30,11 +54,19 @@ main() {
     exit 1
   fi
 
-  # Where to put the checkout back if the image isn't there: the commit, and
-  # the branch if on one (the fast-forward below moves the branch too).
+  # Where to put the checkout back if the release doesn't go ahead: the
+  # commit, and the branch if on one (the fast-forward below moves it too).
   local before_sha before_branch
   before_sha="$(git rev-parse HEAD)"
   before_branch="$(git symbolic-ref --quiet --short HEAD || true)"
+  restore_checkout() {
+    if [ -n "$before_branch" ]; then
+      git checkout --quiet "$before_branch"
+      git reset --quiet --hard "$before_sha"
+    else
+      git checkout --quiet --detach "$before_sha"
+    fi
+  }
 
   git fetch --quiet origin
   local target
@@ -58,13 +90,16 @@ main() {
   echo "==> $(git log -1 --format='%h %s (%an, %ar)')"
   if ! docker pull --quiet "$image"; then
     echo "release: no image $image — has CI finished (and passed) for this commit?" >&2
-    if [ -n "$before_branch" ]; then
-      git checkout --quiet "$before_branch"
-      git reset --quiet --hard "$before_sha"
-    else
-      git checkout --quiet --detach "$before_sha"
-    fi
+    restore_checkout
     exit 1
+  fi
+
+  if [ "$drain" -eq 1 ]; then
+    drain_runs
+    # From here the queue is closed; any failure before the final `up` must
+    # reopen it, or production silently launches nothing.
+    trap 'echo "release: failed after draining; reopening the run queue" >&2
+          "${compose[@]}" up -d --no-deps daemon >/dev/null' ERR
   fi
 
   local previous
@@ -78,12 +113,14 @@ main() {
     printf 'WPRDC_ETL_IMAGE=%s\n' "$image" >>"$env_file"
   fi
 
-  local compose=(docker compose --env-file "$env_file" -f "$repo/deploy/compose.prod.yaml")
+  # Brings every service up at the normal run limit — which also reopens the
+  # queue after a drain, since the daemon's config differs and is recreated.
   "${compose[@]}" pull --quiet
   "${compose[@]}" up -d --remove-orphans
+  trap - INT TERM ERR
 
-  printf '%s\t%s\tprevious=%s\n' "$(date -u +%FT%TZ)" "$image" "${previous:-none}" \
-    >>"$home/releases.log"
+  printf '%s\t%s\tprevious=%s%s\n' "$(date -u +%FT%TZ)" "$image" "${previous:-none}" \
+    "$([ "$drain" -eq 1 ] && echo $'\tdrained')" >>"$home/releases.log"
 
   # Each image is ~2.2 GB. Keeps anything a container uses and anything newer
   # than 30 days, so recent rollback targets stay on disk.
@@ -93,5 +130,71 @@ main() {
   echo "==> released $sha (previous: ${previous:-none})"
 }
 
-main "$@"
-exit
+# Hold new runs and wait for the running ones to finish. Uses main()'s
+# locals (compose, restore_checkout); bash's dynamic scoping makes them
+# visible here.
+drain_runs() {
+  local timeout="${RELEASE_DRAIN_TIMEOUT:-7200}"
+
+  reopen() {
+    echo "release: reopening the run queue; nothing was released" >&2
+    restore_checkout
+    "${compose[@]}" up -d --no-deps daemon >/dev/null
+  }
+  trap 'reopen; exit 130' INT TERM
+
+  echo "==> closing the run queue (daemon at DAGSTER_MAX_CONCURRENT_RUNS=0)"
+  DAGSTER_MAX_CONCURRENT_RUNS=0 "${compose[@]}" up -d --no-deps daemon >/dev/null
+  # A compose file that hard-codes the limit ignores the override. Better to
+  # find out now than to wait for runs that are still being launched.
+  local limit
+  limit="$("${compose[@]}" exec -T daemon printenv DAGSTER_MAX_CONCURRENT_RUNS || true)"
+  if [ "$limit" != "0" ]; then
+    echo "release: the daemon came back with limit '${limit}', not 0" >&2
+    reopen
+    exit 1
+  fi
+
+  local waited=0 last=""
+  while :; do
+    local running
+    if ! running="$(in_progress_runs)"; then
+      echo "release: couldn't list the runs in progress" >&2
+      reopen
+      exit 1
+    fi
+    if [ -z "$running" ]; then
+      echo "==> no runs in progress; releasing"
+      return
+    fi
+    if [ "$running" != "$last" ]; then
+      echo "==> waiting for $(printf '%s\n' "$running" | wc -l | tr -d ' ') run(s):"
+      sed 's/^/    /' <<<"$running"
+      last="$running"
+    fi
+    if [ "$waited" -ge "$timeout" ]; then
+      echo "release: still running after ${timeout}s (RELEASE_DRAIN_TIMEOUT)" >&2
+      reopen
+      exit 1
+    fi
+    sleep 15
+    waited=$((waited + 15))
+  done
+}
+
+# One line per run that is starting, running or cancelling, read from the
+# instance inside the webserver container (it has DAGSTER_HOME and Postgres).
+in_progress_runs() {
+  "${compose[@]}" exec -T webserver python - <<'PY'
+from dagster import DagsterInstance, RunsFilter
+from dagster._core.storage.dagster_run import IN_PROGRESS_RUN_STATUSES
+
+instance = DagsterInstance.get()
+for run in instance.get_runs(RunsFilter(statuses=IN_PROGRESS_RUN_STATUSES)):
+    print(f"{run.job_name}  {run.status.value}  {run.run_id[:8]}")
+PY
+}
+
+# One line: bash has read `exit` before main runs, so whatever the checkout
+# leaves at this file offset is never executed.
+main "$@"; exit

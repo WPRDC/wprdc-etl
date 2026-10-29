@@ -37,7 +37,9 @@ x-app: &app
     AWS_REGION: us-east-1
     LANDING_BUCKET: wprdc-etl-landing
     DAGSTER_RUNTIME_BUCKET: wprdc-dagster-runtime
-    DAGSTER_MAX_CONCURRENT_RUNS: "4"
+    # Interpolated so `deploy/release --drain` can bring the daemon up at 0
+    # (launch nothing) for the length of a release.
+    DAGSTER_MAX_CONCURRENT_RUNS: ${DAGSTER_MAX_CONCURRENT_RUNS:-4}
     CKAN_URL: https://data.wprdc.org
     DAGSTER_WEBSERVER_URL: https://${DAGSTER_DOMAIN:?set DAGSTER_DOMAIN in deploy.env}
     WPRDC_ALERT_SLACK_CHANNEL: "#etl-alerts"

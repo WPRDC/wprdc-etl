@@ -224,6 +224,20 @@ stack is untouched. A change to `deploy/` alone deploys the same way — it
 just re-pulls the image it already has. It refuses a dirty checkout and a
 commit older than the script itself.
 
+**A release kills runs in progress** — they execute inside `code-location`,
+which `up -d` restarts. Release when nothing is running, or drain first:
+
+```sh
+/opt/wprdc-etl/repo/deploy/release --drain [<sha>]
+```
+
+It restarts only the daemon at `DAGSTER_MAX_CONCURRENT_RUNS=0`, so schedules
+and manual launches still queue but nothing new starts; lists the runs it is
+waiting on until none are left; then releases, which brings the daemon back
+at the normal limit and the held runs start. If the runs don't finish within
+`RELEASE_DRAIN_TIMEOUT` seconds (default 7200), or you Ctrl-C, it reopens the
+queue, puts the checkout back and releases nothing.
+
 **Roll back** — `deploy/release <previous sha>`. Every release is a line in
 `/opt/wprdc-etl/releases.log`, with the image it replaced; the next plain
 `deploy/release` returns to `main`.
