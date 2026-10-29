@@ -393,10 +393,15 @@ different for a blob:
 
 | `partition` | Partitions definition | Partition key example |
 |-------------|----------------------|-----------------------|
-| `monthly` | `MonthlyPartitionsDefinition(start_date="2024-01-01")` | `2026-08-01` |
-| `weekly` | `WeeklyPartitionsDefinition(start_date="2024-01-01")` | `2026-08-30` |
+| `monthly` | `MonthlyPartitionsDefinition(start_date="2026-09-01")` | `2026-09-01` |
+| `weekly` | `WeeklyPartitionsDefinition(start_date="2026-09-01")` | `2026-09-06` |
 | `none` / unset | none — the asset is unpartitioned | — (the code uses the literal `current`) |
-| anything else (incl. `daily`) | `DailyPartitionsDefinition(start_date="2024-01-01")` | `2026-08-30` |
+| anything else (incl. `daily`) | `DailyPartitionsDefinition(start_date="2026-09-01")` | `2026-09-06` |
+
+All in America/New_York. The start (`_START`) is the month before the
+production launch, so the launchpad offers only partitions that can hold
+data; a partition exists once its period has ENDED, so the newest monthly
+one is always last month.
 
 Two things worth knowing:
 

@@ -21,11 +21,17 @@ if TYPE_CHECKING:
 
     from wprdc_etl.components.models import PipelineConfig
 
-_START = "2024-01-01"
+# The first partition of every partitioned dataset: the month before the
+# production launch. Earlier partitions would hold no data, crowd the
+# launchpad, show as "missing" and invite a backfill of hundreds of runs —
+# and most sources are snapshots, so running one would file TODAY's data
+# under that old date. Not October: a monthly partition only exists once its
+# month has ended, and the monthly datasets needed one to launch by hand.
+_START = "2026-09-01"
 
 # Every publisher is a Pittsburgh-area civic agency, so schedules fire on
-# Eastern wall-clock time, not UTC. (Partition boundaries are still UTC — see
-# partitions_for; aligning those to Eastern is a separate, larger change.)
+# Eastern wall-clock time, not UTC, and partitions turn over at Eastern
+# midnight too (partitions_for builds them in this timezone).
 SCHEDULE_TZ = "America/New_York"
 
 
