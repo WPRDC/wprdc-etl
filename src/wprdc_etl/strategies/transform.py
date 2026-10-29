@@ -76,8 +76,10 @@ def strip(df: pd.DataFrame, columns: list[str] | None = None) -> pd.DataFrame:
 
 
 def rename(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
-    """Rename columns via {old: new}."""
-    return df.rename(columns=mapping)
+    """Rename columns via {old: new}. Renaming a GeoDataFrame's geometry
+    column keeps it the geometry (e.g. `geometry: wkt` for a legacy table)."""
+    active = _active_geometry(df)
+    return _repoint_geometry(df.rename(columns=mapping), active, mapping.get(active))
 
 
 def coerce_numeric(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
@@ -136,8 +138,9 @@ def drop_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 def snake_case_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize column names to snake_case."""
+    active = _active_geometry(df)
     df.columns = [_to_snake(c) for c in df.columns]
-    return df
+    return _repoint_geometry(df, active, _to_snake(active) if active else None)
 
 
 def to_crs(df: pd.DataFrame, epsg: int) -> pd.DataFrame:
@@ -351,6 +354,27 @@ def _pick(
     if which == "id":
         return region_id
     return region_name if region_name not in (None, "") else region_id
+
+
+def _active_geometry(df: pd.DataFrame) -> str | None:
+    """The name of a GeoDataFrame's active geometry column; None otherwise."""
+    return getattr(df, "_geometry_column_name", None)
+
+
+def _repoint_geometry(
+    df: pd.DataFrame, old: str | None, new: str | None
+) -> pd.DataFrame:
+    """After a column rename, point a GeoDataFrame back at its geometry.
+
+    geopandas tracks the active geometry by NAME, so renaming that column
+    leaves it pointing at a column that no longer exists, and every spatial
+    operation after it fails — the GeoJSON representation included. The CSV
+    publish is unaffected either way: it writes the geometry as WKT under
+    whatever the column is called.
+    """
+    if old and new and new != old and hasattr(df, "set_geometry"):
+        return df.set_geometry(new)
+    return df
 
 
 def _to_snake(name: str) -> str:

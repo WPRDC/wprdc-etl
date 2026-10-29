@@ -38,6 +38,19 @@ attributes:
       This dataset contains boundaries of individual parcels in Allegheny County, including the county block and lot number. As this is a very large dataset, you may wish to use our property information extractor (http://tools.wprdc.org/parcels-n-at/) to download filtered versions of this parcel dataset.
 
       The most authoritative source for this data is now the PASDA page (https://www.pasda.psu.edu/uci/DataSummary.aspx?dataset=1214), which includes links to historical versions of the shapefile representations of this data.
+  transforms:
+    - op: snake_case_columns
+    - op: rename
+      mapping:
+        calcacreag: calc_acreage
+        mapblocklo: map_block_lot
+        shape_leng: shape_length
+        geometry: wkt
+    - op: drop_columns
+      columns:
+        - global_id
+        - shape_area
+
   # The GeoJSON resource is DERIVED from the validated frame, not
   # copied: PASDA ships only a shapefile, so there is no upstream
   # GeoJSON to mirror.

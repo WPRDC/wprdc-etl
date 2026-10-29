@@ -301,3 +301,41 @@ def test_validate_steps_rejects_an_unknown_value_mode() -> None:
                 }
             ]
         )
+
+
+def _parcels_like():
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    return gpd.GeoDataFrame(
+        {"CALCACREAG": [1.5], "Shape_Leng": [10.0]},
+        geometry=[Point(-80.0, 40.4)],
+        crs=4326,
+    )
+
+
+def test_renaming_the_geometry_column_keeps_it_the_geometry() -> None:
+    out = apply_declarative(
+        _parcels_like(),
+        [{"op": "rename", "mapping": {"geometry": "wkt", "CALCACREAG": "acres"}}],
+    )
+    assert out.geometry.name == "wkt"
+    assert out.crs.to_epsg() == 4326
+    assert '"acres": 1.5' in out.to_json()  # GeoJSON still builds
+    # The CSV publish writes the geometry as WKT under the new name.
+    assert "wkt" in out.to_csv(index=False).splitlines()[0]
+    assert "POINT (-80 40.4)" in out.to_csv(index=False)
+
+
+def test_snake_case_columns_keeps_a_renamed_geometry() -> None:
+    gdf = _parcels_like().rename_geometry("SHAPE")
+    out = apply_declarative(gdf, [{"op": "snake_case_columns"}])
+    assert list(out.columns) == ["calcacreag", "shape_leng", "shape"]
+    assert out.geometry.name == "shape"
+
+
+def test_rename_on_a_plain_frame_is_unchanged() -> None:
+    out = apply_declarative(
+        pd.DataFrame({"a": [1]}), [{"op": "rename", "mapping": {"a": "b"}}]
+    )
+    assert list(out.columns) == ["b"]
