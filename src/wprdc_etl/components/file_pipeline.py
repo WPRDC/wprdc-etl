@@ -32,6 +32,7 @@ from wprdc_etl.components._common import (
     partitions_for,
     asset_tags,
     land,
+    landed_kinds,
     landed_resources,
     run_tags,
     schedule_or_sensor,
@@ -64,6 +65,7 @@ class FilePipeline(Component, Model, Resolvable):
             partitions_def=partitions,
             group_name=group,
             tags=asset_tags(cfg),
+            kinds=landed_kinds(cfg),
             retry_policy=network_retry_policy(),
             required_resource_keys=landed_resources(cfg),
         )
@@ -78,6 +80,7 @@ class FilePipeline(Component, Model, Resolvable):
             deps=[landed],
             group_name=group,
             tags=asset_tags(cfg),
+            kinds={"ckan"},
         )
         def published(
             context: dg.AssetExecutionContext,

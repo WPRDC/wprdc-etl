@@ -163,6 +163,24 @@ def land(context: dg.AssetExecutionContext, cfg: PipelineConfig) -> dict[str, An
     return extractor.extract(context, cfg, landing=context.resources.landing, sftp=sftp)
 
 
+# Source formats that read into a GeoDataFrame.
+_GEO_FORMATS = {"geojson", "shapefile"}
+
+
+def landed_kinds(cfg: PipelineConfig) -> set[str]:
+    """Kinds for `landed`: it writes to S3, from this kind of source. Kinds
+    are the catalog's icons and its `kind:` filter (at most three each)."""
+    source = cfg.source.type
+    return {"s3", "api" if source.startswith("api") else source}
+
+
+def frame_kinds(cfg: PipelineConfig) -> set[str]:
+    """Kinds for `validated`. The frame's type is only known at run time, but
+    the source format decides it: geojson and shapefile read as geopandas."""
+    fmt = (getattr(cfg.source, "format", None) or "").lower()
+    return {"geopandas" if fmt in _GEO_FORMATS else "pandas"}
+
+
 def asset_tags(cfg: PipelineConfig) -> dict[str, str]:
     """The run tags, for every asset of the dataset, so the asset catalog can
     filter on them (`tag:wprdc/source=sftp`) — the Jobs list can't filter on

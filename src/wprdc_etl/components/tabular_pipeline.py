@@ -37,7 +37,9 @@ from wprdc_etl.components._common import (
     resolve_modes,
     network_retry_policy,
     asset_tags,
+    frame_kinds,
     land,
+    landed_kinds,
     landed_resources,
     run_tags,
     schedule_or_sensor,
@@ -229,6 +231,7 @@ class TabularPipeline(Component, Model, Resolvable):
             partitions_def=partitions,
             group_name=group,
             tags=asset_tags(cfg),
+            kinds=landed_kinds(cfg),
             required_resource_keys=landed_resources(cfg),
         )
         def landed(context: dg.AssetExecutionContext) -> dict[str, Any]:
@@ -251,6 +254,7 @@ class TabularPipeline(Component, Model, Resolvable):
             deps=[landed],
             group_name=group,
             tags=asset_tags(cfg),
+            kinds=frame_kinds(cfg),
             required_resource_keys=validated_resources,
         )
         def validated(context: dg.AssetExecutionContext) -> pd.DataFrame:
@@ -279,6 +283,7 @@ class TabularPipeline(Component, Model, Resolvable):
                 ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
                 group_name=group,
                 tags=asset_tags(cfg),
+                kinds={"parquet", "s3"},
             )
             def accumulated(
                 context: dg.AssetExecutionContext,
@@ -331,6 +336,7 @@ class TabularPipeline(Component, Model, Resolvable):
                 ins={"to_publish": dg.AssetIn(key=[*key_prefix, upstream])},
                 group_name=group,
                 tags=asset_tags(cfg),
+                kinds={"ckan"},
             )
             def loaded(
                 context: dg.AssetExecutionContext,
@@ -536,6 +542,7 @@ def _make_representation_asset(
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
         group_name=group,
         tags=asset_tags(cfg),
+        kinds={"ckan", fmt},
     )
     def _representation(
         context: dg.AssetExecutionContext,
@@ -603,6 +610,7 @@ def _make_mirror_asset(
         deps=[dg.AssetKey([*key_prefix, "validated"])],
         group_name=group,
         tags=asset_tags(cfg),
+        kinds={"ckan", fmt},
     )
     def _mirror(
         context: dg.AssetExecutionContext,
@@ -642,6 +650,7 @@ def _make_metadata_asset(
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
         group_name=group,
         tags=asset_tags(cfg),
+        kinds={"ckan"},
     )
     def _metadata(
         context: dg.AssetExecutionContext,
