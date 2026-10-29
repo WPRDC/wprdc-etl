@@ -29,7 +29,16 @@ Each phase ends in a state that is safe to leave overnight.
 - [x] **S3**, us-east-1, Block Public Access on:
       - `wprdc-etl-landing` — then
         `aws s3api put-bucket-lifecycle-configuration --bucket wprdc-etl-landing --lifecycle-configuration file://deploy/s3-lifecycle.json`
-      - `wprdc-dagster-runtime`
+      - `wprdc-dagster-runtime` — then
+        `aws s3api put-bucket-lifecycle-configuration --bucket wprdc-dagster-runtime --lifecycle-configuration file://deploy/s3-lifecycle-runtime.json`
+        - `dagster/io/` (pickled step handoffs) expire after 30 days: they
+          only serve re-running a step of a recent run.
+        - `dagster/compute-logs/` are kept, tiered to Standard-IA at 90 days
+          and Glacier Instant Retrieval at 365 — instant retrieval, so the
+          UI's log view still works on old runs. Logs of 128 KB or less stay
+          in Standard: below that, IA bills them as 128 KB anyway.
+- [ ] **Runtime-bucket lifecycle** applied (the item above; added after the
+      bucket was provisioned).
 - [x] **VM** — EC2, Ubuntu, amd64 (CI builds amd64 only), ~16 GB RAM
       (`m6i.xlarge`/`t3.xlarge`: code-location is capped at 6 GB, plus
       webserver, daemon, OS), **50 GB gp3** root volume (peak ~25 GB: OS,
