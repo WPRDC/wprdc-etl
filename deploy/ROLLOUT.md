@@ -37,7 +37,7 @@ Each phase ends in a state that is safe to leave overnight.
           and Glacier Instant Retrieval at 365 — instant retrieval, so the
           UI's log view still works on old runs. Logs of 128 KB or less stay
           in Standard: below that, IA bills them as 128 KB anyway.
-- [ ] **Runtime-bucket lifecycle** applied (the item above; added after the
+- [x] **Runtime-bucket lifecycle** applied (the item above; added after the
       bucket was provisioned).
 - [x] **VM** — EC2, Ubuntu, amd64 (CI builds amd64 only), ~16 GB RAM
       (`m6i.xlarge`/`t3.xlarge`: code-location is capped at 6 GB, plus
@@ -156,7 +156,7 @@ Bring it up with `deploy/release`: it checks out the latest `main`, pins
 /opt/wprdc-etl/deploy/release
 ```
 
-- [ ] All five services healthy; `dagster instance migrate` ran in each Dagster log except `webserver-ro`, which skips it.
+- [x] All five services healthy; `dagster instance migrate` ran in each Dagster log except `webserver-ro`, which skips it.
 - [x] `https://$DAGSTER_DOMAIN` gives a certificate and asks for the password.
 - [x] Code location loaded, 109 jobs and 108 schedules; Deployment → Daemons
       all green.
@@ -179,6 +179,11 @@ in this phase is launched by hand from the UI.
       (`reverse_geocode`) and `addressing_landmarks` (`join_geometry`). Their
       `validated` asset lists `spatial` under required resources; no other
       dataset's does.
+      To queue all 16 at once: `deploy/launch-all --layers --dry-run`, then
+      without `--dry-run`. It submits each job's latest partition as a real
+      job run (job tags, concurrency limits) and skips any job already queued
+      or running. Without `--layers` it queues every dataset — the layers
+      still first, at a higher priority — and `--source` / `--only` narrow it.
 - [ ] **One dataset per source type** — an SFTP, an HTTP, an ArcGIS (mirror),
       a PASDA (`heavy`) and an `api_incremental` one. For each, on
       data.wprdc.org:

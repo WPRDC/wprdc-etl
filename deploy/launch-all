@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Queue every dataset job's latest partition; the run queue paces them.
+#
+#   deploy/launch-all --dry-run          # what it would queue
+#   deploy/launch-all --layers           # the 16 PostGIS layer jobs only
+#   deploy/launch-all --source pasda     # one source type
+#   deploy/launch-all --only __gis__     # job name contains
+#   deploy/launch-all                    # everything
+#
+# PostGIS layer jobs are queued at a higher priority, so the datasets that
+# read them find them loaded. Jobs with a run already queued or running are
+# skipped, so re-running this is safe. See src/wprdc_etl/launch_all.py.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$here/dc" exec -T webserver python -m wprdc_etl.launch_all "$@"
