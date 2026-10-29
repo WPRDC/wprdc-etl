@@ -221,6 +221,13 @@ old/
 # Generated IDE schema for defs.yaml (bin/editor-schema)
 .dg/
 
+
+/deploy.env
+/prod.env
+/proxy.env
+/known_hosts
+/releases.log
+
 # macOS Finder metadata
 .DS_Store
 

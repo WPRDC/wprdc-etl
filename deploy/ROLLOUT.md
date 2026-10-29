@@ -65,13 +65,15 @@ All under `/opt/wprdc-etl/`, owned by the instance's default `ubuntu` user,
 which runs `docker compose` without `sudo`. Root ownership would buy nothing:
 `ubuntu` has passwordless sudo, and `docker` group membership is
 root-equivalent anyway. The modes are what matter — the secret files stay
-0600. Check out the repo (or copy `deploy/`) next to them — compose mounts
-`deploy/Caddyfile` by relative path.
+0600. `/opt/wprdc-etl` is itself the git checkout, and the files below sit
+at its root beside the code. `.gitignore` covers them, so `git status` stays
+clean and `deploy/release` doesn't see them as local changes — but **never
+run `git clean -x` there**: ignored files are exactly what it deletes.
 
 ```sh
 sudo usermod -aG docker ubuntu        # then log out and back in
 sudo install -d -o ubuntu -g ubuntu -m 0700 /opt/wprdc-etl
-git clone https://github.com/WPRDC/wprdc-etl.git /opt/wprdc-etl/repo
+git clone https://github.com/WPRDC/wprdc-etl.git /opt/wprdc-etl   # while it's empty
 # ...write the files below, then:
 chmod 600 /opt/wprdc-etl/{prod.env,proxy.env}
 chmod 644 /opt/wprdc-etl/{deploy.env,known_hosts}
@@ -135,14 +137,14 @@ Every compose command goes through `deploy/dc`, which supplies
 `--env-file /opt/wprdc-etl/deploy.env -f deploy/compose.prod.yaml` and passes
 the rest through, from any directory (`deploy/dc logs -f proxy`,
 `deploy/dc restart daemon`, …). Optionally
-`sudo ln -s /opt/wprdc-etl/repo/deploy/dc /usr/local/bin/dc` to type `dc`.
+`sudo ln -s /opt/wprdc-etl/deploy/dc /usr/local/bin/dc` to type `dc`.
 
 Bring it up with `deploy/release`: it checks out the latest `main`, pins
 `WPRDC_ETL_IMAGE` in `deploy.env` to the image CI built from that commit
 (adding the line if it's missing), pulls, runs `up -d` and prints `ps`:
 
 ```sh
-/opt/wprdc-etl/repo/deploy/release
+/opt/wprdc-etl/deploy/release
 ```
 
 - [ ] All five services healthy; `dagster instance migrate` ran in each Dagster log except `webserver-ro`, which skips it.
@@ -212,8 +214,8 @@ decides the default for one nobody has touched.
 **Deploy a new version** — once CI is green for the commit:
 
 ```sh
-/opt/wprdc-etl/repo/deploy/release          # latest main
-/opt/wprdc-etl/repo/deploy/release <sha>    # a specific commit
+/opt/wprdc-etl/deploy/release          # latest main
+/opt/wprdc-etl/deploy/release <sha>    # a specific commit
 ```
 
 It checks out the commit, pins `WPRDC_ETL_IMAGE` to `:<sha>`, pulls, `up -d`,
@@ -228,7 +230,7 @@ commit older than the script itself.
 which `up -d` restarts. Release when nothing is running, or drain first:
 
 ```sh
-/opt/wprdc-etl/repo/deploy/release --drain [<sha>]
+/opt/wprdc-etl/deploy/release --drain [<sha>]
 ```
 
 It restarts only the daemon at `DAGSTER_MAX_CONCURRENT_RUNS=0`, so schedules
