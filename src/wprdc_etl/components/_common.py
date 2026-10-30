@@ -159,8 +159,33 @@ def land(context: dg.AssetExecutionContext, cfg: PipelineConfig) -> dict[str, An
     from wprdc_etl.strategies import get_extractor
 
     extractor = get_extractor(cfg.source.type)
+    landing = context.resources.landing
     sftp = context.resources.sftp if "sftp" in extractor.resources else None
-    return extractor.extract(context, cfg, landing=context.resources.landing, sftp=sftp)
+    manifest = extractor.extract(context, cfg, landing=landing, sftp=sftp)
+    partition = context.partition_key if context.has_partition_key else "current"
+    try:
+        context.add_output_metadata(landing_links(landing, cfg, partition))
+    except Exception as e:  # a link is a nicety; it must never fail a landing
+        context.log.warning(f"couldn't attach the landing links: {e}")
+    return manifest
+
+
+def landing_links(landing: Any, cfg: PipelineConfig, partition: str) -> dict:
+    """Where this run landed, as run/asset metadata: the s3:// URI, and on
+    real AWS a link to the prefix in the S3 console (LocalStack has none)."""
+    from urllib.parse import quote
+
+    prefix = landing.prefix(cfg.publisher, cfg.dataset, partition, cfg.department)
+    links: dict[str, Any] = {
+        "landing_uri": dg.MetadataValue.path(f"s3://{landing.bucket}/{prefix}/")
+    }
+    if not landing.endpoint_url:
+        region = landing.region
+        links["landing_console"] = dg.MetadataValue.url(
+            f"https://{region}.console.aws.amazon.com/s3/buckets/{landing.bucket}"
+            f"?region={region}&prefix={quote(prefix + '/')}&showversions=false"
+        )
+    return links
 
 
 # Source formats that read into a GeoDataFrame.
