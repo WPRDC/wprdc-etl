@@ -36,6 +36,14 @@ def test_int_for_older_datasets() -> None:
     assert str(out["inactive"].dtype) == "Int64"
 
 
+def test_bool_keeps_a_boolean_column() -> None:
+    out = publishable_booleans(_frame(), "bool")
+    assert str(out["inactive"].dtype) == "boolean"
+    assert out["maybe"][0] and pd.isna(out["maybe"][1])
+    # The CSV DataPusher+ loads still says True/False; blank for missing.
+    assert out.to_csv(index=False).splitlines()[1:] == ["True,True,a", "False,,b"]
+
+
 def test_other_columns_and_the_input_are_untouched() -> None:
     frame = _frame()
     out = publishable_booleans(frame, "text")

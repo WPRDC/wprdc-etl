@@ -50,6 +50,9 @@ attributes:
   ckan:
     package_id: "city-water-features"
     resource_id: "513290a6-2bac-4e41-8029-354cbda6a7b7"
+    # `inactive` stays a real boolean column (the live table's type). Needs
+    # `bool` in data.wprdc.org's ckanext.datapusher_plus.type_mapping.
+    bool_format: bool
   geometry:
     lat: latitude
     lng: longitude

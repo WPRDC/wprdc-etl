@@ -157,13 +157,19 @@ genuinely dataset-specific logic.
     came back numeric every time; with it they stayed text. It also throws
     the dictionary away when it re-creates (seen locally), which is why the
     overrides are rewritten whenever a load finds them missing.
-  - **`bool` can't be pinned**, so the replace loader converts booleans first
-    (`ckan.bool_format`: `text` -> True/False, the default, or `int` -> 1/0
-    for older datasets). Title case because most of production's text
-    booleans already use it. A dataset whose live table has a real `bool` column is
-    blocked once by the column guard (`bool->text`); clear it with one
-    run launched with the tag `wprdc/rebuild=true` (same as
-    `ckan.rebuild: true`, for that run only — no commit, no redeploy).
+  - **`bool` can be pinned only with a server setting.** DataPusher+ applies
+    a `type_override` only if it is one of the VALUES of its
+    `ckanext.datapusher_plus.type_mapping` (verified in its source, 3.0.0 and
+    main), and the default mapping has no boolean. Adding
+    `"Boolean": "bool"` to that CKAN setting makes `bool` an allowed
+    override; qsv is never asked to infer booleans, so nothing else changes.
+    `ckan.bool_format` chooses per dataset: `text` -> True/False (the
+    default), `int` -> 1/0 for older datasets, or `bool`, which keeps the
+    column boolean and writes `type_override: bool` (`water_features`).
+    Without the server setting a `bool` column comes back text and the next
+    run's guard reports `text -> bool`. A dataset whose live table has a real
+    `bool` column and publishes `text` is blocked once (`bool->text`); clear
+    it with one run tagged `wprdc/rebuild=true`.
   - **Anything else added to the table is lost on every load** —
     ckanext-spatialdata's `dataspatial_wkb` included. `replace()` still
     truncates (`filters: {}`) rather than drops on a normal load, but that no

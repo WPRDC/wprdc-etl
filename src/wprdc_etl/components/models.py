@@ -127,9 +127,10 @@ class CkanModel(Model, Resolvable):
     # drop and rebuild the table -- only necessary when changing schema
     rebuild: bool = False
     # How boolean columns are published by a replace: "text" (True/False, the
-    # default) or "int" (1/0, what some older WPRDC datasets use).
-    # Production's DataPusher+ can't keep a bool column — it re-creates every
-    # table and has no bool type_override — so they are converted first.
+    # default), "int" (1/0, what some older WPRDC datasets use) or "bool" (a
+    # real boolean column, pinned with type_override: bool). DataPusher+
+    # re-creates every table and keeps a bool only where the CKAN server's
+    # ckanext.datapusher_plus.type_mapping allows it; see publishable_booleans.
     bool_format: str = "text"
     # make the DataStore table spatial-ready via ckanext-spatialdata; reads the
     # dataset's `geometry:` block, which it therefore requires

@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from wprdc_etl.resources import CkanResource
 
 
-BOOL_FORMATS = ("text", "int")
+BOOL_FORMATS = ("text", "int", "bool")
 
 
 def publishable_booleans(dataframe: pd.DataFrame, bool_format: str) -> pd.DataFrame:
@@ -48,6 +48,13 @@ def publishable_booleans(dataframe: pd.DataFrame, bool_format: str) -> pd.DataFr
     first makes the frame say what the table will hold — so the column-change
     guard compares like with like — and lets a dataset choose the form:
     "text" -> "True"/"False", "int" -> 1/0. Missing values stay missing.
+
+    "bool" keeps them boolean: the CSV still says True/False (PostgreSQL
+    reads both into a boolean column), and `replace` pins the column with
+    `type_override: bool`. DataPusher+ honours that only when its
+    `ckanext.datapusher_plus.type_mapping` lists `bool` among its values —
+    a CKAN server setting. Without it the column comes back text, and the
+    next run's column guard reports `text -> bool`.
     Title case on purpose: it is what most of WPRDC's text booleans already
     use (Python's spelling), and what DataPusher+ was seen storing even when
     sent "false"/"true" — so the file and the DataStore agree.
@@ -66,7 +73,9 @@ def publishable_booleans(dataframe: pd.DataFrame, bool_format: str) -> pd.DataFr
         if out is dataframe:
             out = dataframe.copy()
         values = dataframe[col].astype("boolean")
-        if bool_format == "int":
+        if bool_format == "bool":
+            out[col] = values
+        elif bool_format == "int":
             out[col] = values.astype("Int64")
         else:
             out[col] = values.map({True: "True", False: "False"}).astype("string")

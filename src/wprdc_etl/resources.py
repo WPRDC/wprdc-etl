@@ -50,9 +50,17 @@ FINGERPRINT_FIELD = "etl_sha256"
 
 
 # Our field types -> the data-dictionary type_override DataPusher+ honours.
-# No `bool`: production's DataPusher+ turns it into text regardless, so the
-# replace loader converts booleans first (ckan.bool_format).
-_OVERRIDE_TYPES = {"text": "text", "numeric": "numeric", "timestamp": "timestamp"}
+# `bool` only takes effect where the CKAN server's
+# ckanext.datapusher_plus.type_mapping lists it (DataPusher+ applies an
+# override only if it is one of that mapping's values). A frame reaches
+# replace() with bool columns only under `ckan.bool_format: bool`; the other
+# formats convert them to text or ints first.
+_OVERRIDE_TYPES = {
+    "text": "text",
+    "numeric": "numeric",
+    "timestamp": "timestamp",
+    "bool": "bool",
+}
 
 
 def _with_overrides(

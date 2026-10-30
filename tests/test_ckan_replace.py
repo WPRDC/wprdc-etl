@@ -82,11 +82,12 @@ def test_first_load_creates_the_table_with_type_overrides_before_uploading(
 ) -> None:
     assert _ckan(monkeypatch, live={}).replace(RID, _frame()) is True
     assert _names(calls) == ["datastore_create", "resource_patch", "datapusher_submit"]
-    # type_override pins what DataPusher+ re-creates; bool has none.
+    # type_override pins what DataPusher+ re-creates — bool included, which
+    # the server honours once its type_mapping lists it (bool_format: bool).
     assert calls[0][1]["fields"] == [
         {"id": "id", "type": "text", "info": {"type_override": "text"}},
         {"id": "ward", "type": "text", "info": {"type_override": "text"}},
-        {"id": "inactive", "type": "bool"},
+        {"id": "inactive", "type": "bool", "info": {"type_override": "bool"}},
         {"id": "latitude", "type": "numeric", "info": {"type_override": "numeric"}},
     ]
     assert calls[1][1][FINGERPRINT_FIELD] == _sha(_frame())  # recorded with it
@@ -129,7 +130,7 @@ def test_overrides_already_in_place_are_not_rewritten(
     live = {
         "id": {"type": "text", "info": {"type_override": "text"}},
         "ward": {"type": "text", "info": {"type_override": "text"}},
-        "inactive": "bool",
+        "inactive": {"type": "bool", "info": {"type_override": "bool"}},
         "latitude": {"type": "numeric", "info": {"type_override": "numeric"}},
     }
     _ckan(monkeypatch, live=live, rows=7).replace(RID, _frame())
