@@ -58,3 +58,5 @@ attributes:
         resource_id: "87a73d31-63a4-4568-a76b-de316b50537c"
       - format: rest_api
         resource_id: "12e5b620-7d8a-4582-9f9e-a697e92840e0"
+  transforms:
+    - op: snake_case_columns
