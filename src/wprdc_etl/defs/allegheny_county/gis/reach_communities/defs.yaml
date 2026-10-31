@@ -32,13 +32,7 @@ attributes:
   partition: weekly
   ingest: snapshot
   ckan:
-    # NOT YET CREATED. This id is minted from the catalogue title and
-    # is stable, but no package carries it: run `bin/seed-ckan --write`
-    # against the target portal before publishing.
     package_id: "345ade13-d1df-55e2-9531-40aff7f93188"
-    # Push the publisher's description (HTML -> Markdown) and keywords onto
-    # the package. Anything of ours goes in `description_suffix`, which is
-    # appended and so survives an upstream edit.
     sync_metadata: true
     mirror:
       - format: geojson

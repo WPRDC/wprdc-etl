@@ -31,6 +31,8 @@ attributes:
   schedule: "3 4 * * 0"  # Sunday 04:03 ET
   partition: weekly
   ingest: snapshot
+  transforms:
+    - op: snake_case_columns
   ckan:
     package_id: "5910ce27-8f64-49fe-921e-9b8410d9cc79"
     # Push the publisher's description (HTML -> Markdown) and keywords onto
