@@ -102,6 +102,17 @@ columns. That is why a column your transforms *derive* (anything
 `reverse_geocode` attaches, a computed `full_address`) must **not** be declared
 in `schema.py` — it isn't in the raw file, so it would be reported missing.
 
+Each result carries both sides of the comparison as metadata, so a failure
+reads at a glance in the check's panel:
+
+| Metadata | What |
+|---|---|
+| `source_schema` | the landed file's columns and their pandas dtypes |
+| `destination_schema` | the contract's columns — `schema.py` with dtypes and nullability, or `required_columns` |
+| `missing_columns` | declared but absent (the ERROR) |
+| `undeclared_columns` | in the file but not declared (allowed — the file is a superset) |
+| `value_failures` | on a WARN: each failing column/check, how many values failed, a few examples |
+
 | `schema_ok` outcome | Severity |
 |---------------------|----------|
 | a declared column is missing from the file | **ERROR** (`missing_columns`) |

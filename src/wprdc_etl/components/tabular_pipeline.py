@@ -385,11 +385,13 @@ class TabularPipeline(Component, Model, Resolvable):
             # Skipped when structurally broken, since pandera would just
             # re-report the missing columns.
             pandera_ok = True
+            value_failures: dict[str, Any] = {}
             if not missing and rich is not None:
                 try:
                     rich.validate(df, lazy=True)
-                except pa.errors.SchemaErrors:
+                except pa.errors.SchemaErrors as e:
                     pandera_ok = False
+                    value_failures = _value_failures(e.failure_cases)
 
             # Cheap drift signal: compare this run's column set to the last one
             # this dataset presented, then record it as the next baseline. The
@@ -419,6 +421,18 @@ class TabularPipeline(Component, Model, Resolvable):
                 ),
                 metadata={
                     "missing_columns": missing,  # ERROR: not a superset
+                    # The two sides of the comparison, side by side in the UI:
+                    # what the landed file has, and what schema.py (or
+                    # required_columns) says it must have.
+                    "source_schema": _source_schema(df),
+                    "destination_schema": _contract_schema(rich, cfg.required_columns),
+                    # In the file but not in the contract: allowed (superset),
+                    # listed so a new upstream column is easy to spot.
+                    "undeclared_columns": (
+                        sorted(present - declared) if declared else []
+                    ),
+                    # WARN only: which value/type checks failed, and how often.
+                    **value_failures,
                     # INFO: column_hash + what changed since the last check
                     **drift,
                 },
@@ -799,6 +813,60 @@ def _drift_report(present: set[str], previous: dict[str, Any] | None) -> dict[st
         "columns_added": added,
         "columns_removed": removed,
     }
+
+
+def _source_schema(df: pd.DataFrame) -> dg.MetadataValue:
+    """The landed file's columns and their pandas dtypes, in file order."""
+    return dg.MetadataValue.table_schema(
+        dg.TableSchema(
+            columns=[
+                dg.TableColumn(name=str(col), type=str(dtype))
+                for col, dtype in df.dtypes.items()
+            ]
+        )
+    )
+
+
+def _contract_schema(
+    rich: "pa.DataFrameSchema | None", required_columns: list[str] | None
+) -> dg.MetadataValue:
+    """The columns the dataset's contract declares: schema.py's, with their
+    dtype and nullability, or else `required_columns` (no types)."""
+    columns = []
+    if rich is not None:
+        for name, col in rich.columns.items():
+            columns.append(
+                dg.TableColumn(
+                    name=str(name),
+                    type=str(col.dtype) if col.dtype is not None else "any",
+                    constraints=dg.TableColumnConstraints(nullable=col.nullable),
+                )
+            )
+    else:
+        columns = [dg.TableColumn(name=c, type="any") for c in required_columns or []]
+    return dg.MetadataValue.table_schema(dg.TableSchema(columns=columns))
+
+
+def _value_failures(failure_cases: pd.DataFrame, limit: int = 20) -> dict:
+    """pandera's failure cases, summarised per column and check: how many
+    values failed and a few examples. Markdown, so it reads as a table."""
+    if failure_cases is None or failure_cases.empty:
+        return {}
+    grouped = (
+        failure_cases.astype({"failure_case": str})
+        .groupby(["column", "check"], dropna=False)["failure_case"]
+        .agg(failures="count", examples=lambda v: ", ".join(v.unique()[:3]))
+        .reset_index()
+        .sort_values("failures", ascending=False)
+    )
+    rows = [
+        f"| {r.column} | {r.check} | {r.failures} | {r.examples} |"
+        for r in grouped.head(limit).itertuples()
+    ]
+    table = "\n".join(
+        ["| column | check | failures | examples |", "|---|---|---|---|", *rows]
+    )
+    return {"value_failures": dg.MetadataValue.md(table)}
 
 
 def _load_schema(cfg: TabularPipeline) -> "pa.DataFrameSchema | None":
