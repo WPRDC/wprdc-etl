@@ -535,6 +535,14 @@ def _reject_unknown_host_policy():
     return _Policy()
 
 
+# paramiko's get()/getfo() prefetch the whole file by default: one 32 KB read
+# request per chunk, all queued at once (~15k in flight for a 500 MB file).
+# That flood is the likely reason the county SFTP server dropped assessments
+# mid-transfer ("Server connection dropped", EOFError). Capping the window
+# keeps prefetch's throughput without the flood.
+SFTP_MAX_PREFETCH_REQUESTS = 64
+
+
 class SFTPResource(dg.ConfigurableResource):
     """Minimal SFTP client for landing pulls.
 
@@ -629,7 +637,11 @@ class SFTPResource(dg.ConfigurableResource):
         try:
             sftp = ssh.open_sftp()
             buf = io.BytesIO()
-            sftp.getfo(remote_path, buf)
+            sftp.getfo(
+                remote_path,
+                buf,
+                max_concurrent_prefetch_requests=SFTP_MAX_PREFETCH_REQUESTS,
+            )
             return buf.getvalue()
         finally:
             ssh.close()
@@ -648,7 +660,11 @@ class SFTPResource(dg.ConfigurableResource):
         ssh = self._connect(host, username, password, port)
         try:
             sftp = ssh.open_sftp()
-            sftp.get(remote_path, local_path)
+            sftp.get(
+                remote_path,
+                local_path,
+                max_concurrent_prefetch_requests=SFTP_MAX_PREFETCH_REQUESTS,
+            )
         finally:
             ssh.close()
 
