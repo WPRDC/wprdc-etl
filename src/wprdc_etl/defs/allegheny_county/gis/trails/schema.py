@@ -44,28 +44,28 @@ from wprdc_etl.strategies.schema import frame, num, txt
 
 SCHEMA = frame(
     {
-        "OBJECTID": txt(),  # -> objectid; BOM-prefixed in the legacy source
-        "Trail_ID": txt(),  # -> trail_id
-        "Trail_Name": txt(),  # -> trail_name
-        "abbreviated_park_name": txt(),
-        "Park_Name": txt(),  # -> park_name
-        "Full_Park_Name": txt(),  # -> full_park_name
-        "Full_Blaze_Color": txt(),  # -> full_blaze_color
-        "abbreviated_Blaze_Color": txt(),  # -> abbreviated_blaze_color
-        "Base_Color": txt(),  # -> base_color
-        "Cap_Color": txt(),  # -> cap_color
-        "Dot_Color": txt(),  # -> dot_color
-        "Dash_Color": txt(),  # -> dash_color
-        "Blaze_Image_Link": txt(),  # -> blaze_image_link
-        "Mileage": num(),  # -> mileage
-        "Track": txt(),  # -> track
-        "track_(number_format)": txt(),  # -> track_num
-        "Difficulty": txt(),  # -> difficulty
-        "Configuration": txt(),  # -> configuration
-        "Surface": txt(),  # -> surface
-        "Service_Road": txt(),  # -> service_road
-        "GlobalID": txt(),  # -> globalid
-        "Trail_Status": txt(),  # -> trail_status
-        "SHAPE__Length": num(),  # -> shape_length
+        "OBJECTID": txt(),
+        "Trail_ID": txt(),
+        "Trail_Name": txt(),
+        "Park_Name_Short": txt(),
+        "Park_Name": txt(),
+        "Park_Name_Full": txt(),
+        "Blaze_Color_Full": txt(),
+        "Blaze_Color_Short": txt(),
+        "Base_Color": txt(),
+        "Cap_Color": txt(),
+        "Dot_Color": txt(),
+        "Dash_Color": txt(),
+        "Image_Link": txt(),
+        "Mileage": num(),
+        "Track": txt(),
+        "Track_Num": num(),
+        "Difficulty": txt(),
+        "Configuration": txt(),
+        "Surface": txt(),
+        "Service_Road": txt(),
+        "Trail_Status": txt(),
+        "Shape__Length": num(),
+        "GlobalID": txt(),
     }
 )
