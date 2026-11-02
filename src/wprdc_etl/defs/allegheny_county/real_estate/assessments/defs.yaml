@@ -38,11 +38,11 @@ attributes:
       columns: [SALEPRICE, PREVSALEPRICE, PREVSALEPRICE2,
                 FAIRMARKETLAND, FAIRMARKETBUILDING, FAIRMARKETTOTAL,
                 COUNTYTOTAL, LOCALTOTAL, LOTAREA]
+    - op: coerce_text
+      columns: [CHANGENOTICEADDRESS4,SCHOOLCODE, USECODE]
     - op: strip
     - op: drop_nulls
       columns: [PARID]                   # a parcel row with no parcel id is junk
-  # full_address derivation (bespoke) lives in the co-located transform.py.
-  # Column contract (all columns, each required) lives in schema.py.
-  geocode: false                         # parcels resolve via geometry join, not address geocoding
+  geocode: false
   ckan:
     resource_id: "9a1c60bd-f9f7-4aba-aeb7-af8c3aaa44e5"
