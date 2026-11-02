@@ -45,6 +45,4 @@ attributes:
   # Column contract (all columns, each required) lives in schema.py.
   geocode: false                         # parcels resolve via geometry join, not address geocoding
   ckan:
-    # With WPRDC_ETL_SINK_DIR set, the loader writes locally and never calls
-    # CKAN, so this can stay a placeholder for dev.
     resource_id: "9a1c60bd-f9f7-4aba-aeb7-af8c3aaa44e5"
