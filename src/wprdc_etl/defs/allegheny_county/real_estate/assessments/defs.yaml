@@ -45,4 +45,5 @@ attributes:
       columns: [PARID]                   # a parcel row with no parcel id is junk
   geocode: false
   ckan:
+    package_id: "2b3df818-601e-4f06-b150-643557229491" # property-assessments
     resource_id: "9a1c60bd-f9f7-4aba-aeb7-af8c3aaa44e5"

@@ -188,6 +188,33 @@ def landing_links(landing: Any, cfg: PipelineConfig, partition: str) -> dict:
     return links
 
 
+# The public portal the CKAN links point at. Deliberately NOT `CKAN_URL`:
+# that is the portal a run WRITES to (a local CKAN in dev), while these links
+# are for a person in the UI, who wants the live page. `bin/seed-ckan` gives
+# a dev CKAN the production ids, so the same ids work on either.
+PORTAL_URL = "https://data.wprdc.org"
+
+
+def ckan_links(cfg: PipelineConfig, resource_id: str | None = None) -> dict:
+    """Links to the data.wprdc.org pages an asset publishes to, as definition
+    metadata: the package, and the one resource that asset writes.
+
+    A resource page needs its package (`/dataset/<pkg>/resource/<id>`; CKAN
+    404s a resource under the wrong package), so without `ckan.package_id`
+    there are no links. A mirror with no `resource_id` is created on its
+    first run, so there is no id to link to yet."""
+    ckan = getattr(cfg, "ckan", None)
+    if not ckan or not ckan.package_id:
+        return {}
+    package = f"{PORTAL_URL}/dataset/{ckan.package_id}"
+    links: dict[str, Any] = {"ckan_package": dg.MetadataValue.url(package)}
+    if resource_id:
+        links["ckan_resource"] = dg.MetadataValue.url(
+            f"{package}/resource/{resource_id}"
+        )
+    return links
+
+
 # Source formats that read into a GeoDataFrame.
 _GEO_FORMATS = {"geojson", "shapefile"}
 

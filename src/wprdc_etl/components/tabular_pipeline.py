@@ -39,6 +39,7 @@ from wprdc_etl.components._common import (
     asset_tags,
     frame_kinds,
     land,
+    ckan_links,
     landed_kinds,
     landed_resources,
     run_tags,
@@ -331,6 +332,7 @@ class TabularPipeline(Component, Model, Resolvable):
 
             @dg.asset(
                 key=[*key_prefix, "loaded"],
+                metadata=ckan_links(cfg, cfg.ckan.resource_id),
                 retry_policy=network_retry_policy(),
                 partitions_def=partitions,
                 ins={"to_publish": dg.AssetIn(key=[*key_prefix, upstream])},
@@ -551,6 +553,7 @@ def _make_representation_asset(
 
     @dg.asset(
         key=[*key_prefix, "published", fmt],
+        metadata=ckan_links(cfg, rep.resource_id),
         retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"validated_df": dg.AssetIn(key=[*key_prefix, "validated"])},
@@ -618,6 +621,7 @@ def _make_mirror_asset(
 
     @dg.asset(
         key=[*key_prefix, "mirrored", fmt],
+        metadata=ckan_links(cfg, mirror.resource_id),
         retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},
@@ -659,6 +663,7 @@ def _make_metadata_asset(
 
     @dg.asset(
         key=[*key_prefix, "package_metadata"],
+        metadata=ckan_links(cfg),
         retry_policy=network_retry_policy(),
         partitions_def=partitions,
         ins={"manifest": dg.AssetIn(key=[*key_prefix, "landed"])},

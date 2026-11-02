@@ -32,6 +32,7 @@ from wprdc_etl.components._common import (
     partitions_for,
     asset_tags,
     land,
+    ckan_links,
     landed_kinds,
     landed_resources,
     run_tags,
@@ -75,6 +76,7 @@ class FilePipeline(Component, Model, Resolvable):
         # -- published: upload the landed object to the single CKAN resource -
         @dg.asset(
             key=[*key_prefix, "published"],
+            metadata=ckan_links(cfg, cfg.ckan.resource_id),
             partitions_def=partitions,
             retry_policy=network_retry_policy(),
             deps=[landed],

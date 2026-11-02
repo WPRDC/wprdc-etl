@@ -57,3 +57,37 @@ def test_the_landed_materialization_carries_them(monkeypatch: Any) -> None:
     assert "source_url" in meta  # the extractor's own metadata survives
     assert meta["landing_uri"].value == f"s3://b/allegheny_county/gis/basins/{key}/"
     assert "console.aws.amazon.com" in meta["landing_console"].value
+
+
+def _spec(*key: str) -> dg.AssetSpec:
+    asset_key = dg.AssetKey(list(key))
+    asset = next(
+        a
+        for a in d.defs.assets
+        if isinstance(a, dg.AssetsDefinition) and asset_key in a.keys
+    )
+    return asset.specs_by_key[asset_key]
+
+
+def test_each_publish_asset_links_its_own_resource() -> None:
+    prefix = ("city_of_pittsburgh", "water_features")
+    package = "https://data.wprdc.org/dataset/city-water-features"
+    loaded = _spec(*prefix, "loaded").metadata
+    assert loaded["ckan_package"].value == package
+    assert loaded["ckan_resource"].value == (
+        f"{package}/resource/513290a6-2bac-4e41-8029-354cbda6a7b7"
+    )
+    geojson = _spec(*prefix, "published", "geojson").metadata
+    assert geojson["ckan_resource"].value == (
+        f"{package}/resource/f7c252a5-28be-43ab-95b5-f3eb0f1eef67"
+    )
+    assert "ckan_package" not in _spec(*prefix, "landed").metadata
+
+
+def test_every_loaded_asset_links_its_ckan_pages() -> None:
+    for asset in d.defs.assets:
+        if not isinstance(asset, dg.AssetsDefinition):
+            continue
+        for key, spec in asset.specs_by_key.items():
+            if key.path[-1] == "loaded":
+                assert {"ckan_package", "ckan_resource"} <= set(spec.metadata), key
