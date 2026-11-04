@@ -1,0 +1,33 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Current Transit Routes — https://data.wprdc.org/dataset/prt-current-transit-routes
+# Ported from the legacy rocket-etl job old/payload/port_authority/gis_prt.py
+# (legacy cron `34 15 * * 2`, weekly), which copied the layer's GeoJSON and
+# Shapefile from PRT's ArcGIS Hub onto these two resources. The same copy,
+# addressed by catalogue title as every Hub layer is here. `name` is set on
+# each mirror so the existing resource keeps its PRT-specific title.
+#
+# No sync_metadata: the legacy job never touched the package description.
+
+attributes:
+  publisher: pittsburgh_regional_transit
+  department: gis
+  dataset: current_routes
+  source:
+    type: arcgis
+    catalog: https://open-data-pgh-transit.hub.arcgis.com/data.json
+    title: "PRT Routes - Current (full system)"
+    format: geojson
+  schedule: "18 8 * * 0"  # Sunday 08:18 ET
+  partition: weekly
+  ingest: snapshot
+  ckan:
+    package_id: "6be8185a-7fc3-48c7-9b8d-716602ea03f0"  # prt-current-transit-routes
+    mirror:
+      - format: geojson
+        resource_id: "4c3bf8b1-1bcd-42d6-bc7b-4c45be7da085"
+        name: "Current Transit Routes (GeoJSON)"
+        datastore: false   # needs the spatial load endpoint (not built yet)
+      - format: shapefile
+        resource_id: "2a98ac2f-ff91-49d7-acd2-8d0e1e509802"
+        name: "Current Transit Routes (Shapefile)"

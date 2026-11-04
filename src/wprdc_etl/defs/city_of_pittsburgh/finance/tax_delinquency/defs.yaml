@@ -1,0 +1,48 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Tax Delinquency — https://data.wprdc.org/dataset/city-of-pittsburgh-property-tax-delinquency
+# Ported from the legacy rocket-etl job old/payload/pgh/treasury.py (schema
+# TaxDelinquencySchema; legacy cron `20 1 * * 4`, weekly). Same public file the legacy
+# job read; its property names checked against the live file on 2026-11-02.
+# `header_case: lower` repeats the legacy engine's header folding (the file
+# says e.g. `approved_date_EST`, the legacy schema `approved_date_est`).
+
+attributes:
+  publisher: city_of_pittsburgh
+  department: finance
+  dataset: tax_delinquency
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/finance/tax_delinquency.csv
+    header_case: lower
+  schedule: "57 4 * * 0"  # Sunday 04:57 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        parc_num: pin
+        current_delq: current_delq_tax
+    - op: coerce_text
+      columns: [
+        pin, address, billing_city, state_description, neighborhood,
+        council_district, ward, public_works_division, pli_division, police_zone,
+        fire_zone,
+      ]
+    - op: coerce_numeric
+      columns: [
+        current_delq_tax, current_delq_pi, prior_years, prior_delq_tax,
+        prior_delq_pi, longitude, latitude,
+      ]
+    - op: select
+      columns: [
+        pin, address, billing_city, current_delq_tax, current_delq_pi, prior_years,
+        prior_delq_tax, prior_delq_pi, state_description, neighborhood,
+        council_district, ward, public_works_division, pli_division, police_zone,
+        fire_zone, longitude, latitude,
+      ]
+  geocode: false
+  ckan:
+    package_id: "d0e6dbc6-7086-460d-8479-440a0a4492dd"  # city-of-pittsburgh-property-tax-delinquency
+    resource_id: "ed0d1550-c300-4114-865c-82dc7c23235b"  # Tax Delinquency

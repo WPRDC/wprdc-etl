@@ -1,0 +1,62 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Daily AQI Data — https://data.wprdc.org/dataset/allegheny-county-air-quality
+# Ported from the legacy rocket-etl job old/payload/ac_hd/air_quality.py
+# (schema AQIDailySchema; legacy cron `20 * * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/health/air_quality_daily_aqi --write
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: air_quality_daily_aqi
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/aqi_daily.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "20 * * * *"  # hourly at :20
+  partition: none
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        sitename: site
+        parametername: parameter
+        indexvalue: index_value
+        healthadvisory: health_advisory
+        healtheffects: health_effects
+    - op: coerce_text
+      columns: [site, parameter, description, health_advisory, health_effects]
+    - op: coerce_numeric
+      columns: [index_value]
+    - op: to_datetime
+      columns: [date]
+    - op: drop_nulls
+      columns: [date, site, parameter]
+    - op: select
+      columns: [
+        date, site, parameter, index_value, description, health_advisory,
+        health_effects,
+      ]
+  geocode: false
+  ckan:
+    package_id: "c7b3266c-adc6-41c0-b19a-8d4353bfcdaf"  # allegheny-county-air-quality
+    resource_id: "4ab1e23f-3262-4bd3-adbf-f72f0119108b"  # Daily AQI Data
+    primary_key: [date, site, parameter]

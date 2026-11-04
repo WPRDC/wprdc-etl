@@ -1,0 +1,52 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# 311 Data — https://data.wprdc.org/dataset/pittsburgh-311-data
+# Ported from the legacy rocket-etl job old/payload/pgh/311_v3.py (schema
+# RequestsSchema; legacy cron `15 2,8,14,20 * * *`). The same public file the
+# legacy job read; its header checked against the live file on 2026-11-02.
+#
+# ACCUMULATES: the legacy job upserted on `unique_id` (case number + the
+# two-digit year it was created, built in transform.py). Every run merges the
+# file into the stored table and publishes the whole table through
+# DataPusher+. Seed it from the live resource BEFORE the first publishing run,
+# or that run reloads CKAN down to one file:
+#   bin/seed-accumulator --only city_of_pittsburgh/requests_311 --write
+#
+# Unpartitioned, so it can keep the legacy four-runs-a-day cadence — a daily
+# partition would allow only one.
+
+attributes:
+  publisher: city_of_pittsburgh
+  dataset: requests_311
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/311_open_data.csv
+  schedule: "15 2,8,14,20 * * *"  # 02:15, 08:15, 14:15, 20:15 ET
+  partition: none
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  heavy: true                    # ~290 MB, ~1M rows
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        lat: latitude
+        lon: longitude
+    - op: coerce_text
+      columns: [
+        case_number, status, case_owner, subject, subject_code, legacy_subject,
+        origin, street, street_id, city, neighborhood, census_tract,
+        council_district, ward, police_zone, latitude, longitude, geo_accuracy,
+      ]
+    - op: to_datetime
+      columns: [
+        created_date_et, created_date_utc, last_modified_date_et,
+        last_modified_date_utc, closed_date_et, closed_date_utc,
+      ]
+    # transform.py: unique_id, the legacy street masking, and the column order.
+  geocode: false
+  ckan:
+    package_id: "8069a170-92d1-4f5e-bc03-327bcf262545"  # pittsburgh-311-data
+    resource_id: "5202679a-d243-402e-b82a-63189995a942"  # 311 Data
+    primary_key: [unique_id]

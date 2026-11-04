@@ -65,13 +65,62 @@ def iso_date(
     return df
 
 
+def to_datetime(
+    df: pd.DataFrame, columns: list[str], fmt: str | None = None
+) -> pd.DataFrame:
+    """Parse columns into real (tz-naive) datetimes. Unparseable -> NaT.
+
+    Unlike iso_date, which writes text, this keeps the dtype a datetime, so
+    the published column stays a DataStore `timestamp` (the column guard
+    reads a text column against a live timestamp as a retype) and a timestamp
+    in an accumulating dataset's merge key compares equal to the copy
+    `bin/seed-accumulator` stored.
+    """
+    for c in columns:
+        if c in df.columns:
+            parsed = pd.to_datetime(df[c], format=fmt, errors="coerce")
+            if getattr(parsed.dt, "tz", None) is not None:
+                parsed = parsed.dt.tz_localize(None)
+            df[c] = parsed
+    return df
+
+
+def point_coordinates(
+    df: pd.DataFrame, lat: str = "latitude", lng: str = "longitude"
+) -> pd.DataFrame:
+    """Turn a point GeoDataFrame into a plain table with lat/lng columns.
+
+    For a GeoJSON source published as a CSV DataStore table, the way the
+    legacy geojson-to-csv converter did it: the coordinates become two
+    columns and the geometry column is dropped, so the published header
+    doesn't gain a WKT column (which the column guard would block). A
+    non-point or empty geometry gives NA coordinates.
+    """
+    import pandas as pd
+
+    geom = _active_geometry(df)
+    if geom is None:
+        return df
+    g = df[geom]
+    points = (g.geom_type == "Point") & ~g.is_empty
+    out = pd.DataFrame(df.drop(columns=[geom]))
+    out[lat] = pd.Series(pd.NA, index=out.index, dtype="Float64")
+    out[lng] = pd.Series(pd.NA, index=out.index, dtype="Float64")
+    out.loc[points, lat] = g[points].y
+    out.loc[points, lng] = g[points].x
+    return out
+
+
 def strip(df: pd.DataFrame, columns: list[str] | None = None) -> pd.DataFrame:
     """Trim leading/trailing whitespace on the given text columns (or all
     object columns if none named)."""
     cols = columns or list(df.select_dtypes(include="object").columns)
     for c in cols:
         if c in df.columns:
-            df[c] = df[c].str.strip()
+            # An object column can mix strings with other values (a parsed
+            # list, a stray number); `.str` refuses those outright, so only
+            # the strings are trimmed and everything else passes through.
+            df[c] = df[c].map(lambda v: v.strip() if isinstance(v, str) else v)
     return df
 
 
@@ -102,10 +151,21 @@ def coerce_text(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
             continue
         s = df[c]
         if pd.api.types.is_float_dtype(s):
-            df[c] = s.map(lambda v: pd.NA if pd.isna(v) else f"{v:g}").astype("string")
+            df[c] = s.map(_float_text).astype("string")
         else:
             df[c] = s.astype("string")
     return df
+
+
+def _float_text(v: Any) -> Any:
+    """A float as the text it stood for: 1011.0 -> "1011", 2.5 -> "2.5".
+
+    Not `:g`, which keeps six significant digits — a phone number or parcel
+    id read as a float came out as "1.41235e+10".
+    """
+    if pd.isna(v):
+        return pd.NA
+    return str(int(v)) if float(v).is_integer() else repr(float(v))
 
 
 def drop_nulls(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
@@ -386,6 +446,8 @@ def _to_snake(name: str) -> str:
 # name used in YAML -> primitive
 PRIMITIVES: dict[str, Primitive] = {
     "iso_date": iso_date,
+    "to_datetime": to_datetime,
+    "point_coordinates": point_coordinates,
     "strip": strip,
     "rename": rename,
     "coerce_numeric": coerce_numeric,

@@ -1,0 +1,42 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# PWSA Inlets — https://data.wprdc.org/dataset/pwsa-inlets
+# Ported from the legacy rocket-etl job old/payload/pwsa/gis_jobs.py (schema
+# InletsSchema; legacy cron `37 20 * * 5`, weekly).
+#
+# PWSA's Hub catalogue (pwsa-open-data-pwsa.hub.arcgis.com/data.json) is now
+# EMPTY, so this can't be an arcgis source and can't mirror. It reads the
+# layer by its ArcGIS item id through hub.arcgis.com's download API, as the
+# legacy Shapefile job already did. spatialRefId=2272 (PA State Plane South,
+# feet) because that is what the live table's x/y hold.
+#
+# Only the CSV table is refreshed. The legacy job also re-copied PWSA's
+# GeoJSON (625c4525), KML (83148ede) and Shapefile (faacf676); with no
+# catalogue entry there is nothing to mirror, and a representation can't
+# stand in: it assumes EPSG:4326 coordinates and these x/y are state-plane
+# feet. Those three resources stay as last published until that's solved.
+
+attributes:
+  publisher: pwsa
+  department: gis
+  dataset: inlets
+  source:
+    type: http
+    url: "https://hub.arcgis.com/api/v3/datasets/0c59b699f2e0416e86a208c1fafbf19c_2/downloads/data?format=csv&spatialRefId=2272&where=1%3D1"
+    header_case: lower
+  schedule: "57 7 * * 0"  # Sunday 07:57 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: coerce_text
+      columns: [node_id, objectid, node_type, sub_type, owner, status]
+    - op: coerce_numeric
+      columns: [x, y]
+    - op: select
+      columns: [node_id, objectid, node_type, sub_type, owner, status, x, y]
+    # transform.py: the legacy PENNDOT -> PennDOT owner fix.
+  geocode: false
+  ckan:
+    package_id: "473ec352-da08-4cc2-bc32-20a59b23c0a1"  # pwsa-inlets
+    resource_id: "1d88be51-5af7-4bff-8c49-7bf1a646cb2d"  # PWSA Inlets (CSV)

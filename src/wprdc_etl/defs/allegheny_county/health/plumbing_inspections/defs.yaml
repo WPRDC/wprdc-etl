@@ -1,0 +1,54 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Allegheny County Plumbing Inspections — https://data.wprdc.org/dataset/allegheny-county-plumbing-inspections
+# Ported from the legacy rocket-etl job old/payload/ac_hd/plumbing_inspections.py
+# (schema PlumbingInspectionsSchema; legacy cron `35 5 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: plumbing_inspections
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/alco-plumbing-inspections.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "35 5 * * *"  # daily 05:35 ET
+  partition: daily
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        inspect_id: inspection_id
+        permitid: permit_id
+        inspect_date: inspection_date
+        streetaddress: address
+    - op: coerce_text
+      columns: [
+        inspection_id, permit_id, address, city, state, zip_code, municipal,
+        building_type, plumber_name, final_insp_yn, storm_drain, building_drain,
+        water_service, storm_sewer, rough_above_ground, water_heater,
+        building_sewer, water_distribution, indirect_waste,
+      ]
+    - op: to_datetime
+      columns: [inspection_date]
+    - op: select
+      columns: [
+        inspection_id, permit_id, inspection_date, address, city, state, zip_code,
+        municipal, building_type, plumber_name, final_insp_yn, storm_drain,
+        building_drain, water_service, storm_sewer, rough_above_ground,
+        water_heater, building_sewer, water_distribution, indirect_waste,
+      ]
+  geocode: false
+  ckan:
+    package_id: "00af664b-cdd1-444e-bffc-0e3ccb5066f9"  # allegheny-county-plumbing-inspections
+    resource_id: "a3fb93b8-01a3-4090-8e8e-6310a4160071"  # Allegheny County Plumbing Inspections

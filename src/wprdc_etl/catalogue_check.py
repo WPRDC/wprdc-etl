@@ -54,6 +54,32 @@ CATALOGUE_EXCLUSIONS: dict[str, dict[str, str]] = {
     "city_of_pittsburgh": {
         "Pittsburgh schematic": "nobody - web page only, no file",
     },
+    # PRT's Hub. WPRDC republishes only the three layers wired under
+    # pittsburgh_regional_transit/gis; the rest are PRT's own and were never
+    # on data.wprdc.org (the legacy gis_prt.py wired the same three).
+    "pittsburgh_regional_transit": {
+        "Allegheny County Population Base (Dasymetric)": "nobody - not republished on WPRDC",
+        "PRT Current System Map and Data Explorer": "nobody - not republished on WPRDC",
+        "PRT Fixed Guideway Corridors": "nobody - not republished on WPRDC",
+        "PRT Fixed Guideway Station Walksheds": "nobody - not republished on WPRDC",
+        "PRT Fixed Guideway Stations": "nobody - not republished on WPRDC",
+        "PRT GTFS Historical Archive": "nobody - not republished on WPRDC",
+        "PRT Park and Ride Locations": "nobody - not republished on WPRDC",
+        "PRT Planning Datasets and Documentation": "nobody - not republished on WPRDC",
+        "PRT Routes - Current (by route)": "nobody - not republished on WPRDC",
+        "PRT Routes - Historical (by route)": "nobody - not republished on WPRDC",
+        "PRT Routes - Historical (full system)": "nobody - not republished on WPRDC",
+        "PRT Shelters and Ridership": "nobody - not republished on WPRDC",
+        "PRT Stop Amenities - Current": "nobody - not republished on WPRDC",
+        "PRT Stop Reference Lookup - Historical": "nobody - not republished on WPRDC",
+        "PRT Stop Ridership - Historical (selected months)": "nobody - not republished on WPRDC",
+        "PRT Stop Walksheds - Current (by route)": "nobody - not republished on WPRDC",
+        "PRT Stops - Current (by route)": "nobody - not republished on WPRDC",
+        "PRT Stops - Current (frequent service area)": "nobody - not republished on WPRDC",
+        "PRT Stops - Historical (full system)": "nobody - not republished on WPRDC",
+        "station walksheds": "nobody - not republished on WPRDC",
+        "stations": "nobody - not republished on WPRDC",
+    },
 }
 
 SCHEDULE = "0 6 * * 6"  # Saturday 06:00 ET, the day before the Sunday runs

@@ -1,0 +1,58 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# City-Owned Properties — https://data.wprdc.org/dataset/city-owned-property
+# Ported from the legacy rocket-etl job old/payload/pgh/treasury.py (schema
+# CityOwnedSchema; legacy cron `20 1 * * 4`, weekly). Same public file the legacy
+# job read; its property names checked against the live file on 2026-11-02.
+# `header_case: lower` repeats the legacy engine's header folding (the file
+# says e.g. `approved_date_EST`, the legacy schema `approved_date_est`).
+#
+# A GeoJSON of points published as a CSV table, as the legacy
+# geojson-to-csv step did: `point_coordinates` turns the geometry into the
+# lat/lng columns the live table has and drops it.
+
+attributes:
+  publisher: city_of_pittsburgh
+  department: finance
+  dataset: city_owned_property
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/finance/city_owned_properties.geojson
+    header_case: lower
+  schedule: "39 3 * * 0"  # Sunday 03:39 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: point_coordinates
+      lat: lat
+      lng: lng
+    - op: strip
+    - op: rename
+      mapping:
+        parc_num: pin
+        latest_sale_date: partition_latest_sale_date
+        lat: latitude
+        lng: longitude
+    - op: coerce_text
+      columns: [
+        pin, address, block_lot, neighborhood_name, council_district, fire_zone,
+        police_zone, dpw_streets, dpw_enviro, dpw_parks,
+      ]
+    - op: coerce_numeric
+      columns: [sale_price, latitude, longitude, ward]
+    - op: to_datetime
+      columns: [
+        act77_gent_date, last_payment_date, treasury_sale_date,
+        partition_latest_sale_date,
+      ]
+    - op: select
+      columns: [
+        pin, address, block_lot, sale_price, act77_gent_date, last_payment_date,
+        treasury_sale_date, partition_latest_sale_date, latitude, longitude,
+        neighborhood_name, council_district, ward, fire_zone, police_zone,
+        dpw_streets, dpw_enviro, dpw_parks,
+      ]
+  geocode: false
+  ckan:
+    package_id: "d93bb0b3-f123-4ac5-8ca2-21fb4da70b86"  # city-owned-property
+    resource_id: "4ff5eb17-e2ad-4818-97c4-8f91fc6b6396"  # City-Owned Properties

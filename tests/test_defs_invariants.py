@@ -199,8 +199,14 @@ def test_ckan_ids_are_claimed_by_one_dataset_each() -> None:
     Landmarks", so the legacy mapping and title-based discovery both landed on
     it. The symptom was a 409 "Resource id already exists" from the seeder,
     four resources deep — not where the cause was.
+
+    A package MAY be shared by several tabular pipelines, one per resource
+    (air quality: hourly, daily AQI, H2S, sensor locations), as long as none
+    of them writes the package itself — `mirror` copies distributions onto it
+    and `sync_metadata` rewrites its notes and tags, so two such writers would
+    fight. Resource ids are never shared.
     """
-    packages: dict[str, str] = {}
+    packages: dict[str, list[tuple[str, bool]]] = {}
     resources: dict[str, str] = {}
     clashes = []
     for path in ALL_DEFS:
@@ -208,9 +214,11 @@ def test_ckan_ids_are_claimed_by_one_dataset_each() -> None:
         here = str(path.parent.relative_to(DEFS))
         pid = ckan.get("package_id")
         if pid:
-            if pid in packages:
-                clashes.append(f"package {pid}: {packages[pid]} and {here}")
-            packages[pid] = here
+            writes_package = bool(ckan.get("mirror") or ckan.get("sync_metadata"))
+            prior = packages.setdefault(pid, [])
+            if prior and (writes_package or any(w for _, w in prior)):
+                clashes.append(f"package {pid}: {prior[0][0]} and {here}")
+            prior.append((here, writes_package))
         wanted = [m.get("resource_id") for m in (ckan.get("mirror") or [])]
         wanted.append(ckan.get("resource_id"))
         for rid in [r for r in wanted if r]:

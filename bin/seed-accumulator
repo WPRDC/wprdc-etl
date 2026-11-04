@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Seed an accumulating dataset's canonical table from its live CKAN resource.
+#
+#     bin/seed-accumulator                            # dry run: every accumulating dataset
+#     bin/seed-accumulator --only allegheny_county/jail/jail_census --write
+#     bin/seed-accumulator --only allegheny_county/jail/jail_census --write --force
+#
+# Run once per accumulating dataset BEFORE its first publishing run: without a
+# stored table, the first run's file is the whole table and DataPusher+ would
+# reload CKAN down to it. Reads data.wprdc.org anonymously by default; writes
+# to the landing bucket (LocalStack in dev). See src/wprdc_etl/seed_accumulator.py;
+# in production use deploy/seed-accumulator.
+. "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+exec uv run python -m wprdc_etl.seed_accumulator "$@"

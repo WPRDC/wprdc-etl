@@ -1,0 +1,33 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# PRT Stops — https://data.wprdc.org/dataset/prt-of-allegheny-county-transit-stops
+# Ported from the legacy rocket-etl job old/payload/port_authority/gis_prt.py
+# (legacy cron `34 15 * * 2`, weekly), which copied the layer's GeoJSON and
+# Shapefile from PRT's ArcGIS Hub onto these two resources. The same copy,
+# addressed by catalogue title as every Hub layer is here. `name` is set on
+# each mirror so the existing resource keeps its PRT-specific title.
+#
+# No sync_metadata: the legacy job never touched the package description.
+
+attributes:
+  publisher: pittsburgh_regional_transit
+  department: gis
+  dataset: transit_stops
+  source:
+    type: arcgis
+    catalog: https://open-data-pgh-transit.hub.arcgis.com/data.json
+    title: "PRT Stops - Current (full system)"
+    format: geojson
+  schedule: "39 7 * * 0"  # Sunday 07:39 ET
+  partition: weekly
+  ingest: snapshot
+  ckan:
+    package_id: "33d5f44b-5315-4374-b3e3-e4246e8ad5c9"  # prt-of-allegheny-county-transit-stops
+    mirror:
+      - format: geojson
+        resource_id: "d6e6ed6e-9220-4a0e-9796-e72d83ce8e7a"
+        name: "PRT Stops (GeoJSON)"
+        datastore: false   # needs the spatial load endpoint (not built yet)
+      - format: shapefile
+        resource_id: "ea30bb40-6401-47d9-ae33-b184dbef33a8"
+        name: "PRT Stops (Shapefile)"

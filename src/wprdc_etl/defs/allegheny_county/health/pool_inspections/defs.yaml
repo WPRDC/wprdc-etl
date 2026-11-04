@@ -1,0 +1,107 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Aquatic Inspections — https://data.wprdc.org/dataset/allegheny-county-public-swimming-pool-hot-tub-and-spa-inspections
+# Ported from the legacy rocket-etl job old/payload/ac_hd/pool_inspections.py
+# (schema ACPoolInspectionsSchema; legacy cron `41 2 2-9 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# Inspection Passed, Enclosure, Main Drain Visible, Safety Equipment, Disinfectant Level, pH Balance, No Imminent Health Hazards: a real boolean column in the live table, kept as one
+# (`bool_format: bool`). Assumes the file spells it True/False, which
+# pandas reads as bool — UNVERIFIED; a t/f or Y/N file would arrive as
+# text and the column guard would block the load as `bool -> text`.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: pool_inspections
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/alco-pool-inspections.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "54 3 1 * *"  # day 1 of the month, 03:54 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        inspect_id: "Inspection ID"
+        facility_id: "Facility ID"
+        facility_name: "Facility Name"
+        facility_address: "Facility Address"
+        facility_address_2: "Facility Address 2"
+        muni_name: "Facility Municipality Name"
+        city: "Facility City"
+        county: "Facility County"
+        state: "Facility State"
+        zip: "Facility Postal Code"
+        latitude: "Facility Latitude"
+        longitude: "Facility Longitude"
+        venue_type: "Venue Type"
+        insp_date: "Inspection Date"
+        insp_end: "Inspection End"
+        inspection_purpose: "Inspection Purpose"
+        inspection_passed: "Inspection Passed"
+        inspect_number: "Inspection Number"
+        insp_name: "Inspector Name"
+        free_cl_shallow: "Free Chlorine, Shallow"
+        free_cl_deep: "Free Chlorine, Deep"
+        combined_cl_shallow: "Combined Chlorine, Shallow"
+        combined_cl_deep: "Combined Chlorine, Deep"
+        br_shallow: "Free Bromine, Shallow"
+        br_deep: "Free Bromine, Deep"
+        ph_shallow: "pH Value, Shallow"
+        ph_deep: "pH Value, Deep"
+        cyanuric_acid: "Cyanuric Acid"
+        turnover: Turnover
+        enclosure: Enclosure
+        main_drain_visible: "Main Drain Visible"
+        safety_equipment: "Safety Equipment"
+        disinfectant_level: "Disinfectant Level"
+        ph_balance: "pH Balance"
+        no_imminent_health_hazards: "No Imminent Health Hazards"
+        abated_date: "Abated Date"
+    - op: coerce_text
+      columns: [
+        "Inspection ID", "Facility ID", "Facility Name", "Facility Address",
+        "Facility Address 2", "Facility Municipality Name", "Facility City",
+        "Facility County", "Facility State", "Facility Postal Code", "Venue Type",
+        "Inspection Purpose", "Inspector Name", "pH Value, Shallow",
+        "pH Value, Deep", "Cyanuric Acid",
+      ]
+    - op: coerce_numeric
+      columns: [
+        "Facility Latitude", "Facility Longitude", "Inspection Number",
+        "Free Chlorine, Shallow", "Free Chlorine, Deep",
+        "Combined Chlorine, Shallow", "Combined Chlorine, Deep",
+        "Free Bromine, Shallow", "Free Bromine, Deep", Turnover,
+      ]
+    - op: to_datetime
+      columns: ["Inspection Date", "Inspection End", "Abated Date"]
+    - op: select
+      columns: [
+        "Inspection ID", "Facility ID", "Facility Name", "Facility Address",
+        "Facility Address 2", "Facility Municipality Name", "Facility City",
+        "Facility County", "Facility State", "Facility Postal Code",
+        "Facility Latitude", "Facility Longitude", "Venue Type", "Inspection Date",
+        "Inspection End", "Inspection Purpose", "Inspection Passed",
+        "Inspection Number", "Inspector Name", "Free Chlorine, Shallow",
+        "Free Chlorine, Deep", "Combined Chlorine, Shallow",
+        "Combined Chlorine, Deep", "Free Bromine, Shallow", "Free Bromine, Deep",
+        "pH Value, Shallow", "pH Value, Deep", "Cyanuric Acid", Turnover,
+        Enclosure, "Main Drain Visible", "Safety Equipment", "Disinfectant Level",
+        "pH Balance", "No Imminent Health Hazards", "Abated Date",
+      ]
+  geocode: false
+  ckan:
+    package_id: "f00f803d-78e3-44fd-80b3-c3fb2cd3003a"  # allegheny-county-public-swimming-pool-hot-tub-and-spa-inspections
+    resource_id: "84b3105f-49dd-4fe2-8460-a733ee75d996"  # Aquatic Inspections
+    bool_format: bool

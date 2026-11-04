@@ -1,0 +1,101 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# TRI Underground — https://data.wprdc.org/dataset/toxic-release-inventory
+# Ported from the legacy rocket-etl job old/payload/ac_hd/toxic_inventory.py
+# (schema ToxicAirSchema; legacy cron `40 7 1,3,5,8 1,4,7,10 *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: tri_underground
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/tri_underground.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "9 6 1 * *"  # day 1 of the month, 06:09 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        tri_facility_id: TRI_FACILITY_ID
+        doc_ctrl_num: DOC_CTRL_NUM
+        facility_name: FACILITY_NAME
+        street_address: STREET_ADDRESS
+        city_name: CITY_NAME
+        county_name: COUNTY_NAME
+        state_county_fips_code: STATE_COUNTY_FIPS_CODE
+        state_abbr: STATE_ABBR
+        zip_code: ZIP_CODE
+        region: REGION
+        fac_closed_ind: FAC_CLOSED_IND
+        asgn_federal_ind: ASGN_FEDERAL_IND
+        asgn_agency: ASGN_AGENCY
+        parent_co_db_num: PARENT_CO_DB_NUM
+        parent_co_name: PARENT_CO_NAME
+        standardized_parent_company: STANDARDIZED_PARENT_COMPANY
+        epa_registry_id: EPA_REGISTRY_ID
+        trade_secret_ind: TRADE_SECRET_IND
+        reporting_year: REPORTING_YEAR
+        cas_num: CAS_NUM
+        elemental_metal_included: ELEMENTAL_METAL_INCLUDED
+        tri_chem_id: TRI_CHEM_ID
+        chem_name: CHEM_NAME
+        metal_ind: METAL_IND
+        pbt_ind: PBT_IND
+        list_3350: LIST_3350
+        carcinogen: CARCINOGEN
+        clean_air: CLEAN_AIR
+        primary_sic_code: PRIMARY_SIC_CODE
+        sic_codes: SIC_CODES
+        primary_naics_code: PRIMARY_NAICS_CODE
+        naics_codes: NAICS_CODES
+        industry_code: INDUSTRY_CODE
+        srs_id: SRS_ID
+        pfas_ind: PFAS_IND
+        environmental_medium: ENVIRONMENTAL_MEDIUM
+        release_range_code: RELEASE_RANGE_CODE
+        rel_est_amt: REL_EST_AMT
+        release_na: RELEASE_NA
+        release_basis_est_code: RELEASE_BASIS_EST_CODE
+        total_release: TOTAL_RELEASE
+    - op: coerce_text
+      columns: [
+        TRI_FACILITY_ID, DOC_CTRL_NUM, FACILITY_NAME, STREET_ADDRESS, CITY_NAME,
+        COUNTY_NAME, STATE_COUNTY_FIPS_CODE, STATE_ABBR, ZIP_CODE, REGION,
+        FAC_CLOSED_IND, ASGN_FEDERAL_IND, ASGN_AGENCY, PARENT_CO_DB_NUM,
+        PARENT_CO_NAME, STANDARDIZED_PARENT_COMPANY, EPA_REGISTRY_ID,
+        TRADE_SECRET_IND, CAS_NUM, ELEMENTAL_METAL_INCLUDED, TRI_CHEM_ID,
+        CHEM_NAME, METAL_IND, PBT_IND, LIST_3350, CARCINOGEN, CLEAN_AIR,
+        PRIMARY_SIC_CODE, SIC_CODES, PRIMARY_NAICS_CODE, NAICS_CODES, SRS_ID,
+        PFAS_IND, ENVIRONMENTAL_MEDIUM, RELEASE_RANGE_CODE, RELEASE_NA,
+        RELEASE_BASIS_EST_CODE,
+      ]
+    - op: coerce_numeric
+      columns: [REPORTING_YEAR, INDUSTRY_CODE, REL_EST_AMT, TOTAL_RELEASE]
+    - op: select
+      columns: [
+        TRI_FACILITY_ID, DOC_CTRL_NUM, FACILITY_NAME, STREET_ADDRESS, CITY_NAME,
+        COUNTY_NAME, STATE_COUNTY_FIPS_CODE, STATE_ABBR, ZIP_CODE, REGION,
+        FAC_CLOSED_IND, ASGN_FEDERAL_IND, ASGN_AGENCY, PARENT_CO_DB_NUM,
+        PARENT_CO_NAME, STANDARDIZED_PARENT_COMPANY, EPA_REGISTRY_ID,
+        TRADE_SECRET_IND, REPORTING_YEAR, CAS_NUM, ELEMENTAL_METAL_INCLUDED,
+        TRI_CHEM_ID, CHEM_NAME, METAL_IND, PBT_IND, LIST_3350, CARCINOGEN,
+        CLEAN_AIR, PRIMARY_SIC_CODE, SIC_CODES, PRIMARY_NAICS_CODE, NAICS_CODES,
+        INDUSTRY_CODE, SRS_ID, PFAS_IND, ENVIRONMENTAL_MEDIUM, RELEASE_RANGE_CODE,
+        REL_EST_AMT, RELEASE_NA, RELEASE_BASIS_EST_CODE, TOTAL_RELEASE,
+      ]
+  geocode: false
+  ckan:
+    package_id: "2cff4c07-423a-4b61-af08-7288fbb773eb"  # toxic-release-inventory
+    resource_id: "b2d6f249-4e3b-4c38-b4bc-5dafd3cb55e7"  # TRI Underground

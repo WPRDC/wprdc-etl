@@ -1,0 +1,62 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# 911 EMS Dispatches — https://data.wprdc.org/dataset/allegheny-county-911-dispatches-ems-and-fire
+# Ported from the legacy rocket-etl job old/payload/ac/911.py
+# (schema CallSchema; legacy cron `20 6 1-8 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/emergency_services/dispatches_ems --write
+
+attributes:
+  publisher: allegheny_county
+  department: emergency_services
+  dataset: dispatches_ems
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/911-CAD/911-EMS-dispatches.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "12 4 1 * *"  # day 1 of the month, 04:12 ET
+  partition: monthly
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  heavy: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        censusblockgroupcenter_x: census_block_group_center__x
+        censusblockgroupcenter_y: census_block_group_center__y
+    - op: coerce_text
+      columns: [
+        call_id_hash, service, priority, priority_desc, call_quarter,
+        description_short, city_code, city_name, geoid,
+      ]
+    - op: coerce_numeric
+      columns: [call_year, census_block_group_center__x, census_block_group_center__y]
+    - op: drop_nulls
+      columns: [call_id_hash, call_year, call_quarter]
+    - op: select
+      columns: [
+        call_id_hash, service, priority, priority_desc, call_quarter, call_year,
+        description_short, city_code, city_name, geoid,
+        census_block_group_center__x, census_block_group_center__y,
+      ]
+  geocode: false
+  ckan:
+    package_id: "abba9671-a026-4270-9c83-003a1414d628"  # allegheny-county-911-dispatches-ems-and-fire
+    resource_id: "ff33ca18-2e0c-4cb5-bdcd-60a5dc3c0418"  # 911 EMS Dispatches
+    primary_key: [call_id_hash, call_year, call_quarter]

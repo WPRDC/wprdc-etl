@@ -1,0 +1,62 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Hydrogen Sulfide (H2S) Rolling 24-Hour Averages — https://data.wprdc.org/dataset/allegheny-county-air-quality
+# Ported from the legacy rocket-etl job old/payload/ac_hd/air_quality.py
+# (schema H2SSchema; legacy cron `20 * * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/health/air_quality_h2s --write
+#
+# is_valid: a real boolean column in the live table, kept as one
+# (`bool_format: bool`). Assumes the file spells it True/False, which
+# pandas reads as bool — UNVERIFIED; a t/f or Y/N file would arrive as
+# text and the column guard would block the load as `bool -> text`.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: air_quality_h2s
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/h2s_rolling24avg.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "20 * * * *"  # hourly at :20
+  partition: none
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        datehour: datetime
+        sitename: site
+        reportvalue_ppb: report_value_ppb
+        isvalid: is_valid
+    - op: coerce_text
+      columns: [datetime, site]
+    - op: coerce_numeric
+      columns: [report_value_ppb, avg_24_hrs_ppb]
+    - op: drop_nulls
+      columns: [datetime, site]
+    - op: select
+      columns: [datetime, site, report_value_ppb, is_valid, avg_24_hrs_ppb]
+  geocode: false
+  ckan:
+    package_id: "c7b3266c-adc6-41c0-b19a-8d4353bfcdaf"  # allegheny-county-air-quality
+    resource_id: "99227139-1fa8-46e3-aef2-60ee6ffd4e7d"  # Hydrogen Sulfide (H2S) Rolling 24-Hour Averages
+    primary_key: [datetime, site]
+    bool_format: bool

@@ -1,0 +1,40 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Port Authority Schedule Pick Lookup —
+# https://data.wprdc.org/dataset/prt-schedule-period-lookup
+# Ported from the legacy rocket-etl job old/payload/port_authority/gis_prt.py
+# (schema SchedSchema; legacy cron `34 15 * * 2`, weekly). A plain table on
+# PRT's Hub, published under the legacy job's pick* names. Its CSV checked
+# against the live export on 2026-11-02 (start/end are UTC timestamps; the
+# live columns are dates).
+
+attributes:
+  publisher: pittsburgh_regional_transit
+  department: gis
+  dataset: schedule_period_lookup
+  source:
+    type: arcgis
+    catalog: https://open-data-pgh-transit.hub.arcgis.com/data.json
+    title: "PRT Schedule Period Lookup - Historical"
+    format: csv
+  schedule: "39 5 * * 0"  # Sunday 05:39 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        feed_version: pickID
+        start_date: pickStart
+        end_date: pickEnd
+        pick_type: pickType
+    - op: coerce_text
+      columns: [pickID, pickType]
+    - op: to_datetime
+      columns: [pickStart, pickEnd]
+    - op: select
+      columns: [pickID, pickStart, pickEnd, pickType]
+  geocode: false
+  ckan:
+    package_id: "b401859c-412b-4cb6-ad88-a4183b83183d"  # prt-schedule-period-lookup
+    resource_id: "3f789a37-d02b-4f2e-9212-3b824fb06678"  # Port Authority Schedule Pick Lookup

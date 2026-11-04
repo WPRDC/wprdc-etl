@@ -1,0 +1,69 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Historical Farmers Markets — https://data.wprdc.org/dataset/allegheny-county-farmers-markets-locations
+# Ported from the legacy rocket-etl job old/payload/ac_hd/farmers_markets.py
+# (schema FarmersMarketsSchema; legacy cron `13 4 1 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# The county names this file by year; `{now:%Y}` resolves to the year the
+# run starts (Eastern), as the legacy job's `current_year` did.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/health/farmers_markets_historical --write
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: farmers_markets_historical
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/alco_farmers_markets_{now:%Y}.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "3 4 1 * *"  # day 1 of the month, 04:03 ET
+  partition: monthly
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        farmmarketid: market_id
+        markettype: market_type
+        marketname: market_name
+        statecode: state
+        zip: zip_code
+        marketphone: phone
+        marketphoneext: phone_ext
+        farmmarketcounty: county
+    - op: coerce_text
+      columns: [
+        market_id, market_type, market_name, address1, city, state, zip_code,
+        phone, phone_ext, county,
+      ]
+    - op: coerce_numeric
+      columns: [latitude, longitude]
+    - op: drop_nulls
+      columns: [market_id]
+    - op: select
+      columns: [
+        market_id, market_type, market_name, address1, city, state, zip_code,
+        latitude, longitude, phone, phone_ext, county,
+      ]
+  geocode: false
+  ckan:
+    package_id: "5706fa23-87f6-4757-be8a-bcfc0b677e01"  # allegheny-county-farmers-markets-locations
+    resource_id: "9eacedae-6f38-4621-be8e-7386bf3e3b48"  # Historical Farmers Markets
+    primary_key: [market_id, year]

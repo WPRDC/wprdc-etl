@@ -1,0 +1,44 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Municipality Profiles — https://data.wprdc.org/dataset/allegheny-county-human-services-community-profiles
+# Ported from the legacy rocket-etl job old/payload/ac/ac_profiles.py
+# (schema MunicipalityProfilesSchema; legacy cron `1 12 1-8 2,5,8,11 *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: profiles
+  dataset: municipality
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/DHS/MunicipalityProfiles.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "6 6 1 * *"  # day 1 of the month, 06:06 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        caldr_yr: calendar_year
+    - op: coerce_text
+      columns: [metric_name, report_group, geo_area_name, population_name]
+    - op: coerce_numeric
+      columns: [calendar_year, kpi_count, acs_5_yr_est, kpi_population]
+    - op: select
+      columns: [
+        metric_name, report_group, calendar_year, kpi_count, geo_area_name,
+        population_name, acs_5_yr_est, kpi_population,
+      ]
+  geocode: false
+  ckan:
+    package_id: "3f5b398f-ac2b-428c-b033-0f11935e16d1"  # allegheny-county-human-services-community-profiles
+    resource_id: "13363e19-9e54-4673-be03-4fe2fa587741"  # Municipality Profiles

@@ -34,6 +34,13 @@ class SourceModel(Model, Resolvable):
     path: str | None = None  # glob, e.g. /outbound/crime/*.csv
     url: str | None = None  # full URL for http sources, e.g. https://host/data.csv
     secret_ref: str | None = None  # env var name holding "user:password"
+    # "lower" folds the file's column headers to lower case (and trims them)
+    # as it is read, before schema_ok AND transforms see it. The legacy
+    # rocket-etl did exactly this to every CSV, so a legacy schema's
+    # `load_from` names are lower-case whatever the county's real header
+    # casing — and the county changes that casing without notice. A port of
+    # such a job sets this so its schema.py can use those names as written.
+    header_case: str | None = None
 
     # --- arcgis sources ---------------------------------------------------
     # An ArcGIS Hub site publishes a DCAT catalogue at <site>/data.json listing

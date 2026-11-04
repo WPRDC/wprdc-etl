@@ -1,0 +1,73 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Asbestos Permits Data — https://data.wprdc.org/dataset/allegheny-county-asbestos-permit
+# Ported from the legacy rocket-etl job old/payload/ac_hd/asbestos_permits.py
+# (schema AsbestosPermitV2Schema; legacy cron `15 5 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/health/asbestos_permits --write
+#
+# job_complete: a real boolean column in the live table, kept as one
+# (`bool_format: bool`). Assumes the file spells it True/False, which
+# pandas reads as bool — UNVERIFIED; a t/f or Y/N file would arrive as
+# text and the column guard would block the load as `bool -> text`.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: asbestos_permits
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Asbestos Permits/asbestos_sites_new.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "15 5 * * *"  # daily 05:15 ET
+  partition: daily
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        z_code: zip_code
+        pa_liscense_no: pa_license_no
+        status_value: status
+        parcel: parcel_id
+    - op: coerce_text
+      columns: [
+        permit_number, facility_name, s_address, city, zip_code, pa_license_no,
+        contractor_name, permit_specifications, is_building_occupied, project_type,
+        status, longitude, latitude, parcel_id,
+      ]
+    - op: coerce_numeric
+      columns: [permit_fee, square_feet]
+    - op: to_datetime
+      columns: [permit_issue_date, permit_expire_date]
+    - op: drop_nulls
+      columns: [permit_number]
+    - op: select
+      columns: [
+        permit_number, facility_name, s_address, city, zip_code, permit_fee,
+        pa_license_no, contractor_name, permit_specifications, square_feet,
+        is_building_occupied, permit_issue_date, permit_expire_date, project_type,
+        status, job_complete, longitude, latitude, parcel_id,
+      ]
+  geocode: false
+  ckan:
+    package_id: "7c0175b7-ff33-43ea-b353-bc2c5199a7ff"  # allegheny-county-asbestos-permit
+    resource_id: "8e91e9ae-45db-4d79-b217-e1d0830dbe87"  # Asbestos Permits Data
+    primary_key: [permit_number]
+    bool_format: bool

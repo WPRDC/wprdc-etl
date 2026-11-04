@@ -35,6 +35,10 @@ def _time(cron: str) -> tuple[int, int]:
 def test_every_schedule_fits_its_partitioning() -> None:
     bad = []
     for key, (cadence, cron) in SCHEDULED.items():
+        if cadence == "none":
+            # Unpartitioned (hourly air quality): a plain cron schedule that
+            # requests no partition, so there is no cadence to fit.
+            continue
         try:
             partitioned_schedule_fields(cadence, cron)
         except ValueError as e:

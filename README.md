@@ -178,9 +178,10 @@ attributes:
 - `fetch.py` — `def fetch(source, since): ...` returning `(records, new_watermark)`;
   **required** for `api_incremental` sources.
 
-**Transform primitives:** `iso_date`, `strip`, `rename`, `coerce_numeric`,
-`coerce_text`, `drop_nulls`, `fill_na`, `select`, `drop_columns`,
-`snake_case_columns`, `to_crs`, `reverse_geocode`.
+**Transform primitives:** `iso_date`, `to_datetime`, `strip`, `rename`,
+`coerce_numeric`, `coerce_text`, `drop_nulls`, `fill_na`, `select`,
+`drop_columns`, `snake_case_columns`, `to_crs`, `point_coordinates`,
+`reverse_geocode`, `join_geometry`.
 
 ### Reverse geocoding to administrative regions
 

@@ -1,0 +1,62 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Playground Equipment — https://data.wprdc.org/dataset/playground-equipment
+# The legacy job (old/payload/pgh/cartegraph_dpw.py, PlaygroundEquipmentSchema)
+# read an older Cartegraph export from the city FTP and has not run since
+# 2022-12. The city now writes one file per month,
+# cartegraph_playground_equipment/MM-YYYY.csv; `{now:%m-%Y}` picks the
+# current month's. Checked against the live 11-2026.csv on 2026-11-02 — its
+# columns map one-to-one onto the published ones (renames below).
+#
+# The month's file appears early in the month, not at midnight on the 1st
+# (11-2026.csv was there by 11-03), so a run on the 1st or 2nd may 404.
+#
+# `ada_accessible` is a real boolean in the live table (`bool_format: bool`);
+# the export spells it true/false, which pandas reads as bool.
+
+attributes:
+  publisher: city_of_pittsburgh
+  dataset: playground_equipment
+  source:
+    type: http
+    url: "https://storage.googleapis.com/pghpa_open_data/cartegraph_playground_equipment/{now:%m-%Y}.csv"
+  schedule: "57 8 * * 0"  # Sunday 08:57 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: rename
+      mapping:
+        playground: name
+        type: equipment_type
+        address_num: street_number
+        street_name: street
+        lat: latitude
+        long: longitude
+    - op: coerce_text
+      columns: [id, name, equipment_type, manufacturer, safety_surface_type, street_number, street]
+    - op: strip
+    - op: reverse_geocode
+      lat: latitude
+      lng: longitude
+      regions:
+        - neighborhood
+        - layer: council_district
+          value: id
+        - layer: census_tract
+          column: tract
+          value: id
+        - ward
+        - police_zone
+        - fire_zone
+        - public_works_division
+  geocode: false
+  ckan:
+    package_id: "4b9c5947-5645-4dbc-a7b6-eb323418fe02"  # playground-equipment
+    resource_id: "e39ef76e-0a11-47c8-a86f-a37f55db7a2b"  # Playground Equipment
+    bool_format: bool
+  geometry:
+    lat: latitude
+    lng: longitude
+  representations:
+    - format: geojson
+      resource_id: "eb0cf52f-3da1-4b77-8f6d-891dff8adfa0"  # Playground Equipment (GeoJSON)

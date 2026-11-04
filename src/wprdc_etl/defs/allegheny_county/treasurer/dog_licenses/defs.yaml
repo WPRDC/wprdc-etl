@@ -1,0 +1,49 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Lifetime Dog Licenses — https://data.wprdc.org/dataset/allegheny-county-dog-licenses
+# Ported from the legacy rocket-etl job old/payload/ac/dog_licenses.py
+# (schema DogLicensesSchema; legacy cron `55 6 2-8 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: treasurer
+  dataset: dog_licenses
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Dog_Licenses/DL_gvData_2099.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "18 5 1 * *"  # day 1 of the month, 05:18 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        licensetype: LicenseType
+        breed: Breed
+        color: Color
+        dogname: DogName
+        ownerzip: OwnerZip
+        expyear: ExpYear
+        validdate: ValidDate
+    - op: coerce_text
+      columns: [LicenseType, Breed, Color, DogName, OwnerZip]
+    - op: coerce_numeric
+      columns: [ExpYear]
+    - op: to_datetime
+      columns: [ValidDate]
+    - op: select
+      columns: [LicenseType, Breed, Color, DogName, OwnerZip, ExpYear, ValidDate]
+  geocode: false
+  ckan:
+    package_id: "ad5bd3d6-1b53-4ed0-8cd9-157a985bd0bd"  # allegheny-county-dog-licenses
+    resource_id: "f8ab32f7-44c7-43ca-98bf-c1b444724598"  # Lifetime Dog Licenses

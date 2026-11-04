@@ -65,7 +65,7 @@ from wprdc_etl.strategies.mirror import (
     sync_package_metadata,
     validate_mirrors,
 )
-from wprdc_etl.strategies.read import read_landed
+from wprdc_etl.strategies.read import HEADER_CASES, read_landed
 from wprdc_etl.strategies.transform import (
     apply_declarative,
     steps_need,
@@ -147,6 +147,11 @@ class TabularPipeline(Component, Model, Resolvable):
         cfg = self  # readable alias
         validate_steps(cfg.transforms)  # fail loud at load on an unknown op
         key_prefix, group, stem = taxonomy(cfg)
+        if cfg.source.header_case not in (None, *HEADER_CASES):
+            raise ValueError(
+                f"{stem}: source.header_case {cfg.source.header_case!r} — "
+                f"expected one of {HEADER_CASES}"
+            )
         if not (cfg.ckan or cfg.region_layer or cfg.key_layer):
             raise ValueError(
                 f"{stem}: needs a destination — set `ckan` to publish to CKAN, "

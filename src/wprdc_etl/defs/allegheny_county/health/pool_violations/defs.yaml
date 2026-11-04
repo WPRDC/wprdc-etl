@@ -1,0 +1,51 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Aquatic Violations — https://data.wprdc.org/dataset/allegheny-county-public-swimming-pool-hot-tub-and-spa-inspections
+# Ported from the legacy rocket-etl job old/payload/ac_hd/pool_inspections.py
+# (schema ACPoolViolationsSchema; legacy cron `41 2 2-9 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: pool_violations
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/alco-pool-violations.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "3 6 1 * *"  # day 1 of the month, 06:03 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        viol_uid: violation_uid
+        inspect_number: inspection_number
+    - op: coerce_text
+      columns: [
+        violation_uid, inspect_id, viol_class, allow_prom_yn, emergency_yn,
+        sub_sect, struct_or_dwell, owner_or_tenant, violation, remedy,
+      ]
+    - op: coerce_numeric
+      columns: [inspection_number, sect_num]
+    - op: to_datetime
+      columns: [viol_date]
+    - op: select
+      columns: [
+        violation_uid, inspect_id, inspection_number, viol_date, viol_class,
+        allow_prom_yn, emergency_yn, sect_num, sub_sect, struct_or_dwell,
+        owner_or_tenant, violation, remedy,
+      ]
+  geocode: false
+  ckan:
+    package_id: "f00f803d-78e3-44fd-80b3-c3fb2cd3003a"  # allegheny-county-public-swimming-pool-hot-tub-and-spa-inspections
+    resource_id: "140ed52c-3165-4456-ab91-69ab3042ae8e"  # Aquatic Violations

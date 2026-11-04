@@ -50,6 +50,7 @@ def merge(
         return delta.reset_index(drop=True)
 
     _require_columns(prior, primary_key, "the stored canonical table")
+    _require_comparable_keys(prior, delta, primary_key)
 
     import pandas as pd
 
@@ -73,6 +74,45 @@ def _require_columns(df: pd.DataFrame, primary_key: list[str], what: str) -> Non
         raise ValueError(
             f"accumulate: primary key column(s) {missing} are not in {what} "
             f"(has {sorted(df.columns)})"
+        )
+
+
+def _key_kind(series: pd.Series) -> str:
+    import pandas as pd
+
+    if pd.api.types.is_bool_dtype(series):
+        return "bool"
+    if pd.api.types.is_numeric_dtype(series):
+        return "numeric"
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return "datetime"
+    return "text"
+
+
+def _require_comparable_keys(
+    prior: pd.DataFrame, delta: pd.DataFrame, primary_key: list[str]
+) -> None:
+    """Refuse to merge when a key column is a different KIND on each side.
+
+    drop_duplicates never matches the text "1234" against the number 1234, or
+    a datetime against its ISO string, so such a merge keeps both copies of
+    every row and the table doubles without an error. That is exactly what a
+    seeded table (`bin/seed-accumulator`) and a pipeline that types the key
+    differently would do on their first merge.
+    """
+    clashes = {
+        c: (_key_kind(prior[c]), _key_kind(delta[c]))
+        for c in primary_key
+        if _key_kind(prior[c]) != _key_kind(delta[c])
+    }
+    if clashes:
+        detail = ", ".join(
+            f"{c}: stored {a}, incoming {b}" for c, (a, b) in clashes.items()
+        )
+        raise ValueError(
+            f"accumulate: primary key column(s) differ in kind ({detail}), so no "
+            "row would ever match its stored copy. Coerce the incoming column "
+            "(coerce_text / coerce_numeric / to_datetime) to match."
         )
 
 

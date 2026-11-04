@@ -1,0 +1,49 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Allegheny County Parks Ranger Outreach — https://data.wprdc.org/dataset/allegheny-county-park-rangers-outreach
+# Ported from the legacy rocket-etl job old/payload/ac/rangers.py
+# (schema RangersOutreachSchema; legacy cron `58 4 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: parks
+  dataset: ranger_outreach
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/ParkRangers/ranger_contacts.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "58 4 * * *"  # daily 04:58 ET
+  partition: daily
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: coerce_text
+      columns: [
+        location, program, program_category, special_event_name, contact_type,
+        outreach_group, outreach_group_type, school_district, participant_avg_age,
+        type, volunteer_hours, ranger_work_day_hours, notes,
+      ]
+    - op: coerce_numeric
+      columns: [number, latitude, longitude]
+    - op: to_datetime
+      columns: [date, start_time, end_time]
+    - op: select
+      columns: [
+        date, location, program, program_category, special_event_name,
+        contact_type, outreach_group, outreach_group_type, school_district, number,
+        participant_avg_age, type, volunteer_hours, ranger_work_day_hours,
+        start_time, end_time, latitude, longitude, notes,
+      ]
+  geocode: false
+  ckan:
+    package_id: "01894671-26ec-423c-985c-55c66220e433"  # allegheny-county-park-rangers-outreach
+    resource_id: "b669ae63-d58a-4346-a5a9-879cd0c122b7"  # Allegheny County Parks Ranger Outreach

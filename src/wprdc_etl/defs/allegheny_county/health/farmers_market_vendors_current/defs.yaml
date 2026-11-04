@@ -1,0 +1,51 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Current Vendors — https://data.wprdc.org/dataset/allegheny-county-farmers-markets-locations
+# Ported from the legacy rocket-etl job old/payload/ac_hd/farmers_markets.py
+# (schema VendorsSchema; legacy cron `13 4 1 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# The county names this file by year; `{now:%Y}` resolves to the year the
+# run starts (Eastern), as the legacy job's `current_year` did.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: farmers_market_vendors_current
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/alco_market_vendors_{now:%Y}.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "51 5 1 * *"  # day 1 of the month, 05:51 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        farmmarketid: market_id
+        vendorid: vendor_id
+        vendorname: vendor_name
+        vendorphone: vendor_phone
+        vendorschedule: vendor_schedule
+    - op: coerce_text
+      columns: [market_id, vendor_id, vendor_name, vendor_phone, vendor_schedule]
+    - op: coerce_numeric
+      columns: [latitude, longitude]
+    - op: select
+      columns: [
+        market_id, vendor_id, vendor_name, vendor_phone, vendor_schedule, latitude,
+        longitude,
+      ]
+  geocode: false
+  ckan:
+    package_id: "5706fa23-87f6-4757-be8a-bcfc0b677e01"  # allegheny-county-farmers-markets-locations
+    resource_id: "c84109c5-0875-4ebb-8638-e8b3f694ea72"  # Current Vendors

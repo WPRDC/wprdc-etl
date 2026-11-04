@@ -1,0 +1,48 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Allegheny County Certified MWDBE Businesses — https://data.wprdc.org/dataset/allegheny-county-certified-mwdbe-businesses
+# Ported from the legacy rocket-etl job old/payload/ac/mwdbe_businesses.py
+# (schema MWDBEBusinesseschema; legacy cron `10 21 1-8 2,5,8,11 *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: economic_development
+  dataset: mwdbe_businesses
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Equity_and_Inclusion/mwdbe_certified.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "33 4 1 * *"  # day 1 of the month, 04:33 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        vendorid: vendor_id
+        naics: naics_codes
+    - op: coerce_text
+      columns: [
+        vendor_id, certification_type, firm_name, owners, work_description,
+        naics_codes, physical_address, phone_number, fax_number, email_address,
+        website,
+      ]
+    - op: select
+      columns: [
+        vendor_id, certification_type, firm_name, owners, work_description,
+        naics_codes, physical_address, phone_number, fax_number, email_address,
+        website,
+      ]
+  geocode: false
+  ckan:
+    package_id: "f2deaf21-1a73-4bf7-a6a2-d2e8ea1f2b18"  # allegheny-county-certified-mwdbe-businesses
+    resource_id: "cde4503b-1e1c-4afc-9fc5-d49c1bebb4ee"  # Allegheny County Certified MWDBE Businesses

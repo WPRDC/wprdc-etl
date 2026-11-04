@@ -17,6 +17,7 @@ from wprdc_etl.strategies.extract import (
     HttpFileExtractor,
     get_extractor,
     is_arcgis_pending,
+    render_date_tokens,
     resolve_arcgis_distribution,
 )
 
@@ -189,6 +190,45 @@ def test_http_extractor_basic_auth_from_secret_ref(
         _FakeCtx(), _cfg(secret_ref="WF_HTTP_SECRET"), landing=_FakeLanding()
     )
     assert seen["auth"] == ("svc-user", "s3cr3t")
+
+
+def test_date_tokens_expand_with_strftime() -> None:
+    import datetime as dt
+
+    now = dt.datetime(2026, 11, 3, 4, 0)
+    assert (
+        render_date_tokens("/HD/alco_farmers_markets_{now:%Y}.csv", now)
+        == "/HD/alco_farmers_markets_2026.csv"
+    )
+    assert render_date_tokens("equip/{now:%m-%Y}.csv", now) == "equip/11-2026.csv"
+
+
+def test_date_tokens_leave_other_braces_alone() -> None:
+    url = "https://example.org/q?where={x}&f=csv"
+    assert render_date_tokens(url) == url
+
+
+def test_date_tokens_default_to_eastern_time() -> None:
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+
+    year = dt.datetime.now(ZoneInfo("America/New_York")).year
+    assert render_date_tokens("f_{now:%Y}.csv") == f"f_{year}.csv"
+
+
+def test_http_extractor_renders_date_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(
+        "requests.get",
+        lambda url, **kw: seen.update(url=url) or _FakeResp([b"x"], headers={}),
+    )
+    HttpFileExtractor().extract(
+        _FakeCtx(),
+        _cfg(url="https://example.org/equip/{now:%Y}.csv"),
+        landing=_FakeLanding(),
+    )
+    assert "{now" not in seen["url"]
+    assert seen["url"].endswith(".csv")
 
 
 def test_http_extractor_requires_a_url() -> None:
@@ -441,3 +481,13 @@ def test_extractor_refuses_to_land_a_pending_placeholder(
             landing=landing,
         )
     assert landing.calls == []
+
+
+def test_exporting_data_placeholder_is_pending() -> None:
+    # Seen 2026-11-02 on PRT's Hub: a 232-byte 200 OK that landed as the layer.
+    body = (
+        b'{"message":"Up to date download file is being generated. Please check '
+        b'back again later.","status":"ExportingData","progressInPercent":100,'
+        b'"recordCount":6389}'
+    )
+    assert is_arcgis_pending(body)

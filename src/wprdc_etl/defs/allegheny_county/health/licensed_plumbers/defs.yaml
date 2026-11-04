@@ -1,0 +1,39 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Plumbers — https://data.wprdc.org/dataset/allegheny-county-plumbers
+# Ported from the legacy rocket-etl job old/payload/ac_hd/licensed_plumbers.py
+# (schema PlumbersSchema; legacy cron `1 5 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: licensed_plumbers
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/alco-plumbers.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "1 5 * * *"  # daily 05:01 ET
+  partition: daily
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        postalcode: zip_code
+    - op: coerce_text
+      columns: [registration_number, first_name, last_name, city, zip_code]
+    - op: select
+      columns: [registration_number, first_name, last_name, city, zip_code]
+  geocode: false
+  ckan:
+    package_id: "bafa99e3-6773-4dec-95bf-77d34b7754eb"  # allegheny-county-plumbers
+    resource_id: "60637ef7-96c9-47ee-95c3-ccc2a2140367"  # Plumbers

@@ -1,0 +1,53 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Kane Census (current format) [2020-] — https://data.wprdc.org/dataset/allegheny-county-kane-regional-center-census
+# Ported from the legacy rocket-etl job old/payload/ac/kane.py
+# (schema KaneCensusSchema; legacy cron `35 2 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/kane/kane_census --write
+
+attributes:
+  publisher: allegheny_county
+  department: kane
+  dataset: kane_census
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Kane_Daily_Census/KaneDailyAdmission*.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "35 2 * * *"  # daily 02:35 ET
+  partition: daily
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  heavy: true
+  transforms:
+    - op: strip
+    - op: coerce_text
+      columns: [facility, race, ethnicity, sex]
+    - op: coerce_numeric
+      columns: [resident_count]
+    - op: to_datetime
+      columns: [report_date]
+    - op: drop_nulls
+      columns: [facility, report_date, sex, race, ethnicity]
+    - op: select
+      columns: [facility, report_date, race, ethnicity, sex, resident_count]
+  geocode: false
+  ckan:
+    package_id: "db327693-d758-431e-9f59-a906bdef46b3"  # allegheny-county-kane-regional-center-census
+    resource_id: "7b14f9a7-df4c-4376-85e0-5b830591d47e"  # Kane Census (current format) [2020-]
+    primary_key: [facility, report_date, sex, race, ethnicity]

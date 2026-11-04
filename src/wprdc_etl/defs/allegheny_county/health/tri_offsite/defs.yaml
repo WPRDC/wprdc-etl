@@ -1,0 +1,122 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# TRI Offsite — https://data.wprdc.org/dataset/toxic-release-inventory
+# Ported from the legacy rocket-etl job old/payload/ac_hd/toxic_inventory.py
+# (schema ToxicOffsiteSchema; legacy cron `40 7 1,3,5,8 1,4,7,10 *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: tri_offsite
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/tri_offsite.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "12 6 1 * *"  # day 1 of the month, 06:12 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        tri_facility_id: TRI_FACILITY_ID
+        doc_ctrl_num: DOC_CTRL_NUM
+        facility_name: FACILITY_NAME
+        street_address: STREET_ADDRESS
+        city_name: CITY_NAME
+        county_name: COUNTY_NAME
+        state_county_fips_code: STATE_COUNTY_FIPS_CODE
+        state_abbr: STATE_ABBR
+        zip_code: ZIP_CODE
+        region: REGION
+        fac_closed_ind: FAC_CLOSED_IND
+        asgn_federal_ind: ASGN_FEDERAL_IND
+        asgn_agency: ASGN_AGENCY
+        parent_co_db_num: PARENT_CO_DB_NUM
+        parent_co_name: PARENT_CO_NAME
+        standardized_parent_company: STANDARDIZED_PARENT_COMPANY
+        epa_registry_id: EPA_REGISTRY_ID
+        trade_secret_ind: TRADE_SECRET_IND
+        reporting_year: REPORTING_YEAR
+        cas_num: CAS_NUM
+        elemental_metal_included: ELEMENTAL_METAL_INCLUDED
+        tri_chem_id: TRI_CHEM_ID
+        chem_name: CHEM_NAME
+        metal_ind: METAL_IND
+        pbt_ind: PBT_IND
+        list_3350: LIST_3350
+        carcinogen: CARCINOGEN
+        clean_air: CLEAN_AIR
+        primary_sic_code: PRIMARY_SIC_CODE
+        sic_codes: SIC_CODES
+        primary_naics_code: PRIMARY_NAICS_CODE
+        naics_codes: NAICS_CODES
+        industry_code: INDUSTRY_CODE
+        srs_id: SRS_ID
+        pfas_ind: PFAS_IND
+        transfer_loc_num: TRANSFER_LOC_NUM
+        off_site_amount_sequence: OFF_SITE_AMOUNT_SEQUENCE
+        type_of_waste_management: TYPE_OF_WASTE_MANAGEMENT
+        transfer_range_code: TRANSFER_RANGE_CODE
+        transfer_amt: TRANSFER_AMT
+        transfer_est_na: TRANSFER_EST_NA
+        transfer_basis_est_code: TRANSFER_BASIS_EST_CODE
+        off_site_name: OFF_SITE_NAME
+        off_site_street_address: OFF_SITE_STREET_ADDRESS
+        transfer_city_name: TRANSFER_CITY_NAME
+        transfer_county_name: TRANSFER_COUNTY_NAME
+        transfer_state_abbr: TRANSFER_STATE_ABBR
+        transfer_zip_code: TRANSFER_ZIP_CODE
+        transfer_country_code: TRANSFER_COUNTRY_CODE
+        rcra_num: RCRA_NUM
+        controlled_loc: CONTROLLED_LOC
+        transfer_loc_epa_registry_id: TRANSFER_LOC_EPA_REGISTRY_ID
+    - op: coerce_text
+      columns: [
+        TRI_FACILITY_ID, DOC_CTRL_NUM, FACILITY_NAME, STREET_ADDRESS, CITY_NAME,
+        COUNTY_NAME, STATE_COUNTY_FIPS_CODE, STATE_ABBR, ZIP_CODE, REGION,
+        FAC_CLOSED_IND, ASGN_FEDERAL_IND, ASGN_AGENCY, PARENT_CO_DB_NUM,
+        PARENT_CO_NAME, STANDARDIZED_PARENT_COMPANY, EPA_REGISTRY_ID,
+        TRADE_SECRET_IND, CAS_NUM, ELEMENTAL_METAL_INCLUDED, TRI_CHEM_ID,
+        CHEM_NAME, METAL_IND, PBT_IND, LIST_3350, CARCINOGEN, CLEAN_AIR,
+        PRIMARY_SIC_CODE, SIC_CODES, PRIMARY_NAICS_CODE, NAICS_CODES, SRS_ID,
+        PFAS_IND, TYPE_OF_WASTE_MANAGEMENT, TRANSFER_RANGE_CODE, TRANSFER_EST_NA,
+        TRANSFER_BASIS_EST_CODE, OFF_SITE_NAME, OFF_SITE_STREET_ADDRESS,
+        TRANSFER_CITY_NAME, TRANSFER_COUNTY_NAME, TRANSFER_STATE_ABBR,
+        TRANSFER_ZIP_CODE, TRANSFER_COUNTRY_CODE, RCRA_NUM, CONTROLLED_LOC,
+        TRANSFER_LOC_EPA_REGISTRY_ID,
+      ]
+    - op: coerce_numeric
+      columns: [
+        REPORTING_YEAR, INDUSTRY_CODE, TRANSFER_LOC_NUM, OFF_SITE_AMOUNT_SEQUENCE,
+        TRANSFER_AMT,
+      ]
+    - op: select
+      columns: [
+        TRI_FACILITY_ID, DOC_CTRL_NUM, FACILITY_NAME, STREET_ADDRESS, CITY_NAME,
+        COUNTY_NAME, STATE_COUNTY_FIPS_CODE, STATE_ABBR, ZIP_CODE, REGION,
+        FAC_CLOSED_IND, ASGN_FEDERAL_IND, ASGN_AGENCY, PARENT_CO_DB_NUM,
+        PARENT_CO_NAME, STANDARDIZED_PARENT_COMPANY, EPA_REGISTRY_ID,
+        TRADE_SECRET_IND, REPORTING_YEAR, CAS_NUM, ELEMENTAL_METAL_INCLUDED,
+        TRI_CHEM_ID, CHEM_NAME, METAL_IND, PBT_IND, LIST_3350, CARCINOGEN,
+        CLEAN_AIR, PRIMARY_SIC_CODE, SIC_CODES, PRIMARY_NAICS_CODE, NAICS_CODES,
+        INDUSTRY_CODE, SRS_ID, PFAS_IND, TRANSFER_LOC_NUM,
+        OFF_SITE_AMOUNT_SEQUENCE, TYPE_OF_WASTE_MANAGEMENT, TRANSFER_RANGE_CODE,
+        TRANSFER_AMT, TRANSFER_EST_NA, TRANSFER_BASIS_EST_CODE, OFF_SITE_NAME,
+        OFF_SITE_STREET_ADDRESS, TRANSFER_CITY_NAME, TRANSFER_COUNTY_NAME,
+        TRANSFER_STATE_ABBR, TRANSFER_ZIP_CODE, TRANSFER_COUNTRY_CODE, RCRA_NUM,
+        CONTROLLED_LOC, TRANSFER_LOC_EPA_REGISTRY_ID,
+      ]
+  geocode: false
+  ckan:
+    package_id: "2cff4c07-423a-4b61-af08-7288fbb773eb"  # toxic-release-inventory
+    resource_id: "b21f7581-04bd-4a0e-b14b-fb437da768c2"  # TRI Offsite

@@ -1,0 +1,58 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Cumulative Delinquent Real Estate Taxes — https://data.wprdc.org/dataset/delinquent-real-estate-taxes
+# Ported from the legacy rocket-etl job old/payload/ac/delinquent.py
+# (schema DelinquentAllSchema; legacy cron `00 13 * * 6`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# The county names this file by year; `{now:%Y}` resolves to the year the
+# run starts (Eastern), as the legacy job's `current_year` did.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/real_estate/delinquent_taxes_cumulative --write
+
+attributes:
+  publisher: allegheny_county
+  department: real_estate
+  dataset: delinquent_taxes_cumulative
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Dog_Licenses/delinquent_{now:%Y}.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "18 6 * * 0"  # Sunday 06:18 ET
+  partition: weekly
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: strip
+    - op: coerce_text
+      columns: [ar_id, year, parcel_id_formatted, parcel_id, muni_name, school_district]
+    - op: coerce_numeric
+      columns: [penalties, interest, orig_bill, total_payments]
+    - op: to_datetime
+      columns: [last_pay_date, asof_date]
+    - op: drop_nulls
+      columns: [ar_id]
+    - op: select
+      columns: [
+        ar_id, year, parcel_id_formatted, parcel_id, muni_name, school_district,
+        last_pay_date, penalties, interest, orig_bill, total_payments, asof_date,
+      ]
+  geocode: false
+  ckan:
+    package_id: "faf19fe1-4f68-4b2c-a166-31e6613531f4"  # delinquent-real-estate-taxes
+    resource_id: "96e9d6b2-3e1a-4a0c-8ef6-23a049c263d8"  # Cumulative Delinquent Real Estate Taxes
+    primary_key: [ar_id]

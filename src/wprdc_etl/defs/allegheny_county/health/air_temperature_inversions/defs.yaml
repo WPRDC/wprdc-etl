@@ -1,0 +1,57 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Air Temperature Inversions — https://data.wprdc.org/dataset/air-temperature-inversions
+# Ported from the legacy rocket-etl job old/payload/ac_hd/inversions_achd.py
+# (schema InversionDataSchema; legacy cron `43 16 * * 6`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/health/air_temperature_inversions --write
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: air_temperature_inversions
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/inversions.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "57 6 * * 0"  # Sunday 06:57 ET
+  partition: weekly
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        "inversion..y.n.": inversion_y_n
+        "temperature..c..": temperature_c
+        "depth..m.": depth_m
+    - op: coerce_text
+      columns: [inversion_y_n, temperature_c, strength, notes]
+    - op: coerce_numeric
+      columns: [depth_m]
+    - op: to_datetime
+      columns: [date]
+    - op: drop_nulls
+      columns: [date]
+    - op: select
+      columns: [date, inversion_y_n, temperature_c, depth_m, strength, notes]
+  geocode: false
+  ckan:
+    package_id: "dc57451d-3ff1-4956-942b-22c522b9a620"  # air-temperature-inversions
+    resource_id: "34ec60b4-9ec7-40ad-9fa8-088cfcad8764"  # Air Temperature Inversions
+    primary_key: [date]

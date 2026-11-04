@@ -101,6 +101,28 @@ def test_missing_primary_key_column_is_fatal():
         merge(None, delta, ["id"])
 
 
+def test_key_kind_mismatch_is_fatal():
+    # A text key stored by the seed vs a numeric key from the pipeline would
+    # never dedupe — every row would be kept twice.
+    prior = frame([{"id": "1", "v": 1}])
+    delta = frame([{"id": 1, "v": 2}])
+    with pytest.raises(ValueError, match="differ in kind"):
+        merge(prior, delta, ["id"])
+
+
+def test_int_and_float_keys_still_merge():
+    prior = frame([{"id": 1.0, "v": 1}])
+    delta = frame([{"id": 1, "v": 2}])
+    out = merge(prior, delta, ["id"])
+    assert out["v"].tolist() == [2]
+
+
+def test_string_and_object_keys_still_merge():
+    prior = frame([{"id": "a", "v": 1}]).astype({"id": "string"})
+    delta = frame([{"id": "a", "v": 2}])
+    assert merge(prior, delta, ["id"])["v"].tolist() == [2]
+
+
 def test_empty_primary_key_is_fatal():
     with pytest.raises(ValueError, match="requires ckan.primary_key"):
         merge(None, frame([{"id": "a"}]), [])

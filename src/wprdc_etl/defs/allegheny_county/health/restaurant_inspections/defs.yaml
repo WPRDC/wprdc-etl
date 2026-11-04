@@ -1,0 +1,49 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Food Facility/Restaurant Inspections — https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations
+# Ported from the legacy rocket-etl job old/payload/ac_hd/restaurant_inspections.py
+# (schema InspectionsSchema; legacy cron `10 5 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: restaurant_inspections
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/foodfacility_inspections.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "10 5 * * *"  # daily 05:10 ET
+  partition: daily
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        zip: zip_code
+    - op: coerce_text
+      columns: [
+        inspection_id, placard_desc, facility_name, facility_type, category,
+        nonprofit, num, street, city, state, zip_code, municipal,
+        inspection_purpose, reinspection_need, permit_status,
+      ]
+    - op: to_datetime
+      columns: [bus_st_date, inspect_dt]
+    - op: select
+      columns: [
+        inspection_id, placard_desc, facility_name, bus_st_date, facility_type,
+        category, nonprofit, num, street, city, state, zip_code, municipal,
+        inspect_dt, inspection_purpose, reinspection_need, permit_status,
+      ]
+  geocode: false
+  ckan:
+    package_id: "8744b4f6-5525-49be-9054-401a2c4c2fac"  # allegheny-county-restaurant-food-facility-inspection-violations
+    resource_id: "1c9cf8d8-f3db-4364-b925-d7078c2fb02f"  # Food Facility/Restaurant Inspections

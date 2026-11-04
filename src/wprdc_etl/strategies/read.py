@@ -63,6 +63,33 @@ READERS: dict[str, Callable[[str], pd.DataFrame]] = {
 }
 
 
+HEADER_CASES = ("lower",)
+
+
+def normalize_headers(df: pd.DataFrame, cfg: PipelineConfig) -> pd.DataFrame:
+    """Apply `source.header_case` to a freshly read frame.
+
+    Done here, at read time, so schema_ok (which validates the raw landed
+    file) and the transforms see the same column names. A GeoDataFrame's
+    geometry column is left alone: geopandas names it `geometry` already.
+    """
+    case = getattr(cfg.source, "header_case", None)
+    if not case:
+        return df
+    if case not in HEADER_CASES:
+        raise ValueError(f"source.header_case {case!r}: expected one of {HEADER_CASES}")
+    geometry = getattr(df, "_geometry_column_name", None)
+    mapping = {c: str(c).strip().lower() for c in df.columns if c != geometry}
+    folded = list(mapping.values())
+    clashes = sorted({c for c in folded if folded.count(c) > 1})
+    if clashes:
+        raise ValueError(
+            f"source.header_case: lower-casing the headers makes {clashes} "
+            "collide; the file has columns differing only in case"
+        )
+    return df.rename(columns=mapping)
+
+
 def get_reader(fmt: str) -> Callable[[str], pd.DataFrame]:
     try:
         return READERS[fmt]
@@ -92,7 +119,7 @@ def read_landed(
     os.close(fd)
     try:
         landing.download(f"{prefix}/{filename}", tmp)
-        return get_reader(fmt)(tmp)
+        return normalize_headers(get_reader(fmt)(tmp), cfg)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)

@@ -1,0 +1,58 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# ACJ Daily Census Data (Combined) — https://data.wprdc.org/dataset/allegheny-county-jail-daily-census
+# Ported from the legacy rocket-etl job old/payload/ac/jail.py
+# (schema JailCensusSchema; legacy cron `20 4 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ACCUMULATES: the legacy job upserted on the key below. Here every run
+# merges the file into the stored table (_state/.../current.parquet) and
+# publishes the whole table as one CSV through DataPusher+. Seed it from
+# the live resource BEFORE the first publishing run, or that run reloads
+# CKAN down to one file (in production, deploy/seed-accumulator):
+#   bin/seed-accumulator --only allegheny_county/jail/jail_census --write
+
+attributes:
+  publisher: allegheny_county
+  department: jail
+  dataset: jail_census
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/jail_census_data/ACJ_Census.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "20 4 * * *"  # daily 04:20 ET
+  partition: daily
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  heavy: true
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        recordid: record_id
+        age_at_booking_yrs: age_at_booking
+        age_at_census_yrs: age_at_census
+    - op: coerce_text
+      columns: [gender, race]
+    - op: coerce_numeric
+      columns: [record_id, age_at_booking, age_at_census]
+    - op: to_datetime
+      columns: [census_date]
+    - op: drop_nulls
+      columns: [record_id, census_date]
+    - op: select
+      columns: [record_id, census_date, gender, race, age_at_booking, age_at_census]
+  geocode: false
+  ckan:
+    package_id: "d15ca172-66df-4508-8562-5ec54498cfd4"  # allegheny-county-jail-daily-census
+    resource_id: "66cdcd57-6c92-4aaa-8800-0ed9d8f03e22"  # ACJ Daily Census Data (Combined)
+    primary_key: [record_id, census_date]

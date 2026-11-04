@@ -195,10 +195,12 @@ mutated.
 | `op` | Params | Effect |
 |------|--------|--------|
 | `iso_date` | `columns`, `fmt` (optional) | Parse and re-render as ISO 8601 `YYYY-MM-DD`. Unparseable values become NaT. |
-| `strip` | `columns` (optional) | Trim leading/trailing whitespace. With no `columns`, every object-dtype column. |
+| `to_datetime` | `columns`, `fmt` (optional) | Parse into real (tz-naive) datetimes; unparseable becomes NaT. Use it for a column the live table types `timestamp`/`date` — iso_date writes text, which the column guard reads as a retype — and for a timestamp in an accumulating dataset's merge key (it matches what `bin/seed-accumulator` stores). A tz-aware value keeps its UTC wall time. |
+| `point_coordinates` | `lat`, `lng` (default `latitude` / `longitude`) | Point GeoDataFrame -> plain table: the coordinates become two columns and the geometry is dropped. For a GeoJSON source published as a CSV DataStore table. Non-point geometry gives NA. |
+| `strip` | `columns` (optional) | Trim leading/trailing whitespace. With no `columns`, every object-dtype column; non-string values pass through. |
 | `rename` | `mapping` | Rename columns via `{old: new}`. |
 | `coerce_numeric` | `columns` | To numeric; non-numeric becomes NaN. |
-| `coerce_text` | `columns` | To nullable string — the inverse of `coerce_numeric`. `1011` renders `"1011"`, not `"1011.0"`; missing stays NA. For ids/codes a CSV parser reads as numbers (zip, FIPS, district, account id). |
+| `coerce_text` | `columns` | To nullable string — the inverse of `coerce_numeric`. `1011` renders `"1011"`, not `"1011.0"`, and a large integral float keeps every digit (`14123512345`, not `1.41235e+10`); missing stays NA. For ids/codes a CSV parser reads as numbers (zip, FIPS, district, account id). |
 | `drop_nulls` | `columns` | Drop rows null in any named column (e.g. a missing key). |
 | `fill_na` | `value`, `columns` (optional) | Fill NA with a constant, on named columns or the whole frame. |
 | `select` | `columns` | Keep only the named columns that exist, in order. |

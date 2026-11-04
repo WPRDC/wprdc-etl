@@ -223,6 +223,31 @@ genuinely dataset-specific logic.
   `_state/<publisher>/[<dept>/]<dataset>/current.parquet` and publishes that
   whole table. Parquet, not CSV — a CSV round trip turns nullable ints into
   floats and eats leading zeros on the identifier columns the merge keys on.
+- **An accumulating dataset must be seeded before its first publish.** With
+  no stored table, the first run's file IS the table, and DataPusher+
+  reloads CKAN down to it. `bin/seed-accumulator` (dev) /
+  `deploy/seed-accumulator` (prod) copies the live DataStore table into
+  `_state/.../current.parquet`, typed by DataStore type: timestamps/dates as
+  datetimes, text as string. The merge refuses a key column whose kind
+  differs between the stored and incoming tables (it would never dedupe and
+  the table would double), so a timestamp key needs `to_datetime`, a text id
+  `coerce_text`. It refuses to reseed without `--force`.
+- **A live `timestamp`/`date` column needs `to_datetime`, not `iso_date`.**
+  `iso_date` writes text, and the column guard reads text against a live
+  timestamp as a retype and blocks the load.
+- **Ported legacy jobs use `source.header_case: lower`.** The legacy engine
+  lower-cased every header before matching `load_from`, so the real casing
+  is usually unknowable from the code; folding on read makes the legacy names
+  work as written, in schema_ok and the transforms alike. Don't drop it to
+  "match the file" without a real extract.
+- **`{now:<strftime>}` in `source.path`/`url` is the run's START time,
+  Eastern** — not the partition (a monthly partition names the month that
+  just ended). It's for publishers that put the current year/month in the
+  filename.
+- **ArcGIS's not-ready placeholder changes its wording.** It has said
+  `Pending`, `InProgress` and now `ExportingData` (with
+  `progressInPercent: 100`). `is_arcgis_pending` treats any small status
+  document as pending; don't narrow it back to a list of words.
 - **`department:` drives the asset key, not the folder.** Moving a dataset's
   directory without editing the field leaves the files in one place and the
   data in another — the asset key, the S3 landing prefix and the asset group

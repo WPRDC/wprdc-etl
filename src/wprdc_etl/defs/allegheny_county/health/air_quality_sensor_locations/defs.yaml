@@ -1,0 +1,57 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Sensor Locations — https://data.wprdc.org/dataset/allegheny-county-air-quality
+# Ported from the legacy rocket-etl job old/payload/ac_hd/air_quality.py
+# (schema MeasurementSites; legacy cron `20 * * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# enabled: a real boolean column in the live table, kept as one
+# (`bool_format: bool`). Assumes the file spells it True/False, which
+# pandas reads as bool — UNVERIFIED; a t/f or Y/N file would arrive as
+# text and the column guard would block the load as `bool -> text`.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: air_quality_sensor_locations
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/sourcesites.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "20 * * * *"  # hourly at :20
+  partition: none
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        sitename: site_name
+        airnowmnemonic: air_now_mnemonic
+    - op: coerce_text
+      columns: [site_name, description, air_now_mnemonic, address]
+    - op: coerce_numeric
+      columns: [latitude, longitude]
+    - op: select
+      columns: [
+        site_name, description, air_now_mnemonic, address, latitude, longitude,
+        enabled,
+      ]
+  geocode: false
+  ckan:
+    package_id: "c7b3266c-adc6-41c0-b19a-8d4353bfcdaf"  # allegheny-county-air-quality
+    resource_id: "b646336a-deb4-4075-aee4-c5d28d88c426"  # Sensor Locations
+    bool_format: bool
+  geometry:
+    lat: latitude
+    lng: longitude
+  representations:
+    - format: geojson
+      resource_id: "7f7072ce-7c19-4813-a45c-6135cf4505bb"  # Sensor Locations (GeoJSON)

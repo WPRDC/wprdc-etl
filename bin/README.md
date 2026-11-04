@@ -12,6 +12,7 @@ including `${POSTGIS_PORT}` interpolation.
 | `bin/check` | `black --check` + `pytest` + `dg check defs`, all of them, then a summary. |
 | `bin/boundaries` | Load the PostGIS boundary layers `reverse_geocode` reads. `--list` to look first. |
 | `bin/seed-ckan` | Create the packages/resources the defs publish to, on the local CKAN. Dry-run by default. |
+| `bin/seed-accumulator` | Seed an accumulating dataset's stored table from its live CKAN resource, before its first publishing run. Dry-run by default; `--only <dataset> --write`. |
 | `bin/arcgis` | Generate/refresh the ArcGIS pipelines from each publisher's `data.json`. Dry-run by default. |
 | `bin/editor-schema` | Write `.dg/defs.schema.json` and map it onto every `defs.yaml` in PyCharm: autocomplete, value suggestions, inline errors. |
 | `bin/pasda` | Generate/refresh the pipelines sourced from Penn State's PASDA archive. Dry-run by default. |

@@ -49,6 +49,28 @@ class Extractor:
         raise NotImplementedError
 
 
+# `{now:<strftime>}` in source.path / source.url is replaced with the run's
+# wall-clock time in America/New_York, for publishers that put the date in the
+# filename (`alco_farmers_markets_{now:%Y}.csv`, `{now:%m-%Y}.csv`). It is the
+# time the run STARTS, not the partition — the legacy jobs read the file for
+# the current year/month, and a monthly partition names the month that just
+# ended. Only this one token is recognised, so a literal brace elsewhere in a
+# URL passes through untouched.
+_DATE_TOKEN = re.compile(r"\{now:([^{}]*)\}")
+
+
+def render_date_tokens(value: str, now: Any = None) -> str:
+    """Expand `{now:<strftime>}` tokens in a source path or URL."""
+    if "{now:" not in value:
+        return value
+    if now is None:
+        import datetime as dt
+        from zoneinfo import ZoneInfo
+
+        now = dt.datetime.now(ZoneInfo("America/New_York"))
+    return _DATE_TOKEN.sub(lambda m: now.strftime(m.group(1)), value)
+
+
 class SftpFileExtractor(Extractor):
     """Pull the newest file matching a glob from an SFTP server and land it."""
 
@@ -84,9 +106,10 @@ class SftpFileExtractor(Extractor):
         user, _, password = secret.partition(":")  # expected "user:password"
         port = src.port or 22
 
-        matches = sftp.list_matching(src.host, user, password, src.path, port=port)
+        path = render_date_tokens(src.path or "")
+        matches = sftp.list_matching(src.host, user, password, path, port=port)
         if not matches:
-            raise dg.Failure(f"no files matched {src.path} on {src.host}")
+            raise dg.Failure(f"no files matched {path} on {src.host}")
 
         newest = max(matches, key=lambda m: m["mtime"])
 
@@ -155,6 +178,7 @@ class HttpFileExtractor(Extractor):
             raise dg.Failure(
                 "source.url is required for http sources", allow_retries=False
             )
+        url = render_date_tokens(url)
 
         auth = _basic_auth(src.secret_ref)
         return _download_and_land(
@@ -281,7 +305,13 @@ def is_arcgis_pending(head: bytes) -> bool:
         doc = json.loads(head.decode("utf-8", "replace"))
     except (ValueError, UnicodeDecodeError):
         return False
-    return isinstance(doc, dict) and doc.get("status") in ("Pending", "InProgress")
+    if not isinstance(doc, dict) or "status" not in doc:
+        return False
+    # Any status document is a placeholder, whatever it calls the state:
+    # ArcGIS has said "Pending" and "InProgress", and now "ExportingData"
+    # (with progressInPercent: 100, while still not ready). A real export
+    # is a FeatureCollection; it never parses this small as a status dict.
+    return doc.get("type") != "FeatureCollection" and "features" not in doc
 
 
 def arcgis_ready_url(url: str, *, sleep: Any = None) -> None:

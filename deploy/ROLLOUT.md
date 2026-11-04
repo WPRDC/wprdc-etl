@@ -184,6 +184,16 @@ in this phase is launched by hand from the UI.
       job run (job tags, concurrency limits) and skips any job already queued
       or running. Without `--layers` it queues every dataset — the layers
       still first, at a higher priority — and `--source` / `--only` narrow it.
+- [ ] **Seed every accumulating dataset BEFORE its first run** —
+      `deploy/seed-accumulator` (dry run) lists them: the datasets with
+      `accumulate: true` (air quality, 911, jail, Kane, asbestos, delinquent
+      taxes, inversions, historical farmers markets, 311). Each publishes its
+      whole stored table; with no stored table its first run's file IS the
+      table, and DataPusher+ would reload CKAN down to it — years of history
+      gone. Run `deploy/seed-accumulator --write` on the VM (it reads
+      data.wprdc.org and writes `_state/` in the production bucket), and
+      check each reports the CKAN row count. Never re-seed one that has run:
+      `--force` throws away everything merged since.
 - [ ] **One dataset per source type** — an SFTP, an HTTP, an ArcGIS (mirror),
       a PASDA (`heavy`) and an `api_incremental` one. For each, on
       data.wprdc.org:

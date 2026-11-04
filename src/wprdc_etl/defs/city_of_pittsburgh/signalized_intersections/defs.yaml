@@ -1,0 +1,48 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Signalized Intersections —
+# https://data.wprdc.org/dataset/city-of-pittsburgh-signalized-intersections
+# The legacy job (old/payload/pgh/cartegraph_dpw.py, SignalizedIntersectionsSchema)
+# read an older Cartegraph export from the city FTP and has not run since
+# 2022-12. The city's current export (cartegraph/signalized_intersections.csv,
+# 117 columns) still carries every published column under the same name, so
+# this publishes those, reverse-geocoded against the PostGIS store the way
+# water_features is. Checked against the live export on 2026-11-02.
+
+attributes:
+  publisher: city_of_pittsburgh
+  dataset: signalized_intersections
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/cartegraph/signalized_intersections.csv
+  schedule: "57 3 * * 0"  # Sunday 03:57 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: coerce_text
+      columns: [id, name, description, flash_time, flash_yellow, operation_type]
+    - op: strip
+    - op: reverse_geocode
+      lat: latitude
+      lng: longitude
+      regions:
+        - neighborhood
+        - layer: council_district
+          value: id
+        - layer: census_tract
+          column: tract
+          value: id
+        - ward
+        - police_zone
+        - fire_zone
+        - public_works_division
+  geocode: false
+  ckan:
+    package_id: "f470a3d5-f5cb-4209-93a6-c974f7d5a0a4"  # city-of-pittsburgh-signalized-intersections
+    resource_id: "79ddcc74-33d2-4735-9b95-4169c7d0413d"  # Signalized Intersections
+  geometry:
+    lat: latitude
+    lng: longitude
+  representations:
+    - format: geojson
+      resource_id: "82ce557f-2388-489f-87e0-0d9d052633c4"  # Signalized Intersections (GeoJSON)

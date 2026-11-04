@@ -1,0 +1,50 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Devices — https://data.wprdc.org/dataset/allegheny-county-weights-and-measures-inspections
+# Ported from the legacy rocket-etl job old/payload/ac/weights.py
+# (schema DevicesSchema; legacy cron `20 15 * * 6,7`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: weights_and_measures
+  dataset: devices
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Weights & Measures/devices.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "39 8 * * 0"  # Sunday 08:39 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        deviceid: device_id
+        storeid: store_id
+        devicetype: device_type
+        devicegroup: device_group
+        serialnumber: serial_number
+        inspectioncycle: inspection_cycle
+    - op: coerce_text
+      columns: [
+        device_id, store_id, device_type, device_group, make, model, serial_number,
+        pump, grade, capacity, inspection_cycle, remarks, deleted,
+      ]
+    - op: select
+      columns: [
+        device_id, store_id, device_type, device_group, make, model, serial_number,
+        pump, grade, capacity, inspection_cycle, remarks, deleted,
+      ]
+  geocode: false
+  ckan:
+    package_id: "fd140adb-d740-4ce3-b1e7-31f37bf97d88"  # allegheny-county-weights-and-measures-inspections
+    resource_id: "21921b0d-8222-44a3-9322-38a6d0f9395f"  # Devices

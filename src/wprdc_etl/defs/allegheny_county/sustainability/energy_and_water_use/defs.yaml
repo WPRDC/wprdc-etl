@@ -1,0 +1,50 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Municipal Building Energy and Water Use (2015-present) — https://data.wprdc.org/dataset/allegheny-county-energy-and-water-use
+# Ported from the legacy rocket-etl job old/payload/ac/energy_use.py
+# (schema EnergyWaterUseSchema; legacy cron `12 17 * * 6`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: sustainability
+  dataset: energy_and_water_use
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Energy/sustainability_energycap_metrics.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "39 6 * * 0"  # Sunday 06:39 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: coerce_text
+      columns: [
+        bldg_grp, location, total_energy_use_mmbtu, elec_use_kwh, nat_gas_use_mcf,
+        steam_use_klbs, water_use_kgal, wastewater_use_kgal, total_energy_cost,
+        elec_cost, nat_gas_cost, steam_cost, water_cost, wastewater_cost,
+        total_utility_cost, total_tons_co2, elec_tons_co2, nat_gas_tons_co2,
+        steam_tons_co2,
+      ]
+    - op: to_datetime
+      columns: [date]
+    - op: select
+      columns: [
+        bldg_grp, location, date, total_energy_use_mmbtu, elec_use_kwh,
+        nat_gas_use_mcf, steam_use_klbs, water_use_kgal, wastewater_use_kgal,
+        total_energy_cost, elec_cost, nat_gas_cost, steam_cost, water_cost,
+        wastewater_cost, total_utility_cost, total_tons_co2, elec_tons_co2,
+        nat_gas_tons_co2, steam_tons_co2,
+      ]
+  geocode: false
+  ckan:
+    package_id: "98ec7315-47ad-4ffc-9368-dea01d054761"  # allegheny-county-energy-and-water-use
+    resource_id: "f6a29a0f-cc32-4fd4-8adb-d45e11e09022"  # Municipal Building Energy and Water Use (2015-present)

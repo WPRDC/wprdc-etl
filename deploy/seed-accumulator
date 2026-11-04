@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Seed accumulating datasets' stored tables from data.wprdc.org, in production.
+#
+#   deploy/seed-accumulator                                        # dry run: all of them
+#   deploy/seed-accumulator --only allegheny_county/jail/jail_census --write
+#   deploy/seed-accumulator --write                                # every unseeded one
+#
+# Once per accumulating dataset, BEFORE its first publishing run (ROLLOUT §4).
+# Skips a dataset that already has state unless --force. Runs in the webserver
+# container, so it writes the production bucket with the instance role. See
+# src/wprdc_etl/seed_accumulator.py.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$here/dc" exec -T webserver python -m wprdc_etl.seed_accumulator "$@"

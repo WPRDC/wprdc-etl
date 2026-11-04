@@ -1,0 +1,49 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Service Requests — https://data.wprdc.org/dataset/housing-and-community-environment-inspections
+# Ported from the legacy rocket-etl job old/payload/ac_hd/hc_environment_inspections.py
+# (schema ServiceRequestsSchema; legacy cron `20 5 * * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: health
+  dataset: housing_service_requests
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Health Department/hce_service_requests.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "20 5 * * *"  # daily 05:20 ET
+  partition: daily
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        zip: zip_code
+    - op: coerce_text
+      columns: [
+        service_request_number, address, address_2, city, zip_code, request_type,
+        property_type, emergency_inspection_type,
+      ]
+    - op: coerce_numeric
+      columns: [units]
+    - op: to_datetime
+      columns: [request_date]
+    - op: select
+      columns: [
+        request_date, service_request_number, address, address_2, city, zip_code,
+        request_type, property_type, emergency_inspection_type, units,
+      ]
+  geocode: false
+  ckan:
+    package_id: "19beed76-cd72-4fa8-9f8f-c402608ed569"  # housing-and-community-environment-inspections
+    resource_id: "bcdbf0d3-5a5b-4ded-afe1-74a603232214"  # Service Requests

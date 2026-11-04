@@ -1,0 +1,61 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# City Treasury Sales — https://data.wprdc.org/dataset/city-treasury-sales
+# Ported from the legacy rocket-etl job old/payload/pgh/treasury.py (schema
+# TreasurySalesSchema; legacy cron `20 1 * * 4`, weekly). Same public file the legacy
+# job read; its property names checked against the live file on 2026-11-02.
+# `header_case: lower` repeats the legacy engine's header folding (the file
+# says e.g. `approved_date_EST`, the legacy schema `approved_date_est`).
+#
+# A GeoJSON of points published as a CSV table, as the legacy
+# geojson-to-csv step did: `point_coordinates` turns the geometry into the
+# lat/lng columns the live table has and drops it.
+
+attributes:
+  publisher: city_of_pittsburgh
+  department: finance
+  dataset: treasury_sales
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/finance/treasury_sale_properties.geojson
+    header_case: lower
+  schedule: "18 3 * * 0"  # Sunday 03:18 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: point_coordinates
+      lat: lat
+      lng: lng
+    - op: strip
+    - op: rename
+      mapping:
+        parc_num: pin
+        treas_sale_date: treasury_sale_date
+        treas_sale_flag: treasury_sale_flag
+        lat: latitude
+        lng: longitude
+    - op: coerce_text
+      columns: [
+        pin, address, treasury_sale_flag, neighborhood_name, council_district,
+        ward, police_zone, fire_zone, dpw_streets, dpw_enviro, dpw_parks,
+      ]
+    - op: coerce_numeric
+      columns: [
+        total_tax_due, city_tax_due, county_tax_due, school_tax_due,
+        library_tax_due, pwsa_tax_due, parks_tax_due, demo_cost_due,
+        clean_lien_due, latitude, longitude,
+      ]
+    - op: to_datetime
+      columns: [treasury_sale_date]
+    - op: select
+      columns: [
+        pin, address, treasury_sale_date, treasury_sale_flag, total_tax_due,
+        city_tax_due, county_tax_due, school_tax_due, library_tax_due,
+        pwsa_tax_due, parks_tax_due, demo_cost_due, clean_lien_due, latitude,
+        longitude, neighborhood_name, council_district, ward, police_zone,
+        fire_zone, dpw_streets, dpw_enviro, dpw_parks,
+      ]
+  geocode: false
+  ckan:
+    package_id: "97491251-e607-405f-b89a-af64002b0628"  # city-treasury-sales
+    resource_id: "6b2aa631-26e0-4d02-abe0-7fb87707210c"  # City Treasury Sales

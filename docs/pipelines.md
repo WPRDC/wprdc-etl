@@ -201,7 +201,8 @@ coerced after rendering. This works only because every model here is
 | `type` | str | `sftp` \| `http` \| `arcgis` \| `pasda` \| `api_bulk` \| `api_incremental`. Selects the extractor. |
 | `host` | str \| null | SFTP host. |
 | `port` | int \| null | SFTP port; defaults to 22 when unset. |
-| `path` | str \| null | SFTP glob (`/outbound/*.csv`). Also accepted as an HTTP URL fallback. |
+| `path` | str \| null | SFTP glob (`/outbound/*.csv`). Also accepted as an HTTP URL fallback. `{now:<strftime>}` expands to the run's start time in America/New_York (`alco_farmers_markets_{now:%Y}.csv`); the same goes for `url`. |
+| `header_case` | str \| null | `lower` folds (and trims) the file's column headers as it is read, before schema_ok and the transforms — what the legacy rocket-etl did to every CSV, so a ported legacy schema's lower-case `load_from` names work as written. A header pair differing only in case fails. |
 | `url` | str \| null | Full URL for `http` sources. |
 | `secret_ref` | str \| null | **Name of an env var** holding `user:password` — never the secret itself. Required for `sftp`; optional HTTP Basic auth for `http`. |
 | `catalog` | str \| null | `arcgis`: the Hub site's `data.json`. |

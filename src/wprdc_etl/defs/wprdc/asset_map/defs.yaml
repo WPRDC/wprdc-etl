@@ -1,0 +1,58 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# All Allegheny County Assets for the Asset map —
+# https://data.wprdc.org/dataset/allegheny-county-assets
+# Ported from the legacy rocket-etl job old/payload/wprdc/assets_to_ckan.py
+# (schema AssetSchema; legacy cron `23 4 * * *`). The same dump the legacy job
+# read; its header checked against the live file on 2026-11-02 — it carries
+# two columns the legacy schema excluded (raw_asset_ids, wifi_notes), which
+# `select` drops, and its `id` is published as `asset_id`.
+#
+# residence, computers_available, accessibility, child_friendly, sensitive, do_not_display: real boolean columns in the live table, kept as such
+# (`bool_format: bool`); pandas reads the dump's True/False as bool.
+
+attributes:
+  publisher: wprdc
+  dataset: asset_map
+  source:
+    type: http
+    url: https://assets.wprdc.org/asset_dump.csv
+  schedule: "23 4 * * *"  # daily 04:23 ET
+  partition: daily
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        id: asset_id
+    - op: coerce_text
+      columns: [
+        name, asset_type, asset_id, tags, location_id, street_address, unit,
+        unit_type, municipality, city, state, zip_code, parcel_id, iffy_geocoding,
+        available_transportation, parent_location, url, email, phone,
+        hours_of_operation, holiday_hours_of_operation, periodicity, wifi_network,
+        internet_access, open_to_public, localizability, services,
+        hard_to_count_population, data_source_names, data_source_urls,
+        organization_name, organization_phone, organization_email, etl_notes,
+        geocoding_properties,
+      ]
+    - op: coerce_numeric
+      columns: [latitude, longitude, parent_location_id, capacity]
+    - op: select
+      columns: [
+        name, asset_type, asset_id, tags, location_id, street_address, unit,
+        unit_type, municipality, city, state, zip_code, latitude, longitude,
+        parcel_id, residence, iffy_geocoding, available_transportation,
+        parent_location_id, parent_location, url, email, phone, hours_of_operation,
+        holiday_hours_of_operation, periodicity, capacity, wifi_network,
+        internet_access, computers_available, accessibility, open_to_public,
+        child_friendly, sensitive, do_not_display, localizability, services,
+        hard_to_count_population, data_source_names, data_source_urls,
+        organization_name, organization_phone, organization_email, etl_notes,
+        geocoding_properties,
+      ]
+  geocode: false
+  ckan:
+    package_id: "cd2b3e27-ca31-43e0-a8c6-2e6c43b4050a"  # allegheny-county-assets
+    resource_id: "5c7825d2-6814-40c7-aefe-3d0f3d6f22e7"  # All Allegheny County Assets for the Asset map
+    bool_format: bool

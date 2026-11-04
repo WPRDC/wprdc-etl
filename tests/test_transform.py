@@ -339,3 +339,77 @@ def test_rename_on_a_plain_frame_is_unchanged() -> None:
         pd.DataFrame({"a": [1]}), [{"op": "rename", "mapping": {"a": "b"}}]
     )
     assert list(out.columns) == ["b"]
+
+
+def test_to_datetime_keeps_a_datetime_dtype() -> None:
+    from wprdc_etl.strategies.transform import to_datetime
+
+    df = pd.DataFrame({"t": ["2020-12-03 12:00:00.000", "not a date"]})
+    out = to_datetime(df, ["t"])
+    assert pd.api.types.is_datetime64_any_dtype(out["t"])
+    assert out["t"].iloc[0] == pd.Timestamp("2020-12-03 12:00")
+    assert pd.isna(out["t"].iloc[1])
+
+
+def test_header_case_lower_folds_and_trims() -> None:
+    from types import SimpleNamespace
+
+    from wprdc_etl.strategies.read import normalize_headers
+
+    cfg = SimpleNamespace(source=SimpleNamespace(header_case="lower"))
+    df = pd.DataFrame({"LicenseType": [1], " OwnerZip ": [2]})
+    assert list(normalize_headers(df, cfg).columns) == ["licensetype", "ownerzip"]
+
+
+def test_header_case_unset_leaves_headers_alone() -> None:
+    from types import SimpleNamespace
+
+    from wprdc_etl.strategies.read import normalize_headers
+
+    cfg = SimpleNamespace(source=SimpleNamespace(header_case=None))
+    df = pd.DataFrame({"LicenseType": [1]})
+    assert list(normalize_headers(df, cfg).columns) == ["LicenseType"]
+
+
+def test_header_case_refuses_a_collision() -> None:
+    from types import SimpleNamespace
+
+    from wprdc_etl.strategies.read import normalize_headers
+
+    cfg = SimpleNamespace(source=SimpleNamespace(header_case="lower"))
+    df = pd.DataFrame([[1, 2]], columns=["Zip", "ZIP"])
+    with pytest.raises(ValueError, match="collide"):
+        normalize_headers(df, cfg)
+
+
+def test_point_coordinates_replaces_geometry_with_lat_lng() -> None:
+    import geopandas as gpd
+    from shapely.geometry import LineString, Point
+
+    from wprdc_etl.strategies.transform import point_coordinates
+
+    gdf = gpd.GeoDataFrame(
+        {"pin": ["a", "b"]},
+        geometry=[Point(-79.99, 40.44), LineString([(0, 0), (1, 1)])],
+        crs="EPSG:4326",
+    )
+    out = point_coordinates(gdf)
+    assert "geometry" not in out.columns
+    assert not isinstance(out, gpd.GeoDataFrame)
+    assert out.loc[0, "latitude"] == 40.44 and out.loc[0, "longitude"] == -79.99
+    assert pd.isna(out.loc[1, "latitude"])
+
+
+def test_strip_passes_non_strings_through() -> None:
+    from wprdc_etl.strategies.transform import strip
+
+    df = pd.DataFrame({"a": [" x ", 3, None]}, dtype=object)
+    assert strip(df)["a"].tolist()[:2] == ["x", 3]
+
+
+def test_coerce_text_keeps_every_digit_of_a_big_number() -> None:
+    from wprdc_etl.strategies.transform import coerce_text
+
+    df = pd.DataFrame({"phone": [14123512345.0, None, 2.5]})
+    assert coerce_text(df, ["phone"])["phone"].tolist()[0] == "14123512345"
+    assert coerce_text(pd.DataFrame({"x": [2.5]}), ["x"])["x"].iloc[0] == "2.5"

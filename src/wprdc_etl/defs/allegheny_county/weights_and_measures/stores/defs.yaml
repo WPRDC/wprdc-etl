@@ -1,0 +1,62 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# Stores — https://data.wprdc.org/dataset/allegheny-county-weights-and-measures-inspections
+# Ported from the legacy rocket-etl job old/payload/ac/weights.py
+# (schema StoresSchema; legacy cron `20 15 * * 6,7`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+
+attributes:
+  publisher: allegheny_county
+  department: weights_and_measures
+  dataset: stores
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Weights & Measures/stores.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "39 4 * * 0"  # Sunday 04:39 ET
+  partition: weekly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        storeid: store_id
+        storename: store_name
+        mailingcity: mailing_city
+        corpid: corp_id
+        point_x: longitude
+        point_y: latitude
+        businessphone: business_phone
+        alternatephone: alternate_phone
+        fueldispenser: fuel_dispenser
+        miscinspection: misc_inspection
+        shoppingcenter: shopping_center
+        newmunicipality: new_municipality
+    - op: coerce_text
+      columns: [
+        store_id, store_name, address, mailing_city, state, zip, municipality,
+        corp_id, neighborhood, business_phone, alternate_phone, price_verification,
+        fuel_dispenser, scale, timing, misc_inspection, oob, unit, shopping_center,
+        new_municipality,
+      ]
+    - op: coerce_numeric
+      columns: [longitude, latitude]
+    - op: select
+      columns: [
+        store_id, store_name, address, mailing_city, state, zip, municipality,
+        corp_id, neighborhood, longitude, latitude, business_phone,
+        alternate_phone, price_verification, fuel_dispenser, scale, timing,
+        misc_inspection, oob, unit, shopping_center, new_municipality,
+      ]
+  geocode: false
+  ckan:
+    package_id: "fd140adb-d740-4ce3-b1e7-31f37bf97d88"  # allegheny-county-weights-and-measures-inspections
+    resource_id: "bac0a05c-71b5-4634-96b9-10cc8a20102d"  # Stores
