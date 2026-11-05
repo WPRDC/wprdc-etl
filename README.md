@@ -179,7 +179,7 @@ attributes:
   **required** for `api_incremental` sources.
 
 **Transform primitives:** `iso_date`, `to_datetime`, `strip`, `rename`,
-`coerce_numeric`, `coerce_text`, `drop_nulls`, `fill_na`, `select`,
+`coerce_numeric`, `coerce_text`, `drop_nulls`, `drop_duplicates`, `fill_na`, `select`,
 `drop_columns`, `snake_case_columns`, `to_crs`, `point_coordinates`,
 `reverse_geocode`, `join_geometry`.
 

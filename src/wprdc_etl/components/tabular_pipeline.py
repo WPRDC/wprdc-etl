@@ -59,7 +59,7 @@ from wprdc_etl.dataset_modules import load_dataset_module
 from wprdc_etl.strategies import get_loader
 from wprdc_etl.strategies.accumulate import merge as merge_into_table
 from wprdc_etl.strategies.emit import publish_representation
-from wprdc_etl.strategies.load import BOOL_FORMATS
+from wprdc_etl.strategies.load import BOOL_FORMATS, publish_by_year
 from wprdc_etl.strategies.mirror import (
     publish_mirror,
     sync_package_metadata,
@@ -185,14 +185,27 @@ class TabularPipeline(Component, Model, Resolvable):
                 f"{stem}: ckan.bool_format must be one of {BOOL_FORMATS}, "
                 f"got {cfg.ckan.bool_format!r}"
             )
+        if cfg.source.combine and cfg.source.type != "sftp":
+            raise ValueError(
+                f"{stem}: source.combine concatenates the files an sftp glob "
+                f"matches; a {cfg.source.type!r} source has no glob"
+            )
         if cfg.ckan:
             validate_mirrors(
                 cfg.ckan.mirror, has_datastore_target=bool(cfg.ckan.resource_id)
             )
-            if not (cfg.ckan.resource_id or cfg.ckan.mirror or cfg.ckan.sync_metadata):
+            validate_rolling_targets(cfg, stem, publish, accumulate)
+            if not (
+                cfg.ckan.resource_id
+                or cfg.ckan.resource_name
+                or cfg.ckan.split_by_year
+                or cfg.ckan.mirror
+                or cfg.ckan.sync_metadata
+            ):
                 raise ValueError(
                     f"{stem}: a `ckan:` block does nothing without at least "
-                    "one of resource_id (a table from the frame), mirror "
+                    "one of resource_id / resource_name (a table from the "
+                    "frame), split_by_year (a table per year), mirror "
                     "(copied distributions) or sync_metadata (description "
                     "and tags)"
                 )
@@ -330,7 +343,7 @@ class TabularPipeline(Component, Model, Resolvable):
         # CKAN resources are byte-for-byte copies of the publisher's own
         # distributions rather than anything derived from the frame.
         loaded_assets: list[dg.AssetsDefinition] = []
-        if cfg.ckan and cfg.ckan.resource_id:
+        if cfg.ckan and (cfg.ckan.resource_id or cfg.ckan.resource_name):
             # Publish the accumulated table when there is one, else this run's
             # frame. Everything downstream of here is identical either way.
             upstream = "accumulated" if accumulate else "validated"
@@ -357,6 +370,34 @@ class TabularPipeline(Component, Model, Resolvable):
                 loader.load(cfg, to_publish, ckan=ckan, context=context)
 
             loaded_assets.append(loaded)
+
+        # -- loaded_by_year ------------------------------------------------
+        # The same frame again, one resource per year (`ckan.split_by_year`).
+        # Beside `loaded`, not after it: neither reads the other's output.
+        if cfg.ckan and cfg.ckan.split_by_year:
+            upstream = "accumulated" if accumulate else "validated"
+
+            @dg.asset(
+                key=[*key_prefix, "loaded_by_year"],
+                metadata=ckan_links(cfg),
+                retry_policy=network_retry_policy(),
+                partitions_def=partitions,
+                ins={"to_publish": dg.AssetIn(key=[*key_prefix, upstream])},
+                group_name=group,
+                tags=asset_tags(cfg),
+                kinds={"ckan"},
+            )
+            def loaded_by_year(
+                context: dg.AssetExecutionContext,
+                to_publish: pd.DataFrame,
+                ckan: CkanResource,
+            ) -> None:
+                rows = publish_by_year(cfg, to_publish, ckan=ckan, context=context)
+                context.add_output_metadata(
+                    {"rows_by_year": {str(y): n for y, n in rows.items()}}
+                )
+
+            loaded_assets.append(loaded_by_year)
 
         # -- schema / drift check on the validated asset ------------------
         # blocking: a failure at ERROR severity (declared columns missing)
@@ -509,6 +550,52 @@ class TabularPipeline(Component, Model, Resolvable):
 # --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
+def validate_rolling_targets(
+    cfg: "TabularPipeline", stem: str, publish: str, accumulate: bool
+) -> None:
+    """Load-time checks for the targets addressed by name
+    (`ckan.resource_name`, `ckan.split_by_year`)."""
+    ckan = cfg.ckan
+    if ckan.resource_id and ckan.resource_name:
+        raise ValueError(
+            f"{stem}: set ckan.resource_id OR ckan.resource_name, not both — "
+            "an id is a fixed target, a name is looked up on every run"
+        )
+    if not (ckan.resource_name or ckan.split_by_year):
+        return
+    if not ckan.package_id:
+        raise ValueError(
+            f"{stem}: ckan.resource_name / split_by_year find (or create) "
+            "resources by name inside ckan.package_id, which is unset"
+        )
+    if publish != "replace":
+        raise ValueError(
+            f"{stem}: ckan.resource_name / split_by_year publish with "
+            "`publish: replace`; an upsert needs a table that already exists"
+        )
+    if ckan.resource_name and accumulate:
+        raise ValueError(
+            f"{stem}: ckan.resource_name with accumulate would carry last "
+            "year's stored rows into the next year's resource when the name "
+            "rolls over; publish the snapshot instead"
+        )
+    split = ckan.split_by_year
+    if split and "{year}" not in split.resource_name:
+        raise ValueError(
+            f"{stem}: ckan.split_by_year.resource_name needs a {{year}} "
+            f"placeholder (got {split.resource_name!r})"
+        )
+    if split:
+        try:
+            split.resource_name.format(year=2000)
+        except (KeyError, IndexError, ValueError) as e:
+            raise ValueError(
+                f"{stem}: ckan.split_by_year.resource_name "
+                f"{split.resource_name!r} has a placeholder other than "
+                f"{{year}}: {e}"
+            ) from e
+
+
 def _guard_state_loss(
     prior: pd.DataFrame | None, meta: dict[str, Any] | None, stem: str
 ) -> None:

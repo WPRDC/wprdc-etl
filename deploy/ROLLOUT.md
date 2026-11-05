@@ -186,8 +186,8 @@ in this phase is launched by hand from the UI.
       still first, at a higher priority — and `--source` / `--only` narrow it.
 - [ ] **Seed every accumulating dataset BEFORE its first run** —
       `deploy/seed-accumulator` (dry run) lists them: the datasets with
-      `accumulate: true` (air quality, 911, jail, Kane, asbestos, delinquent
-      taxes, inversions, historical farmers markets, 311). Each publishes its
+      `accumulate: true` (air quality, 911, jail, Kane, asbestos,
+      inversions, historical farmers markets, 311). Each publishes its
       whole stored table; with no stored table its first run's file IS the
       table, and DataPusher+ would reload CKAN down to it — years of history
       gone. Run `deploy/seed-accumulator --write` on the VM (it reads

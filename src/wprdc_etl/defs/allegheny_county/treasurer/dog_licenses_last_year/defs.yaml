@@ -1,0 +1,57 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# {now-1y:%Y} Dog Licenses (last year) — https://data.wprdc.org/dataset/allegheny-county-dog-licenses
+# Ported from the legacy rocket-etl job old/payload/ac/dog_licenses.py
+# (schema DogLicensesSchema; legacy cron `55 6 2-8 * *`).
+#
+# UNVERIFIED against a real extract: the county SFTP isn't reachable from
+# dev. Columns are the legacy job's `load_from` names, which the old engine
+# matched after lower-casing every header — so `header_case: lower` does
+# the same here, and schema.py lists them in that form. The renames map
+# them onto the columns the live CKAN table already has, in its order.
+#
+# ROLLING: the county posts one file per license year, and the package has
+# a resource per year. `{now-1y:%Y}` is the year BEFORE the one the run
+# starts in (Eastern), so on 1 January this pipeline moves on to the year
+# that just ended by itself, and the current-year pipeline to the new one:
+# the resource
+# is found by NAME, and created on the first run whose file has rows. Older
+# years keep the last data published to them.
+
+attributes:
+  publisher: allegheny_county
+  department: treasurer
+  dataset: dog_licenses_last_year
+  source:
+    type: sftp
+    host: "{{ env('ALLEGHENY_SFTP_HOST', '') }}"
+    port: "{{ env('ALLEGHENY_SFTP_PORT', '22') }}"
+    path: "/WPRDC/Dog_Licenses/DL_gvData_{now-1y:%Y}.csv"
+    secret_ref: ALLEGHENY_SFTP
+    header_case: lower
+  schedule: "36 7 1 * *"  # day 1 of the month, 07:36 ET
+  partition: monthly
+  ingest: snapshot
+  transforms:
+    - op: strip
+    - op: rename
+      mapping:
+        licensetype: LicenseType
+        breed: Breed
+        color: Color
+        dogname: DogName
+        ownerzip: OwnerZip
+        expyear: ExpYear
+        validdate: ValidDate
+    - op: coerce_text
+      columns: [LicenseType, Breed, Color, DogName, OwnerZip]
+    - op: coerce_numeric
+      columns: [ExpYear]
+    - op: to_datetime
+      columns: [ValidDate]
+    - op: select
+      columns: [LicenseType, Breed, Color, DogName, OwnerZip, ExpYear, ValidDate]
+  geocode: false
+  ckan:
+    package_id: "ad5bd3d6-1b53-4ed0-8cd9-157a985bd0bd"  # allegheny-county-dog-licenses
+    resource_name: "{now-1y:%Y} Dog Licenses"

@@ -9,6 +9,13 @@ type: wprdc_etl.components.tabular_pipeline.TabularPipeline
 # matched after lower-casing every header — so `header_case: lower` does
 # the same here, and schema.py lists them in that form. The renames map
 # them onto the columns the live CKAN table already has, in its order.
+#
+# The file repeats a small share of its rows; the legacy job upserted on the
+# key `drop_duplicates` uses, which collapsed them. `ckan.split_by_year`
+# publishes the "<year> Property Sales Transactions" resources by SALEDATE
+# year, as the legacy job's per-year filters did — every year, every run,
+# because the county corrects back years (corrective deeds). A new year's
+# resource is created on the first run with a sale in it.
 
 attributes:
   publisher: allegheny_county
@@ -65,6 +72,8 @@ attributes:
       columns: [PROPERTYHOUSENUM, PROPERTYZIP, MUNICODE, PRICE]
     - op: to_datetime
       columns: [RECORDDATE, SALEDATE]
+    - op: drop_duplicates
+      columns: [PARID, RECORDDATE, SALEDATE, DEEDBOOK, DEEDPAGE, INSTRTYP, PRICE, SALECODE]
     - op: select
       columns: [
         PARID, FULL_ADDRESS, PROPERTYHOUSENUM, PROPERTYFRACTION,
@@ -78,3 +87,7 @@ attributes:
   ckan:
     package_id: "9e0ce87d-07b8-420c-a8aa-9de6104f61d6"  # real-estate-sales
     resource_id: "5bbe6c55-bce6-4edb-9d04-68edeb6bf7b1"  # Property Sales Transactions
+    split_by_year:
+      column: SALEDATE
+      since: 2012
+      resource_name: "{year} Property Sales Transactions"

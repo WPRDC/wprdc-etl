@@ -244,6 +244,16 @@ genuinely dataset-specific logic.
   Eastern** — not the partition (a monthly partition names the month that
   just ended). It's for publishers that put the current year/month in the
   filename.
+- **Per-year resources are addressed by name, not id.** Three packages
+  carry a resource per year (dog licenses, property sales, delinquent
+  taxes), and a new one appears each January. `ckan.resource_name`
+  (`"{now:%Y} Dog Licenses"`) and `ckan.split_by_year` find the resource in
+  `package_id` by name every run and create it on the first run with rows.
+  An empty frame is never published by name — not into a new resource, and
+  not over an existing one — because on 1 January the new year has no rows
+  yet. `{now-1y:%Y}` gives the year before. A name-targeted `loaded` has no
+  fixed resource link, so `test_landing_links` exempts it by reading the
+  YAML.
 - **ArcGIS's not-ready placeholder changes its wording.** It has said
   `Pending`, `InProgress` and now `ExportingData` (with
   `progressInPercent: 100`). `is_arcgis_pending` treats any small status

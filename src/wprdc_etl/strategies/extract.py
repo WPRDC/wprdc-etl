@@ -56,19 +56,41 @@ class Extractor:
 # the current year/month, and a monthly partition names the month that just
 # ended. Only this one token is recognised, so a literal brace elsewhere in a
 # URL passes through untouched.
-_DATE_TOKEN = re.compile(r"\{now:([^{}]*)\}")
+#
+# `{now-1y:<strftime>}` (or `+Ny`) shifts the year first, for a rolling
+# "last year" file or resource name (`DL_gvData_{now-1y:%Y}.csv`). Years only:
+# the legacy jobs never offset by anything else.
+_DATE_TOKEN = re.compile(r"\{now(?:([+-]\d+)y)?:([^{}]*)\}")
+
+
+def run_now() -> Any:
+    """The current wall-clock time in America/New_York."""
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+
+    return dt.datetime.now(ZoneInfo("America/New_York"))
+
+
+def _shift_years(now: Any, years: int) -> Any:
+    try:
+        return now.replace(year=now.year + years)
+    except ValueError:  # 29 February into a non-leap year
+        return now.replace(year=now.year + years, day=28)
 
 
 def render_date_tokens(value: str, now: Any = None) -> str:
-    """Expand `{now:<strftime>}` tokens in a source path or URL."""
-    if "{now:" not in value:
+    """Expand `{now:<strftime>}` / `{now-1y:<strftime>}` tokens in a source
+    path, URL or CKAN resource name."""
+    if "{now" not in value:
         return value
     if now is None:
-        import datetime as dt
-        from zoneinfo import ZoneInfo
+        now = run_now()
 
-        now = dt.datetime.now(ZoneInfo("America/New_York"))
-    return _DATE_TOKEN.sub(lambda m: now.strftime(m.group(1)), value)
+    def expand(m: re.Match) -> str:
+        offset = int(m.group(1) or 0)
+        return _shift_years(now, offset).strftime(m.group(2))
+
+    return _DATE_TOKEN.sub(expand, value)
 
 
 class SftpFileExtractor(Extractor):
@@ -111,6 +133,10 @@ class SftpFileExtractor(Extractor):
         if not matches:
             raise dg.Failure(f"no files matched {path} on {src.host}")
 
+        if src.combine:
+            return self._land_combined(
+                context, cfg, landing, sftp, partition, matches, (user, password)
+            )
         newest = max(matches, key=lambda m: m["mtime"])
 
         # Land under the source's real extension (data.csv, data.tif, ...) so
@@ -148,6 +174,122 @@ class SftpFileExtractor(Extractor):
             }
         )
         return manifest
+
+    def _land_combined(
+        self,
+        context: dg.AssetExecutionContext,
+        cfg: PipelineConfig,
+        landing: LandingZoneResource,
+        sftp: SFTPResource,
+        partition: str,
+        matches: list[dict[str, Any]],
+        credentials: tuple[str, str],
+    ) -> dict[str, Any]:
+        """`source.combine`: land every matching CSV as ONE file.
+
+        For a publisher that splits one table across files (a delinquent-tax
+        file per tax year). The files are concatenated in path order, so the
+        landed bytes — and the landing zone's checksum — only change when a
+        file does. Each file keeps its rows; only the header line of the
+        second and later files is dropped, and it must match the first one's,
+        or a column would silently land under another's name.
+        """
+        src = cfg.source
+        user, password = credentials
+        ordered = sorted(matches, key=lambda m: m["path"])
+        bad = [m["path"] for m in ordered if not m["path"].lower().endswith(".csv")]
+        if bad:
+            raise dg.Failure(
+                f"source.combine concatenates CSVs; {path_list(bad)} matched "
+                f"{src.path!r} too",
+                allow_retries=False,
+            )
+        fd, out_path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        header: bytes | None = None
+        try:
+            with open(out_path, "wb") as out:
+                for m in ordered:
+                    fd, part = tempfile.mkstemp(suffix=".csv")
+                    os.close(fd)
+                    try:
+                        sftp.fetch_to_file(
+                            src.host,
+                            user,
+                            password,
+                            m["path"],
+                            part,
+                            port=src.port or 22,
+                        )
+                        header = _append_csv(out, part, header, m["path"])
+                    finally:
+                        os.remove(part)
+            manifest = landing.land_file(
+                cfg.publisher,
+                cfg.dataset,
+                partition,
+                out_path,
+                source_meta={"files": ordered},
+                department=cfg.department,
+                filename="data.csv",
+            )
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+        context.add_output_metadata(
+            {
+                "sha256": manifest["sha256"],
+                "size": manifest["size"],
+                "skipped": manifest["skipped"],
+                "remote_paths": [m["path"] for m in ordered],
+                "files": len(ordered),
+                "filename": "data.csv",
+            }
+        )
+        return manifest
+
+
+def path_list(paths: list[str]) -> str:
+    return ", ".join(paths[:5]) + (
+        f" (+{len(paths) - 5} more)" if len(paths) > 5 else ""
+    )
+
+
+_BOM = b"\xef\xbb\xbf"
+
+
+def _append_csv(out: Any, part: str, header: bytes | None, name: str) -> bytes | None:
+    """Append one CSV file to `out`; return the header line it carried.
+
+    The first file is copied whole. A later file's header must equal the
+    first's (ignoring a UTF-8 BOM, line ending and case — the readers fold
+    case anyway) and is dropped. A file that doesn't end in a newline gets
+    one, or its last row would merge with the next file's first.
+    """
+    import shutil
+
+    with open(part, "rb") as f:
+        first = f.readline()
+        if not first.strip():
+            return header  # an empty file contributes nothing
+        this = first.removeprefix(_BOM).rstrip(b"\r\n")
+        if header is None:
+            out.write(first)
+        elif this.strip().lower() != header.strip().lower():
+            raise dg.Failure(
+                f"source.combine: {name} has a different header from the "
+                f"first file ({this[:200]!r} vs {header[:200]!r}) — refusing to "
+                "concatenate files whose columns don't line up",
+                allow_retries=False,
+            )
+        shutil.copyfileobj(f, out)
+        if f.tell() > len(first):
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) not in (b"\n", b"\r"):
+                out.write(b"\n")
+        elif header is None and not first.endswith((b"\n", b"\r")):
+            out.write(b"\n")  # a header-only first file
+    return this if header is None else header
 
 
 class HttpFileExtractor(Extractor):

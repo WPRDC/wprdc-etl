@@ -37,16 +37,17 @@ before their first publishing run — `deploy/seed-accumulator`, ROLLOUT §4.
 - [x] allegheny-county-air-quality → `allegheny_county/health/air_quality_{hourly,daily_aqi,h2s}` *(accumulate)*, `air_quality_sensor_locations` (+ GeoJSON representation)
   - not refreshed: the "[old format]" archives and the static HTML/PDF links
 - [x] allegheny-county-human-services-community-profiles → `allegheny_county/profiles/{municipality,pittsburgh_neighborhood}`
-- [x] real-estate-sales → `allegheny_county/real_estate/sales` (the cumulative resource only — the per-year resources need a rolling target, see below)
+- [x] real-estate-sales → `allegheny_county/real_estate/sales` (cumulative + the per-year resources by SALEDATE via `ckan.split_by_year`, since 2012)
 - [x] allegheny-county-911-dispatches-ems-and-fire → `allegheny_county/emergency_services/dispatches_{ems,fire}` *(accumulate)*
-- [~] allegheny-county-dog-licenses → `allegheny_county/treasurer/dog_licenses` (the Lifetime resource) only; the current-year and last-year resources need a rolling target
+- [x] allegheny-county-dog-licenses → `allegheny_county/treasurer/dog_licenses` (Lifetime), `dog_licenses_{current_year,last_year}` (`ckan.resource_name: "{now:%Y}"` / `"{now-1y:%Y} Dog Licenses"`)
+  - not refreshed: 2007-2019 (the legacy job stopped updating them in 2020)
 - [x] allegheny-county-fatal-accidental-overdoses → `allegheny_county/medical_examiner/fatal_accidental_overdoses`
 - [x] allegheny-county-park-rangers-outreach → `allegheny_county/parks/ranger_outreach`
 - [x] allegheny-county-jail-daily-census → `allegheny_county/jail/jail_census` *(accumulate)*
 - [x] allegheny-county-kane-regional-center-census → `allegheny_county/kane/kane_census` *(accumulate)*
 - [x] allegheny-county-weights-and-measures-inspections → `allegheny_county/weights_and_measures/{devices,inspections,stores}`
 - [x] allegheny-county-energy-and-water-use → `allegheny_county/sustainability/energy_and_water_use`
-- [~] delinquent-real-estate-taxes → `allegheny_county/real_estate/delinquent_taxes_cumulative` (cumulative, *accumulate*, reads `delinquent_{now:%Y}.csv`); per-year resources need a rolling target
+- [x] delinquent-real-estate-taxes → `allegheny_county/real_estate/delinquent_taxes_cumulative` (every `delinquent_<year>.csv` via `source.combine`, deduped on ar_id; per-year resources via `ckan.split_by_year`, since 2009)
 - [x] allegheny-county-certified-mwdbe-businesses → `allegheny_county/economic_development/mwdbe_businesses`
 - [x] allegheny-county-plumbing-inspections → `allegheny_county/health/plumbing_inspections`
 - [x] housing-and-community-environment-inspections → `allegheny_county/health/housing_{inspections,service_requests,violations}`
@@ -80,7 +81,6 @@ before their first publishing run — `deploy/seed-accumulator`, ROLLOUT §4.
 
 ### Needs a framework feature
 
-- [ ] dog licenses (current / last year), real-estate sales and delinquent taxes per-year resources — the TARGET resource changes every January (`"{year} Dog Licenses"`); needs a resource looked up by templated name
 - [ ] filed-property-assessment-appeals — XLS input (no Excel reader) and a new resource per year
 - [ ] gtfs-archive — a new resource per feed version
 

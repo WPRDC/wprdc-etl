@@ -202,6 +202,7 @@ mutated.
 | `coerce_numeric` | `columns` | To numeric; non-numeric becomes NaN. |
 | `coerce_text` | `columns` | To nullable string — the inverse of `coerce_numeric`. `1011` renders `"1011"`, not `"1011.0"`, and a large integral float keeps every digit (`14123512345`, not `1.41235e+10`); missing stays NA. For ids/codes a CSV parser reads as numbers (zip, FIPS, district, account id). |
 | `drop_nulls` | `columns` | Drop rows null in any named column (e.g. a missing key). |
+| `drop_duplicates` | `columns` (optional), `keep` (`last` \| `first`) | Drop rows repeating an earlier row's values in `columns` (every column when unset). What a legacy upsert on a key did to a file with repeated rows, for a snapshot that now publishes the file whole. |
 | `fill_na` | `value`, `columns` (optional) | Fill NA with a constant, on named columns or the whole frame. |
 | `select` | `columns` | Keep only the named columns that exist, in order. |
 | `drop_columns` | `columns` | Remove the named columns if present. |

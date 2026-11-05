@@ -84,10 +84,36 @@ def test_each_publish_asset_links_its_own_resource() -> None:
     assert "ckan_package" not in _spec(*prefix, "landed").metadata
 
 
+def _named_targets() -> set[tuple[str, ...]]:
+    """Asset key prefixes of the datasets whose target is `ckan.resource_name`."""
+    import pathlib
+
+    import yaml
+
+    root = pathlib.Path(d.__file__).parent / "defs"
+    out = set()
+    for f in root.rglob("defs.yaml"):
+        attrs = (yaml.safe_load(f.read_text()) or {}).get("attributes") or {}
+        if (attrs.get("ckan") or {}).get("resource_name"):
+            parts = [attrs["publisher"], attrs.get("department"), attrs["dataset"]]
+            out.add(tuple(x for x in parts if x))
+    return out
+
+
+_NAMED_TARGETS = _named_targets()
+
+
 def test_every_loaded_asset_links_its_ckan_pages() -> None:
     for asset in d.defs.assets:
         if not isinstance(asset, dg.AssetsDefinition):
             continue
         for key, spec in asset.specs_by_key.items():
-            if key.path[-1] == "loaded":
-                assert {"ckan_package", "ckan_resource"} <= set(spec.metadata), key
+            if key.path[-1] == "loaded_by_year":
+                # One resource per year, found by name at run time.
+                assert "ckan_package" in spec.metadata, key
+            elif key.path[-1] == "loaded":
+                assert "ckan_package" in spec.metadata, key
+                # A target named by `ckan.resource_name` rolls over each
+                # January, so it has no fixed resource page to link.
+                if tuple(key.path[:-1]) not in _NAMED_TARGETS:
+                    assert "ckan_resource" in spec.metadata, key

@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any
 import dagster as dg
 
 from wprdc_etl.runtime import sink_dir
+from wprdc_etl.strategies.extract import render_date_tokens, run_now
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -91,14 +92,17 @@ def dump_local(
     dataframe: pd.DataFrame,
     context: dg.AssetExecutionContext | None,
     suffix: str = "csv",
+    part: str | None = None,
 ) -> bool:
     """Write the frame to the dry-run sink and return True, or return False in
-    production (real writes). Dry-run is the default (see wprdc_etl.runtime)."""
+    production (real writes). Dry-run is the default (see wprdc_etl.runtime).
+    `part` names one of several outputs (a year of a split)."""
     d = sink_dir()
     if not d:
         return False
     os.makedirs(d, exist_ok=True)
-    path = os.path.join(d, f"{_stem(cfg)}.{suffix}")
+    stem = _stem(cfg) + (f"__{part}" if part else "")
+    path = os.path.join(d, f"{stem}.{suffix}")
     dataframe.to_csv(path, index=False)
     if context is not None:
         context.log.info(
@@ -142,7 +146,10 @@ def _coarse(t: object) -> str:
 
 
 def compat_report(
-    cfg: TabularPipeline, dataframe: pd.DataFrame, ckan: CkanResource
+    cfg: TabularPipeline,
+    dataframe: pd.DataFrame,
+    ckan: CkanResource,
+    resource_id: str | None = None,
 ) -> dict[str, Any]:
     """Compare the output schema to CKAN's live schema.
 
@@ -150,7 +157,7 @@ def compat_report(
     the live table has that the output no longer produces; `added` are new;
     `type_changes` maps shared columns whose coarse type differs to (live, out).
     """
-    live = ckan.live_fields(cfg.ckan.resource_id)  # {} if no table yet
+    live = ckan.live_fields(resource_id or cfg.ckan.resource_id)  # {} if no table
     intended = {f["id"]: f["type"] for f in ckan._infer_fields(dataframe)}
     if not live:
         return {
@@ -298,27 +305,157 @@ class ReplaceLoader(Loader):
         ckan: CkanResource,
         context: dg.AssetExecutionContext | None = None,
     ) -> None:
-        dataframe = publishable_booleans(dataframe, cfg.ckan.bool_format)
-        if dump_local(cfg, dataframe, context):
-            return
-        rebuild = wants_rebuild(cfg, context)
-        if not dataframe.empty:
-            _guard_replace(compat_report(cfg, dataframe, ckan), rebuild, context)
-        changed = ckan.replace(
-            cfg.ckan.resource_id,
-            dataframe,
-            rebuild=rebuild,
-            # Only a spatial table needs regenerating; geometry lives on the
-            # dataset, so `spatial` is just the switch.
-            spatial=cfg.geometry if cfg.ckan.spatial else None,
-        )
-        if context is not None:
-            context.log.info(
-                f"replaced {len(dataframe)} rows in {cfg.ckan.resource_id}"
-                if changed
-                else f"unchanged: CKAN already holds these {len(dataframe)} rows — "
-                "skipped the upload and the DataPusher+ reload"
+        if cfg.ckan.resource_name:
+            publish_named(
+                cfg,
+                dataframe,
+                render_date_tokens(cfg.ckan.resource_name),
+                ckan=ckan,
+                context=context,
             )
+            return
+        replace_one(cfg, dataframe, cfg.ckan.resource_id, ckan=ckan, context=context)
+
+
+def replace_one(
+    cfg: TabularPipeline,
+    dataframe: pd.DataFrame,
+    resource_id: str,
+    *,
+    ckan: CkanResource,
+    context: dg.AssetExecutionContext | None,
+    part: str | None = None,
+) -> None:
+    """One full-refresh load of `dataframe` into `resource_id`, guarded."""
+    dataframe = publishable_booleans(dataframe, cfg.ckan.bool_format)
+    if dump_local(cfg, dataframe, context, part=part):
+        return
+    rebuild = wants_rebuild(cfg, context)
+    if not dataframe.empty:
+        _guard_replace(
+            compat_report(cfg, dataframe, ckan, resource_id), rebuild, context
+        )
+    changed = ckan.replace(
+        resource_id,
+        dataframe,
+        rebuild=rebuild,
+        # Only a spatial table needs regenerating; geometry lives on the
+        # dataset, so `spatial` is just the switch.
+        spatial=cfg.geometry if cfg.ckan.spatial else None,
+    )
+    if context is not None:
+        context.log.info(
+            f"replaced {len(dataframe)} rows in {resource_id}"
+            if changed
+            else f"unchanged: CKAN already holds these {len(dataframe)} rows in "
+            f"{resource_id} — skipped the upload and the DataPusher+ reload"
+        )
+
+
+def publish_named(
+    cfg: TabularPipeline,
+    dataframe: pd.DataFrame,
+    name: str,
+    *,
+    ckan: CkanResource,
+    context: dg.AssetExecutionContext | None,
+    part: str | None = None,
+    resource_ids: dict[str, str] | None = None,
+) -> str | None:
+    """Replace the resource called `name` in ckan.package_id, creating it
+    first if the package has none — but only for a frame with rows.
+
+    A rolling target ("2027 Dog Licenses") doesn't exist until its year has
+    data, and on 1 January it has none: an empty frame is never published,
+    neither into a new resource nor over an existing one (which would wipe a
+    table to nothing because a file wasn't posted yet). Returns the resource
+    id published to, or None when skipped.
+
+    `resource_ids` is a name -> id map from one package_show, so a split over
+    15 years doesn't fetch the package 15 times; names compare as
+    `find_resource` does (trimmed, case-insensitive).
+    """
+    if dataframe.empty:
+        if context is not None:
+            context.log.info(f"{name!r}: no rows this run — published nothing")
+        return None
+    if sink_dir():
+        replace_one(cfg, dataframe, "", ckan=ckan, context=context, part=part)
+        return None
+    package_id = cfg.ckan.package_id
+    if resource_ids is not None:
+        resource_id = resource_ids.get(name.strip().lower())
+    else:
+        resource_id = ckan.find_resource(package_id, name, "CSV")
+    if resource_id is None:
+        resource_id = ckan.add_resource(package_id, name, "CSV")
+        if context is not None:
+            context.log.info(f"created resource {name!r} ({resource_id})")
+    replace_one(cfg, dataframe, resource_id, ckan=ckan, context=context, part=part)
+    return resource_id
+
+
+def year_values(series: pd.Series) -> pd.Series:
+    """The year of each value: a datetime's year, or the value read as one."""
+    import pandas as pd
+
+    if pd.api.types.is_datetime64_any_dtype(series.dtype):
+        return series.dt.year.astype("Int64")
+    years = pd.to_numeric(series, errors="coerce")
+    whole = years.notna() & (years % 1 == 0)
+    return years.where(whole).astype("Int64")
+
+
+def publish_by_year(
+    cfg: TabularPipeline,
+    dataframe: pd.DataFrame,
+    *,
+    ckan: CkanResource,
+    context: dg.AssetExecutionContext | None = None,
+    now: Any = None,
+) -> dict[int, int]:
+    """`ckan.split_by_year`: publish each year's rows to its own resource.
+
+    Every year from `since` to the current one is published on every run,
+    because the county corrects back years (sales dates change with
+    corrective deeds; old tax years are re-posted weekly). Unchanged years
+    cost a fingerprint check, not a reload. Returns {year: rows}.
+    """
+    split = cfg.ckan.split_by_year
+    if split.column not in dataframe.columns:
+        raise dg.Failure(
+            f"ckan.split_by_year.column {split.column!r} is not in the frame "
+            f"(columns: {list(dataframe.columns)})",
+            allow_retries=False,
+        )
+    current = (now or run_now()).year
+    years = year_values(dataframe[split.column])
+    outside = int((~years.between(split.since, current)).fillna(True).sum())
+    if outside and context is not None:
+        context.log.warning(
+            f"{outside} row(s) have a {split.column} year outside "
+            f"{split.since}-{current} (or none) and are in no per-year resource"
+        )
+    resource_ids = None
+    if not sink_dir():
+        resource_ids = {
+            (r.get("name") or "").strip().lower(): r["id"]
+            for r in ckan.package(cfg.ckan.package_id).get("resources", [])
+        }
+    published: dict[int, int] = {}
+    for year in range(split.since, current + 1):
+        rows = dataframe[(years == year).fillna(False).to_numpy()]
+        published[year] = len(rows)
+        publish_named(
+            cfg,
+            rows.reset_index(drop=True),
+            split.resource_name.format(year=year),
+            ckan=ckan,
+            context=context,
+            part=str(year),
+            resource_ids=resource_ids,
+        )
+    return published
 
 
 class UpsertLoader(Loader):

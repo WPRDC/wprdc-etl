@@ -174,6 +174,26 @@ def drop_nulls(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     return df.dropna(subset=present) if present else df
 
 
+def drop_duplicates(
+    df: pd.DataFrame, columns: list[str] | None = None, keep: str = "last"
+) -> pd.DataFrame:
+    """Drop rows repeating an earlier row's values in `columns` (all columns
+    when unset), keeping the `last` (default) or `first` occurrence.
+
+    What a legacy upsert on a primary key did to a file with repeated rows,
+    for a snapshot that now publishes the file whole.
+    """
+    if keep not in ("first", "last"):
+        raise ValueError(
+            f"drop_duplicates: keep must be 'first' or 'last', not {keep!r}"
+        )
+    if columns:
+        missing = [c for c in columns if c not in df.columns]
+        if missing:
+            raise ValueError(f"drop_duplicates: no column(s) {missing}")
+    return df.drop_duplicates(subset=columns or None, keep=keep).reset_index(drop=True)
+
+
 def fill_na(
     df: pd.DataFrame, value: Any, columns: list[str] | None = None
 ) -> pd.DataFrame:
@@ -453,6 +473,7 @@ PRIMITIVES: dict[str, Primitive] = {
     "coerce_numeric": coerce_numeric,
     "coerce_text": coerce_text,
     "drop_nulls": drop_nulls,
+    "drop_duplicates": drop_duplicates,
     "fill_na": fill_na,
     "select": select,
     "drop_columns": drop_columns,

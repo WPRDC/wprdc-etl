@@ -201,7 +201,8 @@ coerced after rendering. This works only because every model here is
 | `type` | str | `sftp` \| `http` \| `arcgis` \| `pasda` \| `api_bulk` \| `api_incremental`. Selects the extractor. |
 | `host` | str \| null | SFTP host. |
 | `port` | int \| null | SFTP port; defaults to 22 when unset. |
-| `path` | str \| null | SFTP glob (`/outbound/*.csv`). Also accepted as an HTTP URL fallback. `{now:<strftime>}` expands to the run's start time in America/New_York (`alco_farmers_markets_{now:%Y}.csv`); the same goes for `url`. |
+| `path` | str \| null | SFTP glob (`/outbound/*.csv`). Also accepted as an HTTP URL fallback. `{now:<strftime>}` expands to the run's start time in America/New_York (`alco_farmers_markets_{now:%Y}.csv`); the same goes for `url`. `{now-1y:%Y}` shifts the year first (a rolling "last year" file). |
+| `combine` | bool | `sftp` only: land EVERY file the glob matches, concatenated into one CSV in path order, instead of the newest one. Each file's header must match the first's (case and a BOM aside). For a table the publisher splits across files, one per year (`delinquent_[0-9][0-9][0-9][0-9].csv`). |
 | `header_case` | str \| null | `lower` folds (and trims) the file's column headers as it is read, before schema_ok and the transforms — what the legacy rocket-etl did to every CSV, so a ported legacy schema's lower-case `load_from` names work as written. A header pair differing only in case fails. |
 | `url` | str \| null | Full URL for `http` sources. |
 | `secret_ref` | str \| null | **Name of an env var** holding `user:password` — never the secret itself. Required for `sftp`; optional HTTP Basic auth for `http`. |
@@ -228,6 +229,8 @@ derived — an ArcGIS CSV export of a polygon layer carries no geometry, so a
 | Field | Type | Notes |
 |-------|------|-------|
 | `resource_id` | str | The CKAN resource (UUID) that receives the tabular data. |
+| `resource_name` | str \| null | OR the target by NAME, looked up in `package_id` on every run — for a resource that rolls over each January (`"{now:%Y} Dog Licenses"`, `"{now-1y:%Y} Dog Licenses"`). Created on the first run that has rows; a run with no rows publishes nothing, to a new resource or an existing one. Exclusive with `resource_id`; needs `package_id` and `publish: replace`; refused with `accumulate` (the stored table would carry one year into the next). |
+| `split_by_year` | YearSplitModel \| null | Also publish the frame one resource per year: `column` (a datetime, or a column holding the year), `since` (the first year), `resource_name` (with `{year}`). Every year from `since` to the current one is published on every run (unchanged ones cost a fingerprint check); a year's resource is found by name in `package_id` and created on its first rows; a year with none is skipped. Builds a `loaded_by_year` asset beside `loaded`. |
 | `primary_key` | list[str] \| null | Required for `publish: upsert` (the upsert key) and for `accumulate` (the merge key). |
 | `rebuild` | bool | `false` | Make a `replace` DROP the DataStore table instead of truncating it. Needed for a genuine schema change; discards anything else added to the table, including `ckanext-spatialdata`'s geometry column and indexes. For a one-off, prefer launching the run with the tag `wprdc/rebuild=true` — same effect, that run only, no commit to revert. |
 

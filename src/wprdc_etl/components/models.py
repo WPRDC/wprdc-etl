@@ -41,6 +41,10 @@ class SourceModel(Model, Resolvable):
     # casing — and the county changes that casing without notice. A port of
     # such a job sets this so its schema.py can use those names as written.
     header_case: str | None = None
+    # sftp only: land EVERY file the path glob matches, concatenated into one
+    # CSV (path order; each header must match the first), instead of the
+    # newest one. For a table the publisher splits across files, one per year.
+    combine: bool = False
 
     # --- arcgis sources ---------------------------------------------------
     # An ArcGIS Hub site publishes a DCAT catalogue at <site>/data.json listing
@@ -120,6 +124,23 @@ class MirrorModel(Model, Resolvable):
     datastore: bool = False
 
 
+class YearSplitModel(Model, Resolvable):
+    """Publish the frame a second way: one CKAN resource per year.
+
+    For packages that carry the whole table AND a resource per year of it
+    ("2024 Property Sales Transactions"). Each year's rows go to the resource
+    named `resource_name` with `{year}` filled in, looked up in
+    `ckan.package_id` by name on every run, so the year that starts each
+    January needs no config change: its resource is created on the first run
+    that has rows for it. A year with no rows is skipped, never published
+    empty. Years run from `since` to the current one (Eastern).
+    """
+
+    column: str  # a datetime column (its year) or a column holding the year
+    resource_name: str  # must contain {year}
+    since: int  # the first year with a resource
+
+
 class CkanModel(Model, Resolvable):
     """The CKAN DataStore resource this dataset publishes to."""
 
@@ -130,6 +151,13 @@ class CkanModel(Model, Resolvable):
     # there, and note that doing so builds no `loaded` asset, which makes
     # `schema_ok` the only pre-publish check on that dataset.
     resource_id: str | None = None
+    # OR the target by NAME, looked up in `package_id` on every run, for a
+    # resource that rolls over each January: "{now:%Y} Dog Licenses",
+    # "{now-1y:%Y} Dog Licenses". Created on the first run that has rows;
+    # a run with none publishes nothing. Exclusive with resource_id.
+    resource_name: str | None = None
+    # Also publish the frame split by year, one resource per year.
+    split_by_year: YearSplitModel | None = None
     primary_key: list[str] | None = None  # merge/upsert key
     # drop and rebuild the table -- only necessary when changing schema
     rebuild: bool = False
