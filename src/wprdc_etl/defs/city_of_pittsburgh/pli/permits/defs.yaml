@@ -1,0 +1,118 @@
+type: wprdc_etl.components.tabular_pipeline.TabularPipeline
+
+# PLI Permits — https://data.wprdc.org/dataset/pli-permits
+# Ported from the legacy rocket-etl job old/payload/pgh/pli.py (schema
+# PermitsSchema; legacy cron `16 3 * * *`). Same public file the legacy job
+# read; its property names checked against the live file on 2026-11-04.
+#
+# ACCUMULATES on permit_id, as the legacy upsert (no wipe) did: a permit that
+# drops out of the city's file stays published. Seed it from the live
+# resource BEFORE the first publishing run (in production,
+# deploy/seed-accumulator):
+#   bin/seed-accumulator --only city_of_pittsburgh/pli/permits --write
+#
+# POSSIBLE FUTURE CHANGE — deletions. The city's file is a FULL snapshot
+# (every permit since 2019, not a delta), so a permit_id missing from it may
+# be the city's delete signal — withdrawn, voided or re-numbered — and
+# accumulating keeps those rows forever. Before switching to "drop stored
+# permits the file no longer has", check what the drop-outs are: on
+# 2026-11-04 the live table had 217 permits not in the 2026-10-27 file, but
+# 214 were 2026 permits newer than that file; only 3 (2020/2025) looked like
+# real drop-outs. Dropping them would also drop their carried-forward
+# owner_name, which can't be recovered from the feed.
+#
+# OWNER NAMES: the city's file has had no owner column since its March 2025
+# feed switch. The 48,486 owner names in the live table (permits issued
+# 2019-06 .. 2025-03) were published by the legacy job under its full
+# redaction rules, and it kept them by filling owner_name from a frozen copy
+# of its own table. Here `ckan.carry_forward` keeps each permit's stored
+# owner_name instead; new permits have none. `forbid_columns` fails the run
+# if the city starts sending owners again — they would need the legacy
+# redaction rules (pli.py OldPermitsSchema.redact_data) ported first, so
+# nothing is published until someone decides.
+
+attributes:
+  publisher: city_of_pittsburgh
+  department: pli
+  dataset: permits
+  source:
+    type: http
+    url: https://storage.googleapis.com/pghpa_open_data/agency_counter/wprdc_pli_permits.geojson
+    format: geojson
+    header_case: lower
+  schedule: "16 3 * * *"  # daily 03:16 ET
+  partition: daily
+  ingest: snapshot
+  publish: replace
+  accumulate: true
+  transforms:
+    - op: forbid_columns
+      columns: [owner_name, owner, owners, owner_names]
+      reason: >-
+        owner names need the legacy redaction rules (pli.py redact_data)
+        ported before they can be published
+    - op: point_coordinates
+      lat: latitude
+      lng: longitude
+    # the legacy clean_text_fields: collapse blank lines, trim edge newlines.
+    # Windows line endings first: the live table has none (the legacy CSV
+    # path dropped the CR), and CRLF CRLF wouldn't match a double LF.
+    # Patterns are regex ESCAPES in single quotes, not real newlines:
+    # dagster's YAML templating trims whitespace-only strings ("\n\n" came
+    # through as "\n", "\r\n" as None). `re` reads '\n' in a pattern or
+    # replacement as a newline all the same.
+    - op: regex_replace
+      columns: [work_desc, all_contractors_name]
+      pattern: '\r\n'
+      repl: '\n'
+    - op: regex_replace
+      columns: [work_desc, all_contractors_name]
+      pattern: '\n\n'
+      repl: '\n'
+    - op: regex_replace
+      columns: [work_desc, all_contractors_name]
+      pattern: '^\n|\n$'
+    - op: strip
+    - op: rename
+      mapping:
+        ext_file_num: permit_id
+        all_contractors_name: contractor_name
+        work_desc: work_description
+        type_work_desc: work_type
+        property_type: commercial_or_residential
+        total_proj_value: total_project_value
+        parc_num: parcel_num
+        zipcode: zip_code
+    - op: add_column
+      name: owner_name
+    - op: coerce_text
+      columns: [
+        permit_id, permit_type, owner_name, contractor_name, work_description,
+        work_type, commercial_or_residential, parcel_num, address,
+        council_district, neighborhood, ward, zip_code, status,
+      ]
+    - op: coerce_numeric  # whole dollars, as the legacy round_value did
+      columns: [total_project_value]
+      round_to: 0
+      integer: true
+    - op: coerce_numeric
+      columns: [latitude, longitude]
+    - op: to_datetime  # "2021-12-08T00:00:00-05:00": the reader hands it over in UTC
+      columns: [issue_date]
+      tz: America/New_York
+      date_only: true
+    - op: drop_nulls
+      columns: [permit_id]
+    - op: select
+      columns: [
+        permit_id, permit_type, owner_name, contractor_name, work_description,
+        work_type, commercial_or_residential, total_project_value, issue_date,
+        parcel_num, address, latitude, longitude, council_district,
+        neighborhood, ward, zip_code, status,
+      ]
+  geocode: false
+  ckan:
+    package_id: "d0427f19-7303-43e0-b856-a58130d8cf92"  # pli-permits
+    resource_id: "f4d1177a-f597-4c32-8cbf-7885f56253f6"  # PLI Permits
+    primary_key: [permit_id]
+    carry_forward: [owner_name]

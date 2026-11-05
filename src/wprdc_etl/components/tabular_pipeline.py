@@ -180,6 +180,18 @@ class TabularPipeline(Component, Model, Resolvable):
                     "publish 'replace' to publish the accumulated table as a file, "
                     "or drop accumulate."
                 )
+        if cfg.ckan and cfg.ckan.carry_forward:
+            if not accumulate:
+                raise ValueError(
+                    f"{stem}: ckan.carry_forward keeps values from the stored "
+                    "table, so it needs accumulate"
+                )
+            clash = set(cfg.ckan.carry_forward) & set(cfg.ckan.primary_key or [])
+            if clash:
+                raise ValueError(
+                    f"{stem}: ckan.carry_forward can't include the merge key "
+                    f"{sorted(clash)}"
+                )
         if cfg.ckan and cfg.ckan.bool_format not in BOOL_FORMATS:
             raise ValueError(
                 f"{stem}: ckan.bool_format must be one of {BOOL_FORMATS}, "
@@ -266,6 +278,8 @@ class TabularPipeline(Component, Model, Resolvable):
             validated_resources.add("geocoder")
         if "spatial" in steps_need(cfg.transforms):
             validated_resources.add("spatial")
+        if "ckan" in steps_need(cfg.transforms):
+            validated_resources.add("ckan")
 
         @dg.asset(
             key=[*key_prefix, "validated"],
@@ -286,6 +300,8 @@ class TabularPipeline(Component, Model, Resolvable):
             deps: dict[str, Any] = {"context": context}
             if "spatial" in validated_resources:
                 deps["spatial"] = context.resources.spatial
+            if "ckan" in validated_resources:
+                deps["ckan"] = context.resources.ckan
             return _transform(df, cfg, deps=deps)
 
         # -- accumulated --------------------------------------------------
@@ -319,7 +335,12 @@ class TabularPipeline(Component, Model, Resolvable):
                     ),
                     stem,
                 )
-                merged = merge_into_table(prior, validated_df, cfg.ckan.primary_key)
+                merged = merge_into_table(
+                    prior,
+                    validated_df,
+                    cfg.ckan.primary_key,
+                    carry_forward=cfg.ckan.carry_forward,
+                )
                 landing.write_table_state(
                     publisher, dataset, merged, department=cfg.department
                 )

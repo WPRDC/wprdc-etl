@@ -195,14 +195,18 @@ mutated.
 | `op` | Params | Effect |
 |------|--------|--------|
 | `iso_date` | `columns`, `fmt` (optional) | Parse and re-render as ISO 8601 `YYYY-MM-DD`. Unparseable values become NaT. |
-| `to_datetime` | `columns`, `fmt` (optional) | Parse into real (tz-naive) datetimes; unparseable becomes NaT. Use it for a column the live table types `timestamp`/`date` — iso_date writes text, which the column guard reads as a retype — and for a timestamp in an accumulating dataset's merge key (it matches what `bin/seed-accumulator` stores). A tz-aware value keeps its UTC wall time. |
+| `to_datetime` | `columns`, `fmt`, `tz`, `date_only` (optional) | Parse into real (tz-naive) datetimes; unparseable becomes NaT. Use it for a column the live table types `timestamp`/`date` — iso_date writes text, which the column guard reads as a retype — and for a timestamp in an accumulating dataset's merge key (it matches what `bin/seed-accumulator` stores). A tz-aware value keeps its UTC wall time. `tz` converts an aware value to that zone before dropping the zone — a GeoJSON reader hands ISO datetimes with an offset over in UTC, so midnight Eastern would become 04:00/05:00; `date_only` then drops the time of day (a live `date` column). |
 | `point_coordinates` | `lat`, `lng` (default `latitude` / `longitude`) | Point GeoDataFrame -> plain table: the coordinates become two columns and the geometry is dropped. For a GeoJSON source published as a CSV DataStore table. Non-point geometry gives NA. |
 | `strip` | `columns` (optional) | Trim leading/trailing whitespace. With no `columns`, every object-dtype column; non-string values pass through. |
 | `rename` | `mapping` | Rename columns via `{old: new}`. |
-| `coerce_numeric` | `columns` | To numeric; non-numeric becomes NaN. |
+| `coerce_numeric` | `columns`, `round_to`, `integer` (optional) | To numeric; non-numeric becomes NaN. `round_to: n` rounds (half to even); `integer: true` gives nullable integers, so a column with blanks publishes `3`, not `3.0` — a fractional value fails. |
 | `coerce_text` | `columns` | To nullable string — the inverse of `coerce_numeric`. `1011` renders `"1011"`, not `"1011.0"`, and a large integral float keeps every digit (`14123512345`, not `1.41235e+10`); missing stays NA. For ids/codes a CSV parser reads as numbers (zip, FIPS, district, account id). |
 | `drop_nulls` | `columns` | Drop rows null in any named column (e.g. a missing key). |
 | `drop_duplicates` | `columns` (optional), `keep` (`last` \| `first`) | Drop rows repeating an earlier row's values in `columns` (every column when unset). What a legacy upsert on a key did to a file with repeated rows, for a snapshot that now publishes the file whole. |
+| `regex_replace` | `columns`, `pattern`, `repl` (default `""`) | Regex substitution in text columns; non-strings pass through. |
+| `add_column` | `name`, `value` (default missing) | Add a column if absent — for one the table keeps but the source no longer sends (pair with `ckan.carry_forward`). |
+| `forbid_columns` | `columns`, `reason` | Fail the run (no retries) if the source has any of them: a tripwire for a column that must not be published as it arrives (PLI permits' owner names). |
+| `redact_homestead_owners` | `owner`, `parcel`, `resource_id` (+ `parcel_key`, `flag_column`, `flag`) | Blank `owner` unless the parcel is in property assessments (`resource_id`, on the CKAN being published to) and not homestead-exempt — the legacy condemned-properties rule. Fails closed: a failed lookup fails the step, and finding under half the parcels fails without retries. `@needs("ckan")`. |
 | `fill_na` | `value`, `columns` (optional) | Fill NA with a constant, on named columns or the whole frame. |
 | `select` | `columns` | Keep only the named columns that exist, in order. |
 | `drop_columns` | `columns` | Remove the named columns if present. |

@@ -921,6 +921,59 @@ class CkanResource(dg.ConfigurableResource):
         CKAN's internal _id / _full_text fields."""
         return {k: f["type"] for k, f in self._datastore_state(resource_id)[0].items()}
 
+    def lookup(
+        self,
+        resource_id: str,
+        key: str,
+        values: list[str],
+        fields: list[str],
+        batch: int = 500,
+    ) -> dict[str, dict[str, Any]]:
+        """{key value: row} for the rows of a DataStore table whose `key` is
+        one of `values`, with just `fields` (plus the key). A read.
+
+        `datastore_search` with a list filter (SQL `IN`), POSTed so a few
+        hundred ids don't make a URL the WAF refuses, in batches. A value
+        with no row is simply absent from the result. A resource with NO
+        table raises instead of answering "nothing found": a caller deciding
+        from absence (the homestead redaction) must not mistake a missing
+        table for a table without those rows.
+        """
+        import requests
+
+        wanted = list(dict.fromkeys(v for v in values if v not in (None, "")))
+        out: dict[str, dict[str, Any]] = {}
+        columns = list(dict.fromkeys([key, *fields]))
+        for i in range(0, len(wanted), batch):
+            chunk = wanted[i : i + batch]
+            offset = 0
+            while True:
+                try:
+                    result = self._action(
+                        "datastore_search",
+                        json={
+                            "resource_id": resource_id,
+                            "filters": {key: chunk},
+                            "fields": columns,
+                            "limit": 32000,
+                            "offset": offset,
+                        },
+                    )
+                except requests.HTTPError as e:
+                    if e.response is not None and e.response.status_code == 404:
+                        raise RuntimeError(
+                            f"lookup: resource {resource_id} has no DataStore "
+                            f"table at {self.base_url}"
+                        ) from e
+                    raise
+                records = result.get("records", [])
+                for r in records:
+                    out[str(r[key])] = r
+                offset += len(records)
+                if not records or offset >= result.get("total", 0):
+                    break
+        return out
+
     def _datastore_state(
         self, resource_id: str
     ) -> tuple[dict[str, dict[str, Any]], int]:

@@ -244,6 +244,24 @@ genuinely dataset-specific logic.
   Eastern** — not the partition (a monthly partition names the month that
   just ended). It's for publishers that put the current year/month in the
   filename.
+- **Owner names: redact or refuse, never publish on doubt.**
+  `redact_homestead_owners` (condemned properties) blanks an owner unless
+  the parcel is in property assessments and NOT homestead-exempt; a failed
+  lookup fails the step, and one that finds under half the parcels fails
+  without retries (an empty table would blank everything silently). PLI
+  permits has no owner column in its feed: `ckan.carry_forward` keeps the
+  names already published, and `forbid_columns` stops the run if the city
+  sends owners again — the legacy `redact_data` rules aren't ported. Don't
+  remove either to "fix" a failing run.
+- **Dagster's YAML templating trims whitespace-only strings.** A step param
+  written as a real `"\r\n"` arrives as `None`, and `"\n\n"` as `"\n"` —
+  `yaml.safe_load` shows the right value, so a script that reads the YAML
+  directly won't catch it. Write regex params as escapes in single quotes
+  (`pattern: '\r\n'`, `repl: '\n'`); `re` reads them the same. The
+  `regex_replace` load-time check rejects a mangled pattern or repl.
+- **A GeoJSON reader hands offset datetimes over in UTC.** `2024-08-19T00:00:00-04:00`
+  arrives as 04:00 UTC, and `to_datetime` keeps that wall time unless told
+  `tz: America/New_York` (plus `date_only: true` for a `date` column).
 - **Per-year resources are addressed by name, not id.** Three packages
   carry a resource per year (dog licenses, property sales, delinquent
   taxes), and a new one appears each January. `ckan.resource_name`

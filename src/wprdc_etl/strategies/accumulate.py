@@ -26,6 +26,7 @@ def merge(
     prior: pd.DataFrame | None,
     delta: pd.DataFrame,
     primary_key: list[str],
+    carry_forward: list[str] | None = None,
 ) -> pd.DataFrame:
     """Return the canonical table after folding `delta` into `prior`.
 
@@ -39,6 +40,11 @@ def merge(
 
     Rows are NOT deleted — a delta can't express a deletion. Same limitation the
     DataStore upsert path has.
+
+    `carry_forward` columns are the exception to "the delta wins": where the
+    incoming value is missing, the stored row's value is kept. For a column
+    the source no longer supplies but the table must keep (PLI permits'
+    `owner_name`, which only the stored table still has).
     """
     if not primary_key:
         raise ValueError("accumulate requires ckan.primary_key — it's the merge key")
@@ -62,9 +68,34 @@ def merge(
         ignore_index=True,
     )
     # keep="last" => the delta's copy of a key wins over the stored one.
-    return combined.drop_duplicates(subset=primary_key, keep="last").reset_index(
+    merged = combined.drop_duplicates(subset=primary_key, keep="last").reset_index(
         drop=True
     )
+    if carry_forward:
+        merged = _carry_forward(merged, prior, primary_key, carry_forward)
+    return merged
+
+
+def _carry_forward(
+    merged: pd.DataFrame,
+    prior: pd.DataFrame,
+    primary_key: list[str],
+    columns: list[str],
+) -> pd.DataFrame:
+    """Fill `columns` in `merged` from `prior` (by key) where merged is missing."""
+    missing = [c for c in columns if c not in prior.columns]
+    if missing:
+        raise ValueError(
+            f"accumulate: carry_forward column(s) {missing} are not in the "
+            "stored table, so there is nothing to carry forward"
+        )
+    stored = prior.drop_duplicates(subset=primary_key, keep="last").set_index(
+        primary_key
+    )[columns]
+    keyed = merged.set_index(primary_key)
+    for c in columns:
+        keyed[c] = keyed[c].fillna(stored[c].reindex(keyed.index))
+    return keyed.reset_index()[list(merged.columns)]
 
 
 def _require_columns(df: pd.DataFrame, primary_key: list[str], what: str) -> None:

@@ -159,6 +159,10 @@ class CkanModel(Model, Resolvable):
     # Also publish the frame split by year, one resource per year.
     split_by_year: YearSplitModel | None = None
     primary_key: list[str] | None = None  # merge/upsert key
+    # accumulate only: columns whose STORED value is kept where the incoming
+    # row has none — for a column the source stopped supplying but the
+    # table keeps (PLI permits' owner_name).
+    carry_forward: list[str] | None = None
     # drop and rebuild the table -- only necessary when changing schema
     rebuild: bool = False
     # How boolean columns are published by a replace: "text" (True/False, the

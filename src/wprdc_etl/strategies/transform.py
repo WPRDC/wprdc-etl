@@ -66,7 +66,11 @@ def iso_date(
 
 
 def to_datetime(
-    df: pd.DataFrame, columns: list[str], fmt: str | None = None
+    df: pd.DataFrame,
+    columns: list[str],
+    fmt: str | None = None,
+    tz: str | None = None,
+    date_only: bool = False,
 ) -> pd.DataFrame:
     """Parse columns into real (tz-naive) datetimes. Unparseable -> NaT.
 
@@ -75,12 +79,24 @@ def to_datetime(
     reads a text column against a live timestamp as a retype) and a timestamp
     in an accumulating dataset's merge key compares equal to the copy
     `bin/seed-accumulator` stored.
+
+    A tz-aware value keeps its wall time in whatever zone it was parsed in —
+    for a GeoJSON source that is UTC (the reader normalises offsets), so
+    midnight Eastern becomes 04:00/05:00. `tz: America/New_York` converts to
+    that zone first; `date_only: true` then drops the time of day, for a
+    column the live table holds as a `date`.
     """
     for c in columns:
         if c in df.columns:
-            parsed = pd.to_datetime(df[c], format=fmt, errors="coerce")
+            parsed = pd.to_datetime(
+                df[c], format=fmt, errors="coerce", utc=tz is not None
+            )
             if getattr(parsed.dt, "tz", None) is not None:
+                if tz is not None:
+                    parsed = parsed.dt.tz_convert(tz)
                 parsed = parsed.dt.tz_localize(None)
+            if date_only:
+                parsed = parsed.dt.normalize()
             df[c] = parsed
     return df
 
@@ -131,11 +147,35 @@ def rename(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
     return _repoint_geometry(df.rename(columns=mapping), active, mapping.get(active))
 
 
-def coerce_numeric(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    """Coerce columns to numeric; non-numeric -> NaN."""
+def coerce_numeric(
+    df: pd.DataFrame,
+    columns: list[str],
+    integer: bool = False,
+    round_to: int | None = None,
+) -> pd.DataFrame:
+    """Coerce columns to numeric; non-numeric -> NaN.
+
+    `round_to: n` rounds to n decimal places (half to even, as Python's
+    round does). `integer: true` makes them nullable integers, so a column
+    with blanks still publishes `3`, not `3.0`; a value with a fractional
+    part fails rather than being truncated — round it first (`round_to: 0`).
+    """
     for c in columns:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
+        if c not in df.columns:
+            continue
+        values = pd.to_numeric(df[c], errors="coerce")
+        if round_to is not None:
+            values = values.round(round_to)
+        if integer:
+            fractional = values.notna() & (values % 1 != 0)
+            if fractional.any():
+                raise ValueError(
+                    f"coerce_numeric: {c!r} has {int(fractional.sum())} "
+                    f"non-whole value(s) (e.g. {values[fractional].iloc[0]}) "
+                    "but integer: true"
+                )
+            values = values.astype("Int64")
+        df[c] = values
     return df
 
 
@@ -192,6 +232,127 @@ def drop_duplicates(
         if missing:
             raise ValueError(f"drop_duplicates: no column(s) {missing}")
     return df.drop_duplicates(subset=columns or None, keep=keep).reset_index(drop=True)
+
+
+def add_column(df: pd.DataFrame, name: str, value: Any = None) -> pd.DataFrame:
+    """Add column `name` holding `value` (missing by default), if absent.
+
+    For a column the published table keeps but the source no longer
+    supplies, so the frame's shape doesn't depend on the source (pair it
+    with `ckan.carry_forward` to keep the stored values).
+    """
+    if name not in df.columns:
+        df[name] = pd.Series(
+            [value] * len(df),
+            index=df.index,
+            dtype="string" if value is None or isinstance(value, str) else None,
+        )
+    return df
+
+
+def forbid_columns(df: pd.DataFrame, columns: list[str], reason: str) -> pd.DataFrame:
+    """Fail the run if the source has any of `columns` — a tripwire.
+
+    For a column whose values must not be published as they arrive, and
+    that the source doesn't send today (PLI permits' owner names: if the
+    city sends them again, they need redaction rules first). No retries:
+    the column will still be there in a minute.
+    """
+    import dagster as dg
+
+    present = [c for c in columns if c in df.columns]
+    if present:
+        raise dg.Failure(
+            f"the source now has column(s) {present}: {reason}",
+            allow_retries=False,
+        )
+    return df
+
+
+def regex_replace(
+    df: pd.DataFrame, columns: list[str], pattern: str, repl: str = ""
+) -> pd.DataFrame:
+    """Replace regex `pattern` with `repl` in text columns; non-strings and
+    missing values pass through. `\\1`-style backreferences work in `repl`."""
+    import re
+
+    rx = re.compile(pattern)
+    for c in columns:
+        if c not in df.columns:
+            raise ValueError(f"regex_replace: no column {c!r}")
+        df[c] = df[c].map(lambda v: rx.sub(repl, v) if isinstance(v, str) else v)
+    return df
+
+
+# Below this share of parcels found, the lookup table is presumed wrong or
+# empty rather than the parcels unknown.
+_MIN_PARCELS_FOUND = 0.5
+
+
+@needs("ckan", "context")
+def redact_homestead_owners(
+    df: pd.DataFrame,
+    owner: str,
+    parcel: str,
+    resource_id: str,
+    ckan: Any = None,
+    context: Any = None,
+    parcel_key: str = "PARID",
+    flag_column: str = "HOMESTEADFLAG",
+    flag: str = "HOM",
+) -> pd.DataFrame:
+    """Blank `owner` where the parcel is homestead-exempt — someone lives
+    there — or can't be checked.
+
+    The legacy condemned-properties job's rule, kept exactly: look the
+    parcel up in the property-assessments table (`resource_id`, on the CKAN
+    the pipeline publishes to) and redact when its `flag_column` is `flag`,
+    when the parcel is missing from the table, or when the row has no parcel
+    id. Fails closed: any lookup error fails the step, so nothing is
+    published unredacted. Verified 2026-11-04 against the live table: it
+    reproduces all 584 blanks among 3,594 condemned properties.
+
+    A lookup that finds under half of the parcels fails too (no retries): the
+    table is presumably empty or the wrong resource, and blanking every
+    owner would quietly gut the column.
+    """
+    import dagster as dg
+
+    if owner not in df.columns or parcel not in df.columns:
+        raise ValueError(
+            f"redact_homestead_owners: needs columns {owner!r} and {parcel!r} "
+            f"(has {list(df.columns)})"
+        )
+    named = df[owner].notna() & (df[owner].astype("string").str.strip() != "")
+    pins = df[parcel].astype("string").str.strip()
+    wanted = sorted(set(pins[named & pins.notna() & (pins != "")]))
+    try:
+        found = ckan.lookup(resource_id, parcel_key, wanted, [flag_column])
+    except Exception as e:
+        raise dg.Failure(
+            f"redact_homestead_owners: couldn't read homestead flags from "
+            f"{resource_id}; publishing nothing rather than unredacted owners "
+            f"({type(e).__name__}: {e})"
+        ) from e
+    if len(wanted) >= 50 and len(found) < _MIN_PARCELS_FOUND * len(wanted):
+        raise dg.Failure(
+            f"redact_homestead_owners: only {len(found)} of {len(wanted)} "
+            f"parcels found in {resource_id} — is it the property-assessments "
+            "table, and is it loaded?",
+            allow_retries=False,
+        )
+    homestead = {p for p, r in found.items() if (r.get(flag_column) or "") == flag}
+    keep = pins.isin(set(found) - homestead).fillna(False)
+    redact = named & ~keep
+    df[owner] = df[owner].astype("string").mask(redact | ~named)  # blanks too
+    if context is not None:
+        missing = len(set(wanted) - set(found))
+        context.log.info(
+            f"redact_homestead_owners: blanked {int(redact.sum())} of "
+            f"{int(named.sum())} owners ({len(homestead)} homestead parcels, "
+            f"{missing} parcels not in the assessments table)"
+        )
+    return df
 
 
 def fill_na(
@@ -474,6 +635,10 @@ PRIMITIVES: dict[str, Primitive] = {
     "coerce_text": coerce_text,
     "drop_nulls": drop_nulls,
     "drop_duplicates": drop_duplicates,
+    "regex_replace": regex_replace,
+    "add_column": add_column,
+    "forbid_columns": forbid_columns,
+    "redact_homestead_owners": redact_homestead_owners,
     "fill_na": fill_na,
     "select": select,
     "drop_columns": drop_columns,
@@ -483,8 +648,29 @@ PRIMITIVES: dict[str, Primitive] = {
     "join_geometry": join_geometry,
 }
 
+
 # Ops whose params need more than a name check at load time.
+def _regex_params(params: dict[str, Any]) -> None:
+    """Checked on the RESOLVED step, i.e. after dagster's YAML templating,
+    which trims whitespace-only strings: a pattern written as a real "\r\n"
+    arrives as None. Write patterns as regex escapes ('\r\n') instead."""
+    pattern, repl = params.get("pattern"), params.get("repl", "")
+    if not isinstance(pattern, str) or not pattern:
+        raise ValueError(
+            f"regex_replace: pattern {pattern!r} isn't a non-empty string — a "
+            "whitespace-only pattern is trimmed by the YAML templating; write "
+            "it as a regex escape in single quotes ('\\r\\n')"
+        )
+    if not isinstance(repl, str):
+        raise ValueError(
+            f"regex_replace: repl {repl!r} isn't a string (a whitespace-only "
+            "repl is trimmed to nothing; write it as an escape, '\\n')"
+        )
+    re.compile(pattern)
+
+
 _STEP_VALIDATORS: dict[str, Callable[[dict[str, Any]], Any]] = {
+    "regex_replace": _regex_params,
     "reverse_geocode": lambda params: _region_specs(params.get("regions")),
     "join_geometry": _key_format,
 }

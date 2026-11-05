@@ -68,6 +68,9 @@ before their first publishing run — `deploy/seed-accumulator`, ROLLOUT §4.
 - [x] city-owned-property (`d93bb0b3`) → `city_of_pittsburgh/finance/city_owned_property`
 - [x] city-of-pittsburgh-signalized-intersections → `city_of_pittsburgh/signalized_intersections` (current Cartegraph export)
 - [x] playground-equipment → `city_of_pittsburgh/playground_equipment` (monthly `{now:%m-%Y}.csv`)
+- [x] condemned-properties → `city_of_pittsburgh/pli/condemned_properties` (+ GeoJSON representation), owners of homestead parcels blanked by `redact_homestead_owners`: reproduces the live table's 584 blanks of 3,594 exactly (2026-11-04)
+- [x] pli-permits → `city_of_pittsburgh/pli/permits` *(accumulate)*. The feed has no owner column since 2025-03; the 27,786 owner names already published (permits to 2025-03-24) are kept by `ckan.carry_forward`, and `forbid_columns` fails the run if owners reappear in the feed (the legacy `redact_data` rules would need porting first)
+  - follow-up: the city file is a full snapshot, so a permit missing from it may be a deletion; accumulating keeps it forever. See the note in its defs.yaml before changing that.
 
 ### Others
 
@@ -83,10 +86,6 @@ before their first publishing run — `deploy/seed-accumulator`, ROLLOUT §4.
 
 - [ ] filed-property-assessment-appeals — XLS input (no Excel reader) and a new resource per year
 - [ ] gtfs-archive — a new resource per feed version
-
-### Privacy logic to port first
-
-- [ ] condemned-properties, pli-permits — the legacy jobs blank the owner of homestead-exempt parcels by looking each parcel up in property assessments. Porting without that would publish homeowners' names.
 
 ### Stateful custom processing, not a file-to-table ETL
 
