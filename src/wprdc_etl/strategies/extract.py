@@ -445,7 +445,7 @@ def is_arcgis_pending(head: bytes) -> bool:
         return False
     try:
         doc = json.loads(head.decode("utf-8", "replace"))
-    except (ValueError, UnicodeDecodeError):
+    except ValueError, UnicodeDecodeError:
         return False
     if not isinstance(doc, dict) or "status" not in doc:
         return False

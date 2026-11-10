@@ -1,6 +1,6 @@
 [project]
 name = "wprdc_etl"
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.14,<3.15"
 version = "0.1.0"
 # Dagster core + libraries are pinned EXACTLY: a minor bump changes the
 # run/event/schedule Postgres schema and requires `dagster instance migrate`

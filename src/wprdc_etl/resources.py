@@ -1712,7 +1712,7 @@ def _json_safe(value: Any) -> Any:
     try:
         if pd.isna(value):
             return None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         pass  # arrays and the like aren't scalar-NA testable
     return str(value)
 

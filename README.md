@@ -93,7 +93,7 @@ wprdc-etl/
 
 ## Getting started
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.14 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync                          # install deps into .venv

@@ -2,7 +2,7 @@
 # `uv sync --no-dev` -> no `dg` CLI / questionary / pytest / black, but keeps
 # dagster-webserver (it's a real dependency for this deployment).
 
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

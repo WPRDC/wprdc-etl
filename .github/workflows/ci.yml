@@ -43,7 +43,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0  # no floating major tags since v8
         with:
           version: "0.12.7"
-      - run: uv python install 3.11
+      - run: uv python install 3.14
       - run: uv sync --frozen
 
       - name: create buckets

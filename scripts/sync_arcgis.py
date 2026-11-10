@@ -981,7 +981,7 @@ def is_table(entry: dict[str, Any] | None) -> bool | None:
         resp = requests.get(url, params={"f": "json"}, timeout=60)
         resp.raise_for_status()
         return resp.json().get("type") == "Table"
-    except (requests.RequestException, ValueError):
+    except requests.RequestException, ValueError:
         return None
 
 
